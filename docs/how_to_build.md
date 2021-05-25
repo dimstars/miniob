@@ -29,7 +29,19 @@ make
 sudo make install
 ```
 
-4. build miniob
+4. build jsoncpp
+```shell
+cd deps
+git submodule add https://github.com/open-source-parsers/jsoncpp.git
+cd jsoncpp
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+5. build miniob
 
 ```shell
 cd `project home`

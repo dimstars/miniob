@@ -219,7 +219,11 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
       const char *table_name = sql->sstr.desc_table.table_name;
       Table *table = handler_->find_table(current_db, table_name);
       std::stringstream ss;
-      table->table_meta().desc(ss);
+      if (table != nullptr) {
+        table->table_meta().desc(ss);
+      } else {
+        ss << "No such table: " << table_name << std::endl;
+      }
       snprintf(response, sizeof(response), "%s", ss.str().c_str());
     }
     break;

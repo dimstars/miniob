@@ -279,6 +279,18 @@ bool match_table(const Selects &selects, const char *table_name_in_condition, co
   return selects.nConditions == 1;
 }
 
+static RC schema_add_field(Table *table, const char *field_name, TupleSchema &schema) {
+  const FieldMeta *field_meta = table->table_meta().field(field_name);
+  if (nullptr == field_meta) {
+    // TODO 返回客户端
+    LOG_WARN("No such field. %s.%s", table->name(), field_name);
+    return RC::SCHEMA_FIELD_MISSING;
+  }
+
+  schema.add_if_not_exists(field_meta->type(), table->name(), field_meta->name());
+  return RC::SUCCESS;
+}
+
 // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
 RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node) {
   // 列出跟这张表关联的Attr
@@ -299,14 +311,27 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         break; // TODO 没有校验，给出* 之后，再写字段的错误
       } else {
         // 列出这张表相关字段
-        const FieldMeta *field_meta = table->table_meta().field(attr.attrName);
-        if (nullptr == field_meta) {
-          // TODO 返回客户端
-          LOG_WARN("No such field. %s.%s.%s", db, table_name, attr.attrName);
-          return RC::SCHEMA_FIELD_MISSING;
+        RC rc = schema_add_field(table, attr.attrName, schema);
+        if (rc != RC::SUCCESS) {
+          return rc;
         }
+      }
+    }
+  }
 
-        schema.add(field_meta->type(), table_name, field_meta->name());
+  // 把所有condition中的属性也加入进来
+  for (int i = 0; i < selects.nConditions; i++) {
+    const Condition &condition = selects.conditions[i];
+    if (condition.bLhsIsAttr == 1 && match_table(selects, condition.lhsAttr.relName, table_name)) {
+      RC rc = schema_add_field(table, condition.lhsAttr.attrName, schema);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+    }
+    if (condition.bRhsIsAttr == 1 && match_table(selects, condition.rhsAttr.relName, table_name)) {
+      RC rc = schema_add_field(table, condition.rhsAttr.attrName, schema);
+      if (rc != RC::SUCCESS) {
+        return rc;
       }
     }
   }

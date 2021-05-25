@@ -218,7 +218,7 @@ RC JoinExeNode::init(const std::vector<TupleSet> &tuple_set_list, TupleSchema &&
   } else {
     condition_filter_ = condition_filter;
   }
-  return RC::SUCCESS;
+  return rc;
 }
 
 RC JoinExeNode::execute(TupleSet &tuple_set) {

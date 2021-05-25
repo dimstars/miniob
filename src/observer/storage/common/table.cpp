@@ -208,7 +208,15 @@ RC Table::insert_record(Trx *trx, Record *record) {
   }
 
   if (trx != nullptr) {
-    rc = trx->insert_record(this, record);
+    Record phy_record;
+    rc = record_handler_->get_record(&record->rid, &phy_record);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to get record. rid=%d.%d, rc=%d:%s",
+                record->rid.page_num, record->rid.slot_num, rc, strrc(rc));
+      // TODO rollback
+      return rc;
+    }
+    rc = trx->insert_record(this, &phy_record);
     if (rc != RC::SUCCESS) {
       RC rc2 = record_handler_->delete_record(&record->rid);
       if (rc2 != RC::SUCCESS) {

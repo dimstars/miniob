@@ -107,6 +107,8 @@ private:
   void delete_operation(Table *table, const RID &rid);
 
 private:
+  void start_if_not_started();
+private:
   int32_t  trx_id_;
   std::unordered_map<Table *, OperationSet> operations_; // TODO set
 };

@@ -57,6 +57,8 @@ RC Trx::insert_record(Table *table, Record *record) {
     return RC::GENERIC_ERROR; // TODO error code
   }
 
+  start_if_not_started();
+
   // 设置record中trx_field为当前的事务号
   set_record_trx_id(table, record, trx_id_, false);
   // 记录到operations中
@@ -66,6 +68,7 @@ RC Trx::insert_record(Table *table, Record *record) {
 
 RC Trx::delete_record(Table *table, Record *record) {
   RC rc = RC::SUCCESS;
+  start_if_not_started();
   Operation *old_oper = find_operation(table, record->rid);
   if (old_oper != nullptr) {
     if (old_oper->type() == Operation::Type::INSERT) {
@@ -166,6 +169,7 @@ RC Trx::commit() {
   }
 
   operations_.clear();
+  trx_id_ = 0;
   return rc;
 }
 
@@ -208,6 +212,7 @@ RC Trx::rollback() {
   }
 
   operations_.clear();
+  trx_id_ = 0;
   return rc;
 }
 
@@ -231,5 +236,11 @@ bool Trx::is_visible(Table *table, const Record *record) {
     return !record_deleted;
   }
 
-  return false;
+  return record_deleted; // 当前记录上面有事务号，说明是未提交数据，那么如果有删除标记的话，就表示是未提交的删除
+}
+
+void Trx::start_if_not_started() {
+  if (trx_id_ == 0) {
+    trx_id_ = next_trx_id();
+  }
 }

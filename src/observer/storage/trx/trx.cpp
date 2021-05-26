@@ -20,6 +20,7 @@
 #include <atomic>
 
 #include "storage/trx/trx.h"
+#include "storage/lock/lock.h"
 #include "storage/common/table.h"
 #include "storage/common/record_manager.h"
 #include "storage/common/field_meta.h"
@@ -49,6 +50,18 @@ int Trx::trx_field_len() {
   return sizeof(int32_t);
 }
 
+Trx::Trx() {
+  table_locks_ = new TableLocksInTrx(this);
+  record_locks_ = new RecordLocksInTrx(this);
+}
+
+Trx::~Trx() {
+  delete table_locks_;
+  table_locks_ = nullptr;
+  delete record_locks_;
+  record_locks_ = nullptr;
+}
+
 RC Trx::insert_record(Table *table, Record *record) {
   RC rc = RC::SUCCESS;
   // 先校验是否以前是否存在过(应该不会存在) TODO
@@ -60,7 +73,7 @@ RC Trx::insert_record(Table *table, Record *record) {
   start_if_not_started();
 
   // 设置record中trx_field为当前的事务号
-  set_record_trx_id(table, record, trx_id_, false);
+  // set_record_trx_id(table, record, trx_id_, false);
   // 记录到operations中
   insert_operation(table, Operation::Type::INSERT, record->rid);
   return rc;
@@ -78,23 +91,23 @@ RC Trx::delete_record(Table *table, Record *record) {
       return RC::GENERIC_ERROR; // TODO error code
     }
   }
-  set_record_trx_id(table, record, trx_id_, true);
+  set_record_trx_id(table, *record, trx_id_, true);
   insert_operation(table, Operation::Type::DELETE, record->rid);
   return rc;
 }
 
-void Trx::set_record_trx_id(Table *table, Record *record, int32_t trx_id, bool deleted) const {
+void Trx::set_record_trx_id(Table *table, Record &record, int32_t trx_id, bool deleted) const {
   const FieldMeta *trx_field = table->table_meta().trx_field();
-  int32_t *ptrx_id = (int32_t*)(record->data + trx_field->offset());
+  int32_t *ptrx_id = (int32_t*)(record.data + trx_field->offset());
   if (deleted) {
     trx_id |= DELETED_FLAG_BIT_MASK;
   }
   *ptrx_id = trx_id;
 }
 
-void Trx::get_record_trx_id(Table *table, const Record *record, int32_t &trx_id, bool &deleted) {
+void Trx::get_record_trx_id(Table *table, const Record &record, int32_t &trx_id, bool &deleted) {
   const FieldMeta *trx_field = table->table_meta().trx_field();
-  int32_t trx = *(int32_t*)(record->data + trx_field->offset());
+  int32_t trx = *(int32_t*)(record.data + trx_field->offset());
   trx_id = trx & TRX_ID_BIT_MASK;
   deleted = (trx & DELETED_FLAG_BIT_MASK) != 0;
 }
@@ -170,6 +183,7 @@ RC Trx::commit() {
 
   operations_.clear();
   trx_id_ = 0;
+  LockManager::instance().unlock(this);
   return rc;
 }
 
@@ -213,23 +227,24 @@ RC Trx::rollback() {
 
   operations_.clear();
   trx_id_ = 0;
+  LockManager::instance().unlock(this);
   return rc;
 }
 
 RC Trx::commit_insert(Table *table, Record &record) {
-  set_record_trx_id(table, &record, 0, false);
+  set_record_trx_id(table, record, 0, false);
   return RC::SUCCESS;
 }
 
 RC Trx::rollback_delete(Table *table, Record &record) {
-  set_record_trx_id(table, &record, 0, false);
+  set_record_trx_id(table, record, 0, false);
   return RC::SUCCESS;
 }
 
 bool Trx::is_visible(Table *table, const Record *record) {
   int32_t record_trx_id;
   bool record_deleted;
-  get_record_trx_id(table, record, record_trx_id, record_deleted);
+  get_record_trx_id(table, *record, record_trx_id, record_deleted);
 
   // 0 表示这条数据已经提交
   if (0 == record_trx_id || record_trx_id == trx_id_) {
@@ -239,8 +254,27 @@ bool Trx::is_visible(Table *table, const Record *record) {
   return record_deleted; // 当前记录上面有事务号，说明是未提交数据，那么如果有删除标记的话，就表示是未提交的删除
 }
 
+void Trx::init_trx_info(Table *table, Record &record) {
+  set_record_trx_id(table, record, trx_id_, false);
+}
+
 void Trx::start_if_not_started() {
   if (trx_id_ == 0) {
     trx_id_ = next_trx_id();
   }
+}
+
+TableLocksInTrx &Trx::table_locks() {
+  return *table_locks_;
+}
+RecordLocksInTrx &Trx::record_locks() {
+  return *record_locks_;
+}
+
+void Trx::wait(std::unique_lock<std::mutex> &mutex) {
+  lock_waiter_.wait(mutex);
+}
+
+void Trx::wakeup() {
+  lock_waiter_.notify_one();
 }

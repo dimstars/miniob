@@ -51,8 +51,8 @@ RC DiskBufferPool::create_file(const char *file_name) {
 
   BPFileSubHeader *fileSubHeader;
   fileSubHeader = (BPFileSubHeader *)page.data;
-  fileSubHeader->allocatedPages = 1;
-  fileSubHeader->pageCount = 1;
+  fileSubHeader->allocated_pages = 1;
+  fileSubHeader->page_count = 1;
 
   char *bitmap = page.data + (int)BP_FILE_SUB_HDR_SIZE;
   bitmap[0] |= 0x01;
@@ -79,7 +79,7 @@ RC DiskBufferPool::open_file(const char *file_name, int *file_id) {
   // TODO,  This part isn't gentle, the better method is using LRU queue.
   for (i = 0; i < MAX_OPEN_FILE; i++) {
     if (open_list_[i]) {
-      if (!strcmp(open_list_[i]->fileName, file_name)) {
+      if (!strcmp(open_list_[i]->file_name, file_name)) {
         *file_id = i;
         LOG_INFO("%s has already been opened.", file_name);
         return RC::SUCCESS;
@@ -115,29 +115,29 @@ RC DiskBufferPool::open_file(const char *file_name, int *file_id) {
   int fileNameLen = strlen(file_name) + 1;
   char *clonedFileName = new char [fileNameLen];
   snprintf(clonedFileName, fileNameLen, "%s", file_name);
-  fileHandle->fileName = clonedFileName;
-  fileHandle->fileDesc = fd;
-  if ((tmp = allocate_block(&fileHandle->pHdrFrame)) != RC::SUCCESS) {
+  fileHandle->file_name = clonedFileName;
+  fileHandle->file_desc= fd;
+  if ((tmp = allocate_block(&fileHandle->hdr_frame)) != RC::SUCCESS) {
     LOG_ERROR("Failed to allocate block for %s's BPFileHandle.", file_name);
     delete fileHandle;
     close(fd);
     return tmp;
   }
-  fileHandle->pHdrFrame->dirty = false;
-  fileHandle->pHdrFrame->accTime = clock();
-  fileHandle->pHdrFrame->fileDesc = fd;
-  fileHandle->pHdrFrame->pinCount = 1;
-  if ((tmp = load_page(0, fileHandle, fileHandle->pHdrFrame)) != RC::SUCCESS) {
-    fileHandle->pHdrFrame->pinCount = 0;
-    dispose_block(fileHandle->pHdrFrame);
+  fileHandle->hdr_frame->dirty = false;
+  fileHandle->hdr_frame->acc_time = clock();
+  fileHandle->hdr_frame->file_desc = fd;
+  fileHandle->hdr_frame->pin_count = 1;
+  if ((tmp = load_page(0, fileHandle, fileHandle->hdr_frame)) != RC::SUCCESS) {
+    fileHandle->hdr_frame->pin_count = 0;
+    dispose_block(fileHandle->hdr_frame);
     close(fd);
     delete fileHandle;
     return tmp;
   }
 
-  fileHandle->pHdrPage = &(fileHandle->pHdrFrame->page);
-  fileHandle->pBitmap = fileHandle->pHdrPage->data + BP_FILE_SUB_HDR_SIZE;
-  fileHandle->pFileSubHeader = (BPFileSubHeader *)fileHandle->pHdrPage->data;
+  fileHandle->hdr_page = &(fileHandle->hdr_frame->page);
+  fileHandle->bitmap = fileHandle->hdr_page->data + BP_FILE_SUB_HDR_SIZE;
+  fileHandle->file_sub_header = (BPFileSubHeader *)fileHandle->hdr_page->data;
   open_list_[i - 1] = fileHandle;
   *file_id = i - 1;
   LOG_INFO("Successfully open %s.", file_name);
@@ -152,16 +152,16 @@ RC DiskBufferPool::close_file(int file_id) {
   }
 
   BPFileHandle *file_handle = open_list_[file_id];
-  file_handle->pHdrFrame->pinCount--;
+  file_handle->hdr_frame->pin_count--;
   if ((tmp = force_all_pages(file_handle)) != RC::SUCCESS) {
     LOG_ERROR("Failed to closeFile %d:%s, due to failed to force all pages.",
-              file_id, file_handle->fileName);
+              file_id, file_handle->file_name);
     return tmp;
   }
 
-  if (close(file_handle->fileDesc) < 0) {
+  if (close(file_handle->file_desc) < 0) {
     LOG_ERROR("Failed to close fileId:%d, fileName:%s, error:%s", file_id,
-              file_handle->fileName, strerror(errno));
+              file_handle->file_name, strerror(errno));
     return RC::IOERR_CLOSE;
   }
   open_list_[file_id] = nullptr;
@@ -180,41 +180,41 @@ RC DiskBufferPool::get_this_page(int file_id, PageNum page_num, BPPageHandle *pa
   BPFileHandle *file_handle= open_list_[file_id];
   if ((tmp = check_page_num(page_num, file_handle)) != RC::SUCCESS) {
     LOG_ERROR("Failed to load page %s:%d, due to invalid pageNum.",
-              file_handle->fileName, page_num);
+              file_handle->file_name, page_num);
     return tmp;
   }
 
   for (int i = 0; i < BP_BUFFER_SIZE; i++) {
-    if (bp_manager_.allocated[i] == false)
+    if (!bp_manager_.allocated[i])
       continue;
-    if (bp_manager_.frame[i].fileDesc != file_handle->fileDesc)
+    if (bp_manager_.frame[i].file_desc != file_handle->file_desc)
       continue;
 
     // This page has been loaded.
-    if (bp_manager_.frame[i].page.pageNum == page_num) {
-      page_handle->pFrame = bp_manager_.frame + i;
-      page_handle->pFrame->pinCount++;
-      page_handle->pFrame->accTime = clock();
+    if (bp_manager_.frame[i].page.page_num == page_num) {
+      page_handle->frame = bp_manager_.frame + i;
+      page_handle->frame->pin_count++;
+      page_handle->frame->acc_time = clock();
       page_handle->open = true;
       return RC::SUCCESS;
     }
   }
 
   // Allocate one page and load the data into this page
-  if ((tmp = allocate_block(&(page_handle->pFrame))) != RC::SUCCESS) {
+  if ((tmp = allocate_block(&(page_handle->frame))) != RC::SUCCESS) {
     LOG_ERROR("Failed to load page %s:%d, due to failed to alloc page.",
-              file_handle->fileName, page_num);
+              file_handle->file_name, page_num);
     return tmp;
   }
-  page_handle->pFrame->dirty = false;
-  page_handle->pFrame->fileDesc = file_handle->fileDesc;
-  page_handle->pFrame->pinCount = 1;
-  page_handle->pFrame->accTime = clock();
-  if ((tmp = load_page(page_num, file_handle, page_handle->pFrame)) !=
+  page_handle->frame->dirty = false;
+  page_handle->frame->file_desc = file_handle->file_desc;
+  page_handle->frame->pin_count = 1;
+  page_handle->frame->acc_time = clock();
+  if ((tmp = load_page(page_num, file_handle, page_handle->frame)) !=
       RC::SUCCESS) {
-    LOG_ERROR("Failed to load page %s:%d", file_handle->fileName);
-    page_handle->pFrame->pinCount = 0;
-    dispose_block(page_handle->pFrame);
+    LOG_ERROR("Failed to load page %s:%d", file_handle->file_name);
+    page_handle->frame->pin_count = 0;
+    dispose_block(page_handle->frame);
     return tmp;
   }
 
@@ -232,47 +232,47 @@ RC DiskBufferPool::allocate_page(int file_id, BPPageHandle *page_handle) {
   BPFileHandle *file_handle = open_list_[file_id];
 
   int byte = 0, bit = 0;
-  if ((file_handle->pFileSubHeader->allocatedPages) <
-      (file_handle->pFileSubHeader->pageCount)) {
+  if ((file_handle->file_sub_header->allocated_pages) <
+      (file_handle->file_sub_header->page_count)) {
     // There is one free page
-    for (int i = 0; i < file_handle->pFileSubHeader->pageCount; i++) {
+    for (int i = 0; i < file_handle->file_sub_header->page_count; i++) {
       byte = i / 8;
       bit = i % 8;
-      if (((file_handle->pBitmap[byte]) & (1 << bit)) == 0) {
-        (file_handle->pFileSubHeader->allocatedPages)++;
-        file_handle->pBitmap[byte] |= (1 << bit);
+      if (((file_handle->bitmap[byte]) & (1 << bit)) == 0) {
+        (file_handle->file_sub_header->allocated_pages)++;
+        file_handle->bitmap[byte] |= (1 << bit);
         return get_this_page(file_id, i, page_handle);
       }
     }
 
   }
 
-  if ((tmp = allocate_block(&(page_handle->pFrame))) != RC::SUCCESS) {
+  if ((tmp = allocate_block(&(page_handle->frame))) != RC::SUCCESS) {
     LOG_ERROR("Failed to allocate page %s, due to no free page.",
-              file_handle->fileName);
+              file_handle->file_name);
     return tmp;
   }
 
-  PageNum page_num = file_handle->pFileSubHeader->pageCount;
-  file_handle->pFileSubHeader->allocatedPages++;
-  file_handle->pFileSubHeader->pageCount++;
+  PageNum page_num = file_handle->file_sub_header->page_count;
+  file_handle->file_sub_header->allocated_pages++;
+  file_handle->file_sub_header->page_count++;
 
   byte = page_num / 8;
   bit = page_num % 8;
-  file_handle->pBitmap[byte] |= (1 << bit);
-  file_handle->pHdrFrame->dirty = true;
+  file_handle->bitmap[byte] |= (1 << bit);
+  file_handle->hdr_frame->dirty = true;
 
-  page_handle->pFrame->dirty = false;
-  page_handle->pFrame->fileDesc = file_handle->fileDesc;
-  page_handle->pFrame->pinCount = 1;
-  page_handle->pFrame->accTime = clock();
-  memset(&(page_handle->pFrame->page), 0, sizeof(Page));
-  page_handle->pFrame->page.pageNum = file_handle->pFileSubHeader->pageCount - 1;
+  page_handle->frame->dirty = false;
+  page_handle->frame->file_desc = file_handle->file_desc;
+  page_handle->frame->pin_count = 1;
+  page_handle->frame->acc_time = clock();
+  memset(&(page_handle->frame->page), 0, sizeof(Page));
+  page_handle->frame->page.page_num = file_handle->file_sub_header->page_count - 1;
 
   // Use flush operation to extion file
-  if ((tmp = flush_block(page_handle->pFrame)) != RC::SUCCESS) {
+  if ((tmp = flush_block(page_handle->frame)) != RC::SUCCESS) {
     LOG_ERROR("Failed to alloc page %s , due to failed to extend one page.",
-              file_handle->fileName);
+              file_handle->file_name);
     return tmp;
   }
 
@@ -283,25 +283,25 @@ RC DiskBufferPool::allocate_page(int file_id, BPPageHandle *page_handle) {
 RC DiskBufferPool::get_page_num(BPPageHandle *page_handle, PageNum *page_num) {
   if (!page_handle->open)
     return RC::BUFFERPOOL_CLOSED;
-  *page_num = page_handle->pFrame->page.pageNum;
+  *page_num = page_handle->frame->page.page_num;
   return RC::SUCCESS;
 }
 
 RC DiskBufferPool::get_data(BPPageHandle *page_handle, char **data) {
   if (!page_handle->open)
     return RC::BUFFERPOOL_CLOSED;
-  *data = page_handle->pFrame->page.data;
+  *data = page_handle->frame->page.data;
   return RC::SUCCESS;
 }
 
 RC DiskBufferPool::mark_dirty(BPPageHandle *page_handle) {
-  page_handle->pFrame->dirty = true;
+  page_handle->frame->dirty = true;
   return RC::SUCCESS;
 }
 
 RC DiskBufferPool::unpin_page(BPPageHandle *page_handle) {
   page_handle->open = false;
-  page_handle->pFrame->pinCount--;
+  page_handle->frame->pin_count--;
   return RC::SUCCESS;
 }
 
@@ -322,28 +322,29 @@ RC DiskBufferPool::dispose_page(int file_id, PageNum page_num) {
   BPFileHandle *file_handle = open_list_[file_id];
   if ((rc = check_page_num(page_num, file_handle)) != RC::SUCCESS) {
     LOG_ERROR("Failed to dispose page %s:%d, due to invalid pageNum",
-              file_handle->fileName, page_num);
+              file_handle->file_name, page_num);
     return rc;
   }
 
-  file_handle->pHdrFrame->dirty = true;
-  file_handle->pFileSubHeader->allocatedPages--;
-  char tmp = 1 << (page_num % 8);
-  file_handle->pBitmap[page_num / 8] &= ~tmp;
   for (int i = 0; i < BP_BUFFER_SIZE; i++) {
-    if (bp_manager_.allocated[i] == false)
+    if (!bp_manager_.allocated[i])
       continue;
-    if (bp_manager_.frame[i].fileDesc != file_handle->fileDesc) {
+    if (bp_manager_.frame[i].file_desc != file_handle->file_desc) {
       continue;
     }
 
-    if (bp_manager_.frame[i].page.pageNum == page_num) {
-      if (bp_manager_.frame[i].pinCount != 0)
+    if (bp_manager_.frame[i].page.page_num == page_num) {
+      if (bp_manager_.frame[i].pin_count != 0)
         return RC::BUFFERPOOL_PAGEPINNED;
       bp_manager_.allocated[i] = false;
-      return RC::SUCCESS;
     }
   }
+
+  file_handle->hdr_frame->dirty = true;
+  file_handle->file_sub_header->allocated_pages--;
+  // file_handle->pFileSubHeader->pageCount--;
+  char tmp = 1 << (page_num % 8);
+  file_handle->bitmap[page_num / 8] &= ~tmp;
   return RC::SUCCESS;
 }
 
@@ -357,25 +358,25 @@ RC DiskBufferPool::dispose_page(int file_id, PageNum page_num) {
 RC DiskBufferPool::force_page(BPFileHandle *file_handle, PageNum page_num) {
   int i;
   for (i = 0; i < BP_BUFFER_SIZE; i++) {
-    if (bp_manager_.allocated[i] == false)
+    if (!bp_manager_.allocated[i])
       continue;
 
     Frame *frame = &bp_manager_.frame[i];
-    if (frame->fileDesc != file_handle->fileDesc)
+    if (frame->file_desc != file_handle->file_desc)
       continue;
-    if (frame->page.pageNum != page_num && page_num != -1) {
+    if (frame->page.page_num != page_num && page_num != -1) {
       continue;
     }
 
-    if (frame->pinCount != 0) {
-      LOG_ERROR("Page :%s:%d has been pinned.", file_handle->fileName, page_num);
+    if (frame->pin_count != 0) {
+      LOG_ERROR("Page :%s:%d has been pinned.", file_handle->file_name, page_num);
       return RC::BUFFERPOOL_PAGEPINNED;
     }
 
     if (frame->dirty) {
       RC rc = RC::SUCCESS;
       if ((rc = flush_block(frame)) != RC::SUCCESS) {
-        LOG_ERROR("Failed to flush page:%s:%d.", file_handle->fileName, page_num);
+        LOG_ERROR("Failed to flush page:%s:%d.", file_handle->file_name, page_num);
         return rc;
       }
     }
@@ -402,13 +403,13 @@ RC DiskBufferPool::force_all_pages(BPFileHandle *file_handle) {
     if (!bp_manager_.allocated[i])
       continue;
 
-    if (bp_manager_.frame[i].fileDesc != file_handle->fileDesc)
+    if (bp_manager_.frame[i].file_desc != file_handle->file_desc)
       continue;
 
     if (bp_manager_.frame[i].dirty) {
       RC rc = flush_block(&bp_manager_.frame[i]);
       if (rc != RC::SUCCESS) {
-        LOG_ERROR("Failed to flush all pages' of %s.", file_handle->fileName);
+        LOG_ERROR("Failed to flush all pages' of %s.", file_handle->file_name);
         return rc;
       }
     }
@@ -422,16 +423,16 @@ RC DiskBufferPool::flush_block(Frame *frame) {
   // The better way is use mmap the block into memory,
   // so it is easier to flush data to file.
 
-  s64_t offset = ((s64_t)frame->page.pageNum) * sizeof(Page);
-  if (lseek(frame->fileDesc, offset, SEEK_SET) == offset - 1) {
+  s64_t offset = ((s64_t)frame->page.page_num) * sizeof(Page);
+  if (lseek(frame->file_desc, offset, SEEK_SET) == offset - 1) {
     LOG_ERROR("Failed to flush page %lld of %d due to failed to seek %s.",
-              offset, frame->fileDesc, strerror(errno));
+              offset, frame->file_desc, strerror(errno));
     return RC::IOERR_SEEK;
   }
 
-  if (write(frame->fileDesc, &(frame->page), sizeof(Page)) != sizeof(Page)) {
+  if (write(frame->file_desc, &(frame->page), sizeof(Page)) != sizeof(Page)) {
     LOG_ERROR("Failed to flush page %lld of %d due to %s.", offset,
-              frame->fileDesc, strerror(errno));
+              frame->file_desc, strerror(errno));
     return RC::IOERR_WRITE;
   }
   frame->dirty = false;
@@ -454,24 +455,24 @@ RC DiskBufferPool::allocate_block(Frame **buffer) {
   clock_t mintime = 0;
   bool flag = false;
   for (int i = 0; i < BP_BUFFER_SIZE; i++) {
-    if (bp_manager_.frame[i].pinCount != 0)
+    if (bp_manager_.frame[i].pin_count != 0)
       continue;
     if (flag == false) {
       flag = true;
       min = i;
-      mintime = bp_manager_.frame[i].accTime;
+      mintime = bp_manager_.frame[i].acc_time;
     }
-    if (bp_manager_.frame[i].accTime < mintime) {
+    if (bp_manager_.frame[i].acc_time < mintime) {
       min = i;
-      mintime = bp_manager_.frame[i].accTime;
+      mintime = bp_manager_.frame[i].acc_time;
     }
   }
-  if (flag == false) {
+  if (!flag) {
     LOG_ERROR("All pages have been used and pinned.");
     return RC::NOMEM;
   }
 
-  if (bp_manager_.frame[min].dirty == true) {
+  if (bp_manager_.frame[min].dirty) {
     RC rc = flush_block(&(bp_manager_.frame[min]));
     if (rc != RC::SUCCESS) {
       return rc;
@@ -482,9 +483,9 @@ RC DiskBufferPool::allocate_block(Frame **buffer) {
 }
 
 RC DiskBufferPool::dispose_block(Frame *buf) {
-  if (buf->pinCount != 0) {
-    LOG_WARN("Begin to free page %d of %d, but it's pinned.", buf->page.pageNum,
-             buf->fileDesc);
+  if (buf->pin_count != 0) {
+    LOG_WARN("Begin to free page %d of %d, but it's pinned.", buf->page.page_num,
+             buf->file_desc);
     return RC::LOCKED_UNLOCK;
   }
   if (buf->dirty == true) {
@@ -516,19 +517,19 @@ RC DiskBufferPool::get_page_count(int file_id, int *page_count) {
   if ((rc = check_file_id(file_id)) != RC::SUCCESS) {
     return rc;
   }
-  *page_count = open_list_[file_id]->pFileSubHeader->pageCount;
+  *page_count = open_list_[file_id]->file_sub_header->page_count;
   return RC::SUCCESS;
 }
 
 RC DiskBufferPool::check_page_num(PageNum page_num, BPFileHandle *file_handle) {
-  if (page_num >= file_handle->pFileSubHeader->pageCount) {
+  if (page_num >= file_handle->file_sub_header->page_count) {
     LOG_ERROR("Invalid pageNum:%d, file's name:%s", page_num,
-              file_handle->fileName);
+              file_handle->file_name);
     return RC::BUFFERPOOL_INVALID_PAGE_NUM;
   }
-  if ((file_handle->pBitmap[page_num / 8] & (1 << (page_num % 8))) == 0) {
+  if ((file_handle->bitmap[page_num / 8] & (1 << (page_num % 8))) == 0) {
     LOG_ERROR("Invalid pageNum:%d, file's name:%s", page_num,
-              file_handle->fileName);
+              file_handle->file_name);
     return RC::BUFFERPOOL_INVALID_PAGE_NUM;
   }
   return RC::SUCCESS;
@@ -536,16 +537,16 @@ RC DiskBufferPool::check_page_num(PageNum page_num, BPFileHandle *file_handle) {
 
 RC DiskBufferPool::load_page(PageNum page_num, BPFileHandle *file_handle, Frame *frame) {
   s64_t offset = ((s64_t)page_num) * sizeof(Page);
-  if (lseek(file_handle->fileDesc, offset, SEEK_SET) == offset - 1) {
+  if (lseek(file_handle->file_desc, offset, SEEK_SET) == offset - 1) {
     LOG_ERROR("Failed to load page %s:%d, due to failed to lseek:%s.",
-              file_handle->fileName, page_num, strerror(errno));
+              file_handle->file_name, page_num, strerror(errno));
 
     return RC::IOERR_SEEK;
   }
-  if (read(file_handle->fileDesc, &(frame->page), sizeof(Page)) !=
+  if (read(file_handle->file_desc, &(frame->page), sizeof(Page)) !=
       sizeof(Page)) {
     LOG_ERROR("Failed to load page %s:%d, due to failed to read data:%s.",
-              file_handle->fileName, page_num, strerror(errno));
+              file_handle->file_name, page_num, strerror(errno));
     return RC::IOERR_READ;
   }
   return RC::SUCCESS;

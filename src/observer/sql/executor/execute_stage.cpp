@@ -198,6 +198,15 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
   }
 }
 
+void end_trx_if_need(Session *session, Trx *trx, bool all_right) {
+  if (!session->is_trx_multi_operation_mode()) {
+    if (all_right) {
+      trx->commit();
+    } else {
+      trx->rollback();
+    }
+  }
+}
 RC ExecuteStage::do_select(const char *db, sqlstr *sql, SessionEvent *session_event) {
   // 制作简单的查询树
   // 目前仅支持 select xxx from table1, tableN where condition1, conditionN
@@ -211,7 +220,8 @@ RC ExecuteStage::do_select(const char *db, sqlstr *sql, SessionEvent *session_ev
   //   )
 
   RC rc = RC::SUCCESS;
-  Trx *trx = session_event->get_client()->session->current_trx();
+  Session *session = session_event->get_client()->session;
+  Trx *trx = session->current_trx();
   const Selects &selects = sql->sstr.sel;
   // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
   std::vector<SelectExeNode> select_nodes;
@@ -220,6 +230,7 @@ RC ExecuteStage::do_select(const char *db, sqlstr *sql, SessionEvent *session_ev
     SelectExeNode select_node;
     rc = create_selection_executor(trx, selects, db, table_name, select_node);
     if (rc != RC::SUCCESS) {
+      end_trx_if_need(session, trx, false);
       return rc;
     }
     select_nodes.emplace_back(std::move(select_node));
@@ -227,6 +238,7 @@ RC ExecuteStage::do_select(const char *db, sqlstr *sql, SessionEvent *session_ev
 
   if (select_nodes.empty()) {
     LOG_ERROR("No table given");
+    end_trx_if_need(session, trx, false);
     return RC::SQL_SYNTAX;
   }
 
@@ -235,6 +247,7 @@ RC ExecuteStage::do_select(const char *db, sqlstr *sql, SessionEvent *session_ev
     TupleSet tuple_set;
     rc = node.execute(tuple_set);
     if (rc != RC::SUCCESS) {
+      end_trx_if_need(session, trx, false);
       return rc;
     } else {
       tuple_sets.push_back(std::move(tuple_set));
@@ -246,12 +259,14 @@ RC ExecuteStage::do_select(const char *db, sqlstr *sql, SessionEvent *session_ev
     JoinExeNode join_exe_node;
     rc = create_join_executor(selects, db, tuple_sets, join_exe_node);
     if (rc != RC::SUCCESS) {
+      end_trx_if_need(session, trx, false);
       return rc;
     }
 
     TupleSet tuple_set;
     rc = join_exe_node.execute(tuple_set);
     if (rc != RC::SUCCESS) {
+      end_trx_if_need(session, trx, false);
       return rc;
     }
     if (tuple_set.is_empty()) { // TODO 优化代码
@@ -268,6 +283,7 @@ RC ExecuteStage::do_select(const char *db, sqlstr *sql, SessionEvent *session_ev
   }
 
   session_event->set_response(ss.str());
+  end_trx_if_need(session, trx, true);
   return rc;
 }
 

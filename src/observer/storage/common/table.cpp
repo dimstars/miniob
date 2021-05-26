@@ -31,11 +31,15 @@
 #include "storage/common/index.h"
 #include "storage/common/bplus_tree_index.h"
 #include "storage/trx/trx.h"
+#include "storage/lock/lock.h"
 
 Table::Table() : 
     data_buffer_pool_(nullptr),
     file_id_(-1),
     record_handler_(nullptr) {
+
+  table_locks_ = new TableLocksInTable(this);
+  record_locks_ = new RecordLocksInTable(this);
 }
 
 Table::~Table() {
@@ -46,6 +50,11 @@ Table::~Table() {
     data_buffer_pool_->close_file(file_id_);
     data_buffer_pool_ = nullptr;
   }
+
+  delete table_locks_;
+  table_locks_ = nullptr;
+  delete record_locks_;
+  record_locks_ = nullptr;
   LOG_INFO("Table has been closed: %s", name());
 }
 
@@ -186,10 +195,28 @@ RC Table::rollback_insert(Trx *trx, const RID &rid) {
 RC Table::insert_record(Trx *trx, Record *record) {
   RC rc = RC::SUCCESS;
 
+  if (trx != nullptr) {
+    trx->init_trx_info(this, *record);
+  }
   rc = record_handler_->insert_record(record->data, table_meta_.record_size(), &record->rid);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Insert record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
     return rc;
+  }
+
+  if (trx != nullptr) {
+    LockManager::instance().lock_record_exclusive(this, trx, record->rid);
+    rc = trx->insert_record(this, record);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to log operation(insertion) to trx");
+
+      RC rc2 = record_handler_->delete_record(&record->rid);
+      if (rc2 != RC::SUCCESS) {
+        LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+                  name(), rc2, strrc(rc2));
+      }
+      return rc;
+    }
   }
 
   rc = insert_entry_of_indexes(record->data, record->rid);
@@ -205,30 +232,6 @@ RC Table::insert_record(Trx *trx, Record *record) {
                 name(), rc2, strrc(rc2));
     }
     return rc;
-  }
-
-  if (trx != nullptr) {
-    Record phy_record;
-    rc = record_handler_->get_record(&record->rid, &phy_record);
-    if (rc != RC::SUCCESS) {
-      LOG_ERROR("Failed to get record. rid=%d.%d, rc=%d:%s",
-                record->rid.page_num, record->rid.slot_num, rc, strrc(rc));
-      // TODO rollback
-      return rc;
-    }
-    rc = trx->insert_record(this, &phy_record);
-    if (rc != RC::SUCCESS) {
-      RC rc2 = record_handler_->delete_record(&record->rid);
-      if (rc2 != RC::SUCCESS) {
-        LOG_PANIC("Failed to rollback insert record. rc_rollback=%d:%s", rc2, strrc(rc2));
-      }
-      rc2 = delete_entry_of_indexes(record->data, record->rid, false); // TODO rollback
-      if (rc2 != RC::SUCCESS) {
-        LOG_PANIC("Failed to rollback insert record. rc_rollback=%d:%s", rc2, strrc(rc2));
-      }
-
-      return rc;
-    }
   }
   return rc;
 }
@@ -373,6 +376,9 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   rc = scanner.get_first_record(&record);
   for ( ; RC::SUCCESS == rc && record_count < limit; rc = scanner.get_next_record(&record)) {
     if (trx == nullptr || trx->is_visible(this, &record)) {
+      if (trx != nullptr) {
+        LockManager::instance().lock_record_shared(this, trx, record.rid); // TODO select for update
+      }
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {
         break;
@@ -414,6 +420,9 @@ RC Table::scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter 
     }
 
     if ((trx == nullptr || trx->is_visible(this, &record)) && (filter == nullptr || filter->filter(record))) {
+      if (trx != nullptr) {
+        LockManager::instance().lock_record_shared(this, trx, rid);
+      }
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {
         LOG_TRACE("Record reader break the table scanning. rc=%d:%s", rc, strrc(rc));
@@ -430,7 +439,7 @@ RC Table::scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter 
 
 class IndexInserter {
 public:
-  IndexInserter(Index *index) : index_(index) {
+  explicit IndexInserter(Index *index) : index_(index) {
   }
 
   RC insert_index(const Record *record) {
@@ -770,10 +779,6 @@ public:
   RecordDeleter(Table &table, Trx *trx) : table_(table), trx_(trx) {
   }
 
-  RC init(DiskBufferPool &buffer_pool, int file_id) {
-    return record_file_handler_.init(buffer_pool, file_id);
-  }
-
   RC delete_record(Record *record) {
     RC rc = RC::SUCCESS;
     rc = table_.delete_record(trx_, record);
@@ -790,7 +795,6 @@ public:
 private:
   Table & table_;
   Trx *trx_;
-  RecordFileHandler record_file_handler_; // TODO remove
   int deleted_count_ = 0;
 };
 
@@ -801,7 +805,6 @@ static RC record_reader_delete_adapter(Record *record, void *context) {
 
 RC Table::delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count) {
   RecordDeleter deleter(*this, trx);
-  deleter.init(*data_buffer_pool_, file_id_);
   RC rc = scan_record(trx, filter, -1, &deleter, record_reader_delete_adapter);
   if (deleted_count != nullptr) {
     *deleted_count = deleter.deleted_count();
@@ -812,6 +815,7 @@ RC Table::delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count) {
 RC Table::delete_record(Trx *trx, Record *record) {
   RC rc = RC::SUCCESS;
   if (trx != nullptr) {
+    LockManager::instance().lock_record_exclusive(this, trx, record->rid);
     rc = trx->delete_record(this, record);
   } else {
     rc = delete_entry_of_indexes(record->data, record->rid, false);// TODO 重复代码 refer to commit_delete
@@ -965,4 +969,12 @@ RC Table::sync() {
   }
   LOG_INFO("Sync table over. table=%s", name());
   return rc;
+}
+
+TableLocksInTable & Table::table_locks() {
+  return *table_locks_;
+}
+
+RecordLocksInTable & Table::record_locks() {
+  return *record_locks_;
 }

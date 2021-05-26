@@ -184,7 +184,11 @@ RC RecordPageHandler::delete_record(const RID *rid) {
     disk_buffer_pool_->mark_dirty(&page_handle_);
 
     if (page_header_->record_num == 0) {
-      disk_buffer_pool_->dispose_page(file_id_, get_page_num());
+      DiskBufferPool *disk_buffer_pool = disk_buffer_pool_;
+      int file_id = file_id_;
+      PageNum page_num = get_page_num();
+      deinit();
+      disk_buffer_pool->dispose_page(file_id, page_num);
     }
   } else {
     ret = RC::RECORD_RECORD_NOT_EXIST;
@@ -207,7 +211,7 @@ RC RecordPageHandler::get_record(const RID *rid, Record *rec) {
 
   rec->valid = true;
   rec->rid = *rid;
-  rec->data = data;
+  rec->data = data; // TODO 参考table中的调用，返回record后，page可能会释放掉
   return RC::SUCCESS;
 }
 

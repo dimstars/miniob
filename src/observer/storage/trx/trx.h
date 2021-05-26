@@ -23,12 +23,16 @@
 #include <stddef.h>
 #include <unordered_map>
 #include <unordered_set>
+#include <mutex>
+#include <condition_variable>
 
 #include "handler/handler_defs.h"
 #include "storage/common/record_manager.h"
 #include "rc.h"
 
 class Table;
+class TableLocksInTrx;
+class RecordLocksInTrx;
 
 class Operation {
 public:
@@ -82,8 +86,11 @@ public:
   static int      trx_field_len();
 
 public:
+  Trx();
+  ~Trx();
 
 public:
+  // TODO 统一参数使用引用类型
   RC insert_record(Table *table, Record *record);
   RC delete_record(Table *table, Record *record);
 
@@ -95,9 +102,16 @@ public:
 
   bool is_visible(Table *table, const Record *record);
 
+  void init_trx_info(Table *table, Record &record);
+public:
+  void wait(std::unique_lock<std::mutex> &mutex);
+  void wakeup(); // TODO for lock
+  TableLocksInTrx & table_locks();
+  RecordLocksInTrx & record_locks();
+
 private:
-  void set_record_trx_id(Table *table, Record *record, int32_t trx_id, bool deleted) const;
-  static void get_record_trx_id(Table *table, const Record *record, int32_t &trx_id, bool &deleted);
+  void set_record_trx_id(Table *table, Record &record, int32_t trx_id, bool deleted) const;
+  static void get_record_trx_id(Table *table, const Record &record, int32_t &trx_id, bool &deleted);
 
 private:
   using OperationSet = std::unordered_set<Operation, OperationHasher, OperationEqualer>;
@@ -109,8 +123,11 @@ private:
 private:
   void start_if_not_started();
 private:
-  int32_t  trx_id_;
+  int32_t  trx_id_ = 0;
   std::unordered_map<Table *, OperationSet> operations_; // TODO set
+  TableLocksInTrx *      table_locks_ = nullptr;
+  RecordLocksInTrx *     record_locks_ = nullptr;
+  std::condition_variable lock_waiter_;
 };
 
 #endif // __OBSERVER_STORAGE_TRX_TRX_H_

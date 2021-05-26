@@ -31,6 +31,10 @@ struct RID
   PageNum page_num; // record's page number
   SlotNum slot_num; // record's slot number
   bool    valid;    // true means a valid record
+
+  bool operator== (const RID &other) const {
+    return page_num == other.page_num && slot_num == other.slot_num;
+  }
 };
 
 struct Record 
@@ -38,6 +42,29 @@ struct Record
   bool valid; // false means the recard hasn't been load
   RID  rid;   // record's rid
   char *data; // record's data
+};
+
+class RidDigest {
+public:
+  size_t operator() (const RID &rid) const {
+    return ((size_t)(rid.page_num) << 32) | rid.slot_num;
+  }
+};
+
+namespace std {
+template <>
+struct hash<RID> {
+  size_t operator() (const RID &rid) const {
+    return ((size_t)(rid.page_num) << 32) | rid.slot_num;
+  }
+};
+}
+class RidEqualChecker {
+public:
+  bool operator() (const RID &rid1, const RID &rid2) const {
+    return rid1.page_num == rid2.page_num &&
+           rid1.slot_num == rid2.slot_num;
+  }
 };
 
 class RecordPageHandler {
@@ -50,6 +77,19 @@ public:
 
   RC insert_record(const char *data, RID *rid);
   RC update_record(const Record *rec);
+
+  template <class RecordUpdater>
+  RC update_record_in_place(const RID *rid, RecordUpdater updater) {
+    Record record;
+    RC rc = get_record(rid, &record);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    rc = updater(record);
+    disk_buffer_pool_->mark_dirty(&page_handle_);
+    return rc;
+  }
+
   RC delete_record(const RID *rid);
 
   RC get_record(const RID *rid, Record *rec);
@@ -104,6 +144,18 @@ public:
    * @return
    */
   RC get_record(const RID *rid, Record *rec);
+
+  template<class RecordUpdater> // TODO 改成普通模式, 不使用模板
+  RC update_record_in_place(const RID *rid, RecordUpdater updater) {
+
+    RC rc = RC::SUCCESS;
+    RecordPageHandler page_handler;
+    if ((rc != page_handler.init(*disk_buffer_pool_, file_id_, rid->page_num)) != RC::SUCCESS) {
+      return rc;
+    }
+
+    return page_handler.update_record_in_place(rid, updater);
+  }
 
 private:
   DiskBufferPool  *   disk_buffer_pool_;

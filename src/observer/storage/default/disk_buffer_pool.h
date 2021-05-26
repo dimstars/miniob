@@ -42,27 +42,27 @@ typedef int PageNum; // 使用Unsigned不能清晰的判断是否invalid page nu
 
 
 typedef struct {
-  PageNum pageNum;
+  PageNum page_num;
   char data[BP_PAGE_DATA_SIZE];
 } Page;
 // sizeof(Page) should be equal to BP_PAGE_SIZE
 
 typedef struct {
-  PageNum pageCount;
-  int allocatedPages;
+  PageNum page_count;
+  int allocated_pages;
 } BPFileSubHeader;
 
 typedef struct {
   bool dirty;
-  unsigned int pinCount;
-  clock_t accTime;
-  int fileDesc;
+  unsigned int pin_count;
+  clock_t acc_time;
+  int file_desc;
   Page page;
 } Frame;
 
 typedef struct {
   bool open;
-  Frame *pFrame;
+  Frame *frame;
 } BPPageHandle; // TODO 没有初始化
 
 class BPFileHandle{
@@ -73,12 +73,12 @@ public:
 
 public:
   bool bopen;
-  const char *fileName;
-  int fileDesc;
-  Frame *pHdrFrame;
-  Page *pHdrPage;
-  char *pBitmap;
-  BPFileSubHeader *pFileSubHeader;
+  const char *file_name;
+  int file_desc;
+  Frame *hdr_frame;
+  Page *hdr_page;
+  char *bitmap;
+  BPFileSubHeader *file_sub_header;
 
 
 } ;
@@ -97,7 +97,7 @@ public:
   BPManager() {
     for (int i = 0; i < BP_BUFFER_SIZE; i++) {
       allocated[i] = false;
-      frame[i].pinCount = 0;
+      frame[i].pin_count = 0;
     }
   }
 

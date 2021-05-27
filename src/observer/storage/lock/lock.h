@@ -114,7 +114,7 @@ public:
 
 private:
   Trx *trx_;
-  using RecordLockMap = std::unordered_map<RID, LockRecordMeta>;
+  using RecordLockMap = std::unordered_map<RID, LockRecordMeta, RidDigest>;
   std::unordered_map<Table *, RecordLockMap> locks_;
 };
 
@@ -161,7 +161,7 @@ public:
   void delete_record(const RID &rid, Trx *trx);
 private:
   Table *table_;
-  std::unordered_map<RID, RecordLocksInRecord> locks_;
+  std::unordered_map<RID, RecordLocksInRecord, RidDigest> locks_;
 };
 
 class LockManager {

@@ -30,27 +30,11 @@ struct RID
 {
   PageNum page_num; // record's page number
   SlotNum slot_num; // record's slot number
-  bool    valid;    // true means a valid record
+  // bool    valid;    // true means a valid record
 
   bool operator== (const RID &other) const {
     return page_num == other.page_num && slot_num == other.slot_num;
   }
-};
-
-namespace std {
-template <>
-struct hash<RID> {
-  size_t operator() (const RID &rid) const {
-    return ((size_t)(rid.page_num) << 32) | rid.slot_num;
-  }
-};
-}
-
-struct Record 
-{
-  bool valid; // false means the recard hasn't been load
-  RID  rid;   // record's rid
-  char *data; // record's data
 };
 
 class RidDigest {
@@ -60,12 +44,11 @@ public:
   }
 };
 
-class RidEqualChecker {
-public:
-  bool operator() (const RID &rid1, const RID &rid2) const {
-    return rid1.page_num == rid2.page_num &&
-           rid1.slot_num == rid2.slot_num;
-  }
+struct Record 
+{
+  // bool valid; // false means the record hasn't been load
+  RID  rid;   // record's rid
+  char *data; // record's data
 };
 
 class RecordPageHandler {

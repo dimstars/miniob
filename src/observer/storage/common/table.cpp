@@ -257,7 +257,7 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
 
   Record record;
   record.data = record_data;
-  record.valid = true;
+  // record.valid = true;
   return insert_record(trx, &record);
 }
 
@@ -658,7 +658,7 @@ public:
 
     if (record_.data == nullptr) {
       record_.data = new char [record_size_];
-      record_.valid = true;
+      // record_.valid = true;
     }
     record_.rid = record->rid;
     memcpy(record_.data, record->data, record_size_);

@@ -196,6 +196,7 @@ RC Table::insert_record(Trx *trx, Record *record) {
   RC rc = RC::SUCCESS;
 
   if (trx != nullptr) {
+    LockManager::instance().lock_table_intent_exclusive(this, trx); // TODO drop table时，会影响这个方法
     trx->init_trx_info(this, *record);
   }
   rc = record_handler_->insert_record(record->data, table_meta_.record_size(), &record->rid);
@@ -271,7 +272,7 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
 
   const int normal_field_start_index = table_meta_.sys_field_num();
   for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field = table_meta_.field(i + normal_field_start_index); // TODO bad code 这里把事务字段算上来
+    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[value_num - i - 1];
     if (field->type() != value.type) {
       LOG_ERROR("Invalid value type. field name=%s, type=%d, but given=%d",
@@ -358,6 +359,10 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
     limit = INT_MAX;
   }
 
+  if (trx != nullptr) {
+    LockManager::instance().lock_table_intent_shared(this, trx);
+  }
+
   IndexScanner *index_scanner = find_index_for_scan(filter);
   if (index_scanner != nullptr) {
     return scan_record_by_index(trx, index_scanner, filter, limit, context, record_reader);
@@ -377,7 +382,7 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   for ( ; RC::SUCCESS == rc && record_count < limit; rc = scanner.get_next_record(&record)) {
     if (trx == nullptr || trx->is_visible(this, &record)) {
       if (trx != nullptr) {
-        LockManager::instance().lock_record_shared(this, trx, record.rid); // TODO select for update
+        LockManager::instance().lock_record_shared(this, trx, record.rid);
       }
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {
@@ -454,7 +459,7 @@ static RC insert_index_record_reader_adapter(Record *record, void *context) {
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(const char *index_name, const char *attribute_name) {
+RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_name) {
   if (index_name == nullptr || common::is_blank(index_name) ||
       attribute_name == nullptr || common::is_blank(attribute_name)) {
     return RC::INVALID_ARGUMENT;
@@ -475,6 +480,8 @@ RC Table::create_index(const char *index_name, const char *attribute_name) {
     return rc;
   }
 
+  LockManager::instance().lock_table_exclusive(this, trx);
+
   // 创建索引相关数据
   BplusTreeIndex *index = new BplusTreeIndex();
   std::string index_file = index_data_file(base_dir_.c_str(), name(), index_name);
@@ -486,8 +493,8 @@ RC Table::create_index(const char *index_name, const char *attribute_name) {
   }
 
   // 遍历当前的所有数据，插入这个索引
-  IndexInserter index_inserter(index); // TODO 可以创建一个临时的trx
-  rc = scan_record(nullptr, nullptr, -1, &index_inserter, insert_index_record_reader_adapter);
+  IndexInserter index_inserter(index);
+  rc = scan_record(trx, nullptr, -1, &index_inserter, insert_index_record_reader_adapter);
   if (rc != RC::SUCCESS) {
     // TODO rollback
     delete index;
@@ -651,6 +658,7 @@ public:
     updater_.update(&record_);
 
     if (trx_ != nullptr) {
+      // 带事务的更新改成插入一条新数据，删除一条旧数据
       rc = table_.insert_record(trx_, &record_);
       if (RC::SUCCESS == rc) {
         rc = table_.delete_record(trx_, record);
@@ -815,6 +823,7 @@ RC Table::delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count) {
 RC Table::delete_record(Trx *trx, Record *record) {
   RC rc = RC::SUCCESS;
   if (trx != nullptr) {
+    LockManager::instance().lock_table_intent_exclusive(this, trx); // TODO drop table时，会影响这个方法
     LockManager::instance().lock_record_exclusive(this, trx, record->rid);
     rc = trx->delete_record(this, record);
   } else {

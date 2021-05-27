@@ -187,29 +187,45 @@ TableLocksInTable::TableLocksInTable(Table *table) : table_(table){
 void TableLocksInTable::lock(Trx *trx, LockTableType type) {
   std::unique_lock<std::mutex> unique_lock(*mutex_ptr_);
 
+  RC rc = lock_internal(trx, type);
+  if (RC::LOCKED_NEED_WAIT == rc) {
+    waiting_list_.emplace_back(table_, trx, type);
+  }
+
+  while (RC::LOCKED_NEED_WAIT == rc) {
+    trx->wait(unique_lock);
+    rc = lock_internal(trx, type);
+  }
+  remove_from_waiting_list(trx);
+  wakeup_first_lock();
+}
+RC TableLocksInTable::lock_internal(Trx *trx, LockTableType type) {
+
+  RC rc = RC::SUCCESS;
+
   auto table_lock_iter = locks_.find(trx);
   if (locks_.end() != table_lock_iter) {
     LockTableMeta &table_lock = table_lock_iter->second;
     LockTableType table_type = table_lock.table_type();
     if (TABLE_LOCK_HIGHER_LEVEL[(int)table_type][(int)type]) {
-      return ;
+      return rc;
     }
 
     // need upgrade
     // 只有一个锁，不管waiting_list直接升级
     if (locks_.size() == 1) {
       table_lock.set_table_type(type);
-      return;
+      return rc;
     }
 
     // 不只有一个锁，判断是否除了自己全部兼容
     bool all_compatible = true;
     for (const auto &lock: locks_) {
-      const LockTableMeta & table_meta = lock.second;
-      if (table_meta.trx() == trx) {
+      const LockTableMeta & other_table_lock = lock.second;
+      if (other_table_lock.trx() == trx) {
         continue;
       }
-      if (!TABLE_LOCK_COMPATIBLE_TABLE[(int)type][(int)table_meta.table_type()]) {
+      if (!TABLE_LOCK_COMPATIBLE_TABLE[(int)type][(int)other_table_lock.table_type()]) {
         all_compatible = false;
         break;
       }
@@ -217,43 +233,41 @@ void TableLocksInTable::lock(Trx *trx, LockTableType type) {
 
     if (all_compatible) {
       table_lock.set_table_type(type);
-      return ;
+      return rc;
     }
 
     waiting_list_.emplace_back(table_, trx, type);
-    trx->wait(unique_lock);
-    lock(trx, type); // TODO 递归调用
-    remove_from_waiting_list(trx);
-    wakeup_first_lock();
-    return;
+    return RC::LOCKED_NEED_WAIT;
   }
 
-  if (!waiting_list_.empty()) {
-    waiting_list_.emplace_back(table_, trx, type); // 有可能已经在waiting_list中了 TODO
-    trx->wait(unique_lock);
-    lock(trx, type);
-    remove_from_waiting_list(trx);
-    wakeup_first_lock();
-  } else {
-    // 判断是否都兼容
-    bool all_compatible = true;
-    for (const auto &lock : locks_) {
-      LockTableType table_type = lock.second.table_type();
-      if (!TABLE_LOCK_COMPATIBLE_TABLE[(int)type][(int)table_type]) {
-        all_compatible = false;
-        waiting_list_.emplace_back(table_, trx, type);
-        break;
-      }
-    }
-    if (all_compatible) {
-      locks_.emplace(trx, LockTableMeta(table_, trx, type));
-    } else {
-      trx->wait(unique_lock);
-      lock(trx, type); // TODO 消除递归
-      remove_from_waiting_list(trx);
-      wakeup_first_lock();
+  // 判断是否都兼容
+  bool all_compatible = true;
+  for (const auto &lock : locks_) {
+    LockTableType table_type = lock.second.table_type();
+    if (!TABLE_LOCK_COMPATIBLE_TABLE[(int)type][(int)table_type]) {
+      all_compatible = false;
+      break;
     }
   }
+
+  if (all_compatible) {
+    // 当前已经持有的锁与当前想要加的锁都是兼容的，那么判断在等待队列中，当前锁位置之前的锁，是否也都兼容
+    for (const auto &waiting_lock: waiting_list_) {
+      if (waiting_lock.trx() == trx) {
+        break;
+      }
+      if (!TABLE_LOCK_COMPATIBLE_TABLE[(int)type][(int)waiting_lock.table_type()]) {
+        all_compatible = false;
+      }
+    }
+  }
+
+  if (all_compatible) {
+    locks_.emplace(trx, LockTableMeta(table_, trx, type));
+  } else {
+    rc = RC::LOCKED_NEED_WAIT;
+  }
+  return rc;
 }
 
 void TableLocksInTable::unlock(Trx *trx) {
@@ -353,6 +367,8 @@ RC RecordLocksInRecord::lock_internal(Trx *trx, LockRecordType type) {
 void RecordLocksInRecord::unlock(Trx *trx) {
   std::unique_lock<std::mutex> unique_lock(*mutex_ptr_);
 
+  // 这里操作waiting_list中元素, 唤醒事务时，保证先从队列中删除. 这个做法与表锁不同
+
   if (locks_.size() == 1) {
     // assert locks_[0].trx() == trx
     locks_.clear();
@@ -425,6 +441,31 @@ LockManager &LockManager::instance() {
   return instance;
 }
 
+void LockManager::lock_table_shared(Table *table, Trx *trx) {
+  lock_table(table, trx, LockTableType::SHARED);
+}
+void LockManager::lock_table_exclusive(Table *table, Trx *trx) {
+  lock_table(table, trx, LockTableType::EXCLUSIVE);
+}
+void LockManager::lock_table_intent_shared(Table *table, Trx *trx) {
+  lock_table(table, trx, LockTableType::INTENT_SHARED);
+}
+void LockManager::lock_table_intent_exclusive(Table *table, Trx *trx) {
+  lock_table(table, trx, LockTableType::INTENT_EXCLUSIVE);
+}
+
+void LockManager::lock_table(Table *table, Trx *trx, LockTableType type) {
+  TableLocksInTrx &table_locks_in_trx = trx->table_locks();
+  if (table_locks_in_trx.is_locked(table, type)) {
+    return;
+  }
+
+  TableLocksInTable & table_locks_in_table = table->table_locks();
+  table_locks_in_table.lock(trx, type);
+
+  trx->table_locks().add_lock(table, type);
+}
+
 void LockManager::lock_record_shared(Table *table, Trx *trx, const RID &rid) {
   lock_record(table, trx, rid, LockRecordType::SHARED);
 }
@@ -434,6 +475,13 @@ void LockManager::lock_record_exclusive(Table *table, Trx *trx, const RID &rid) 
 }
 
 void LockManager::lock_record(Table *table, Trx *trx, const RID &rid, LockRecordType type) {
+  // 先判断有没有对应的表锁能满足需求
+  TableLocksInTrx & table_locks_in_trx = trx->table_locks();
+  if ((LockRecordType::SHARED == type && table_locks_in_trx.is_locked(table, LockTableType::SHARED)) ||
+      (LockRecordType::EXCLUSIVE == type && table_locks_in_trx.is_locked(table, LockTableType::EXCLUSIVE))) {
+    return;
+  }
+
   RecordLocksInTrx & record_locks_in_trx = trx->record_locks();
   if (record_locks_in_trx.is_locked(table, rid, type)) {
     return;
@@ -444,7 +492,9 @@ void LockManager::lock_record(Table *table, Trx *trx, const RID &rid, LockRecord
 }
 
 void LockManager::unlock(Trx *trx) {
-  // TODO table lock
   RecordLocksInTrx &record_locks_in_trx = trx->record_locks();
   record_locks_in_trx.unlock();
+
+  TableLocksInTrx & table_locks_in_trx = trx->table_locks();
+  table_locks_in_trx.unlock();
 }

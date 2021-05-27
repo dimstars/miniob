@@ -101,44 +101,44 @@ RC DiskBufferPool::open_file(const char *file_name, int *file_id) {
   }
   LOG_INFO("Successfully open file %s.", file_name);
 
-  BPFileHandle *fileHandle = new (std::nothrow) BPFileHandle();
-  if (fileHandle == nullptr) {
+  BPFileHandle *file_handle = new (std::nothrow) BPFileHandle();
+  if (file_handle == nullptr) {
     LOG_ERROR("Failed to alloc memory of BPFileHandle for %s.", file_name);
     close(fd);
     return RC::NOMEM;
   }
 
   RC tmp;
-  fileHandle->bopen = true;
+  file_handle->bopen = true;
   // TODO
   // The filename's memory is likely to exist problem
-  int fileNameLen = strlen(file_name) + 1;
-  char *clonedFileName = new char [fileNameLen];
-  snprintf(clonedFileName, fileNameLen, "%s", file_name);
-  fileHandle->file_name = clonedFileName;
-  fileHandle->file_desc= fd;
-  if ((tmp = allocate_block(&fileHandle->hdr_frame)) != RC::SUCCESS) {
+  int file_name_len = strlen(file_name) + 1;
+  char *cloned_file_name = new char [file_name_len];
+  snprintf(cloned_file_name, file_name_len, "%s", file_name);
+  file_handle->file_name = cloned_file_name;
+  file_handle->file_desc= fd;
+  if ((tmp = allocate_block(&file_handle->hdr_frame)) != RC::SUCCESS) {
     LOG_ERROR("Failed to allocate block for %s's BPFileHandle.", file_name);
-    delete fileHandle;
+    delete file_handle;
     close(fd);
     return tmp;
   }
-  fileHandle->hdr_frame->dirty = false;
-  fileHandle->hdr_frame->acc_time = clock();
-  fileHandle->hdr_frame->file_desc = fd;
-  fileHandle->hdr_frame->pin_count = 1;
-  if ((tmp = load_page(0, fileHandle, fileHandle->hdr_frame)) != RC::SUCCESS) {
-    fileHandle->hdr_frame->pin_count = 0;
-    dispose_block(fileHandle->hdr_frame);
+  file_handle->hdr_frame->dirty = false;
+  file_handle->hdr_frame->acc_time = clock();
+  file_handle->hdr_frame->file_desc = fd;
+  file_handle->hdr_frame->pin_count = 1;
+  if ((tmp = load_page(0, file_handle, file_handle->hdr_frame)) != RC::SUCCESS) {
+    file_handle->hdr_frame->pin_count = 0;
+    dispose_block(file_handle->hdr_frame);
     close(fd);
-    delete fileHandle;
+    delete file_handle;
     return tmp;
   }
 
-  fileHandle->hdr_page = &(fileHandle->hdr_frame->page);
-  fileHandle->bitmap = fileHandle->hdr_page->data + BP_FILE_SUB_HDR_SIZE;
-  fileHandle->file_sub_header = (BPFileSubHeader *)fileHandle->hdr_page->data;
-  open_list_[i - 1] = fileHandle;
+  file_handle->hdr_page = &(file_handle->hdr_frame->page);
+  file_handle->bitmap = file_handle->hdr_page->data + BP_FILE_SUB_HDR_SIZE;
+  file_handle->file_sub_header = (BPFileSubHeader *)file_handle->hdr_page->data;
+  open_list_[i - 1] = file_handle;
   *file_id = i - 1;
   LOG_INFO("Successfully open %s.", file_name);
   return RC::SUCCESS;
@@ -335,7 +335,7 @@ RC DiskBufferPool::dispose_page(int file_id, PageNum page_num) {
 
     if (bp_manager_.frame[i].page.page_num == page_num) {
       if (bp_manager_.frame[i].pin_count != 0)
-        return RC::BUFFERPOOL_PAGEPINNED;
+        return RC::BUFFERPOOL_PAGE_PINNED;
       bp_manager_.allocated[i] = false;
     }
   }
@@ -370,7 +370,7 @@ RC DiskBufferPool::force_page(BPFileHandle *file_handle, PageNum page_num) {
 
     if (frame->pin_count != 0) {
       LOG_ERROR("Page :%s:%d has been pinned.", file_handle->file_name, page_num);
-      return RC::BUFFERPOOL_PAGEPINNED;
+      return RC::BUFFERPOOL_PAGE_PINNED;
     }
 
     if (frame->dirty) {
@@ -444,7 +444,7 @@ RC DiskBufferPool::allocate_block(Frame **buffer) {
 
   // There is one Frame which is free.
   for (int i = 0; i < BP_BUFFER_SIZE; i++) {
-    if (bp_manager_.allocated[i] == false) {
+    if (!bp_manager_.allocated[i]) {
       bp_manager_.allocated[i] = true;
       *buffer = bp_manager_.frame + i;
       return RC::SUCCESS;
@@ -457,7 +457,7 @@ RC DiskBufferPool::allocate_block(Frame **buffer) {
   for (int i = 0; i < BP_BUFFER_SIZE; i++) {
     if (bp_manager_.frame[i].pin_count != 0)
       continue;
-    if (flag == false) {
+    if (!flag) {
       flag = true;
       min = i;
       mintime = bp_manager_.frame[i].acc_time;
@@ -488,7 +488,7 @@ RC DiskBufferPool::dispose_block(Frame *buf) {
              buf->file_desc);
     return RC::LOCKED_UNLOCK;
   }
-  if (buf->dirty == true) {
+  if (buf->dirty) {
     RC rc = flush_block(buf);
     if (rc != RC::SUCCESS) {
       return rc;

@@ -121,6 +121,7 @@ public:
   void unlock(Trx *trx);
 
 private:
+  RC lock_internal(Trx *trx, LockTableType type);
   void remove_from_waiting_list(Trx *trx);
   void wakeup_first_lock();
 private:
@@ -163,12 +164,16 @@ public:
   LockManager();
 
   static LockManager &instance();
-
+  void lock_table_shared(Table *table, Trx *trx);
+  void lock_table_exclusive(Table *table, Trx *trx);
+  void lock_table_intent_shared(Table *table, Trx *trx);
+  void lock_table_intent_exclusive(Table *table, Trx *trx);
   void lock_record_shared(Table *table, Trx *trx, const RID &rid);
   void lock_record_exclusive(Table *table, Trx *trx, const RID &rid);
   void unlock(Trx *trx);
 private:
-  void lock_record(Table *table, Trx *trx, const RID &rid, LockRecordType type);
+  void lock_table(Table *table, Trx *trx, LockTableType type);
+  void lock_record(Table *table, Trx *trx, const RID &rid, LockRecordType type); // TODO 行被删掉怎么处理
 };
 
 #endif //__OBSERVER_STORAGE_LOCK_LOCK_H_

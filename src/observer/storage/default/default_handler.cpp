@@ -30,6 +30,7 @@
 #include "storage/common/bplus_tree.h"
 #include "storage/common/table.h"
 #include "storage/common/condition_filter.h"
+#include "storage/lock/lock.h"
 
 DefaultHandler &DefaultHandler::get_default() {
   static DefaultHandler handler;
@@ -194,15 +195,15 @@ RC DefaultHandler::drop_table(const char *dbname, const char *relation_name) {
   return RC::GENERIC_ERROR;
 }
 
-RC DefaultHandler::create_index(const char *dbname, const char *relation_name, const char *index_name, const char *attribute_name) {
+RC DefaultHandler::create_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name, const char *attribute_name) {
   Table *table = find_table(dbname, relation_name);
   if (nullptr == table) {
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
-  return table->create_index(index_name, attribute_name);
+  return table->create_index(trx, index_name, attribute_name);
 }
 
-RC DefaultHandler::drop_index(const char *dbname, const char *relation_name, const char *index_name) {
+RC DefaultHandler::drop_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name) {
 
   return RC::GENERIC_ERROR;
 }
@@ -221,6 +222,7 @@ RC DefaultHandler::delete_record(Trx *trx, const char *dbname, const char *relat
   if (nullptr == table) {
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
+
   CompositeConditionFilter condition_filter;
   RC rc = condition_filter.init(*table, conditions, condition_num);
   if (rc != RC::SUCCESS) {
@@ -235,6 +237,7 @@ RC DefaultHandler::update_record(Trx *trx, const char *dbname, const char *relat
   if (nullptr == table) {
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
+
   return table->update_record(trx, attribute_name, value, condition_num, conditions, updated_count);
 }
 

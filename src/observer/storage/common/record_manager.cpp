@@ -82,12 +82,19 @@ RC RecordPageHandler::init(DiskBufferPool &buffer_pool, int file_id, PageNum pag
     return ret;
   }
 
+  char *data;
+  ret = buffer_pool.get_data(&page_handle_, &data);
+  if (ret != RC::SUCCESS) {
+    LOG_ERROR("Failed to get page data. ret=%d:%s", ret, strrc(ret));
+    return ret;
+  }
+
   disk_buffer_pool_ = &buffer_pool;
   file_id_ = file_id;
 
-  page_header_ = (PageHeader*)(page_handle_.pFrame->page.data);
-  bitmap_ = page_handle_.pFrame->page.data + page_fix_size();
-  return RC::SUCCESS;
+  page_header_ = (PageHeader*)(data);
+  bitmap_ = data + page_fix_size();
+  return ret;
 }
 
 RC RecordPageHandler::init_empty_page(DiskBufferPool &buffer_pool, int file_id, PageNum page_num, int record_size) {
@@ -96,13 +103,13 @@ RC RecordPageHandler::init_empty_page(DiskBufferPool &buffer_pool, int file_id, 
     return ret;
   }
 
-  int page_size = sizeof(page_handle_.pFrame->page.data);
+  int page_size = sizeof(page_handle_.frame->page.data);
   page_header_->record_num = 0;
   page_header_->record_capacity = page_record_capacity(page_size, record_size);
   page_header_->record_real_size = record_size;
   page_header_->record_size = align8(record_size);
   page_header_->first_record_offset = page_header_size(page_header_->record_capacity);
-  bitmap_ = page_handle_.pFrame->page.data + page_fix_size();
+  bitmap_ = page_handle_.frame->page.data + page_fix_size();
 
   memset(bitmap_, 0, page_bitmap_size(page_header_->record_capacity));
   disk_buffer_pool_->mark_dirty(&page_handle_);
@@ -133,7 +140,7 @@ RC RecordPageHandler::insert_record(const char *data, RID *rid) {
   page_header_->record_num++;
 
   // assert index < page_header_->record_capacity
-  char *record_data = page_handle_.pFrame->page.data + 
+  char *record_data = page_handle_.frame->page.data +
       page_header_->first_record_offset + (index * page_header_->record_size);
   memcpy(record_data, data, page_header_->record_real_size);
 
@@ -160,7 +167,7 @@ RC RecordPageHandler::update_record(const Record *rec) {
   if (!bitmap.get_bit(rec->rid.slot_num)) {
     ret = RC::RECORD_RECORD_NOT_EXIST;
   } else {
-    char *record_data = page_handle_.pFrame->page.data + 
+    char *record_data = page_handle_.frame->page.data +
         page_header_->first_record_offset + (rec->rid.slot_num * page_header_->record_size);
     memcpy(record_data, rec->data, page_header_->record_real_size);
     disk_buffer_pool_->mark_dirty(&page_handle_);
@@ -206,7 +213,7 @@ RC RecordPageHandler::get_record(const RID *rid, Record *rec) {
     return RC::RECORD_RECORD_NOT_EXIST;
   }
 
-  char *data = page_handle_.pFrame->page.data + 
+  char *data = page_handle_.frame->page.data +
       page_header_->first_record_offset + (page_header_->record_size * rid->slot_num);
 
   rec->valid = true;
@@ -236,7 +243,7 @@ RC RecordPageHandler::get_next_record(Record *rec) {
   rec->rid.slot_num = index;
   rec->valid = true;
 
-  char *record_data = page_handle_.pFrame->page.data +  // TODO buffer_pool::get_data
+  char *record_data = page_handle_.frame->page.data +  // TODO buffer_pool::get_data
       page_header_->first_record_offset + (index * page_header_->record_size);
   rec->data = record_data;
   return RC::SUCCESS;
@@ -246,7 +253,7 @@ PageNum RecordPageHandler::get_page_num() const {
   if (nullptr == page_header_) {
     return (PageNum)(-1);
   }
-  return page_handle_.pFrame->page.pageNum;
+  return page_handle_.frame->page.page_num;
 }
 
 bool RecordPageHandler::is_full() const {
@@ -332,7 +339,7 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
       return ret;
     }
 
-    current_page_num = page_handle.pFrame->page.pageNum;
+    current_page_num = page_handle.frame->page.page_num;
     record_page_handler_.deinit();
     ret = record_page_handler_.init_empty_page(*disk_buffer_pool_, file_id_, current_page_num, record_size);
     if (ret != RC::SUCCESS) { // TODO 初始化失败，文件就被破坏了

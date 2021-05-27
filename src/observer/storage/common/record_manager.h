@@ -37,6 +37,15 @@ struct RID
   }
 };
 
+namespace std {
+template <>
+struct hash<RID> {
+  size_t operator() (const RID &rid) const {
+    return ((size_t)(rid.page_num) << 32) | rid.slot_num;
+  }
+};
+}
+
 struct Record 
 {
   bool valid; // false means the recard hasn't been load
@@ -51,14 +60,6 @@ public:
   }
 };
 
-namespace std {
-template <>
-struct hash<RID> {
-  size_t operator() (const RID &rid) const {
-    return ((size_t)(rid.page_num) << 32) | rid.slot_num;
-  }
-};
-}
 class RidEqualChecker {
 public:
   bool operator() (const RID &rid1, const RID &rid2) const {

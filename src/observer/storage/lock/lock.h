@@ -110,7 +110,7 @@ public:
 
 private:
   Trx *trx_;
-  using RecordLockMap = std::unordered_map<RID, LockRecordMeta, RidDigest, RidEqualChecker>;
+  using RecordLockMap = std::unordered_map<RID, LockRecordMeta>;
   std::unordered_map<Table *, RecordLockMap> locks_;
 };
 
@@ -156,7 +156,7 @@ public:
 
 private:
   Table *table_;
-  std::unordered_map<RID, RecordLocksInRecord, RidDigest, RidEqualChecker> locks_;
+  std::unordered_map<RID, RecordLocksInRecord> locks_;
 };
 
 class LockManager {

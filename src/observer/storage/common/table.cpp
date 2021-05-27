@@ -206,7 +206,14 @@ RC Table::insert_record(Trx *trx, Record *record) {
   }
 
   if (trx != nullptr) {
-    LockManager::instance().lock_record_exclusive(this, trx, record->rid);
+    RC rc_lock = LockManager::instance().lock_record_exclusive(this, trx, record->rid);
+    if (rc_lock != RC::SUCCESS) {
+      LOG_PANIC("Lock record failed when inserting record. rid=%d.%d, rc=%d:%s",
+                record->rid.page_num, record->rid.slot_num, rc_lock, strrc(rc_lock));
+      record_handler_->delete_record(&record->rid);
+      return RC::LOCKED_LOCK;
+    }
+
     rc = trx->insert_record(this, record);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to log operation(insertion) to trx");
@@ -381,8 +388,8 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   rc = scanner.get_first_record(&record);
   for ( ; RC::SUCCESS == rc && record_count < limit; rc = scanner.get_next_record(&record)) {
     if (trx == nullptr || trx->is_visible(this, &record)) {
-      if (trx != nullptr) {
-        LockManager::instance().lock_record_shared(this, trx, record.rid);
+      if (trx != nullptr && LockManager::instance().lock_record_shared(this, trx, record.rid) != RC::SUCCESS) {
+        continue;
       }
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {
@@ -425,8 +432,8 @@ RC Table::scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter 
     }
 
     if ((trx == nullptr || trx->is_visible(this, &record)) && (filter == nullptr || filter->filter(record))) {
-      if (trx != nullptr) {
-        LockManager::instance().lock_record_shared(this, trx, rid);
+      if (trx != nullptr && LockManager::instance().lock_record_shared(this, trx, rid) != RC::SUCCESS) {
+        continue;
       }
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {
@@ -824,7 +831,12 @@ RC Table::delete_record(Trx *trx, Record *record) {
   RC rc = RC::SUCCESS;
   if (trx != nullptr) {
     LockManager::instance().lock_table_intent_exclusive(this, trx); // TODO drop table时，会影响这个方法
-    LockManager::instance().lock_record_exclusive(this, trx, record->rid);
+    RC rc_lock = LockManager::instance().lock_record_exclusive(this, trx, record->rid);
+    if (rc_lock != RC::SUCCESS) {
+      LOG_TRACE("Lock record failed. may be deleted, rid=%d.%d,rc=%d:%s",
+                record->rid.page_num, record->rid.slot_num, rc_lock, strrc(rc_lock));
+      return rc;
+    }
     rc = trx->delete_record(this, record);
   } else {
     rc = delete_entry_of_indexes(record->data, record->rid, false);// TODO 重复代码 refer to commit_delete

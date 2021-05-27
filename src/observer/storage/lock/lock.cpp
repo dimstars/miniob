@@ -179,6 +179,23 @@ void RecordLocksInTrx::unlock() {
   locks_.clear();
 }
 
+void RecordLocksInTrx::delete_record(Table *table, const RID &rid) {
+  auto record_locks_iter = locks_.find(table);
+  if (record_locks_iter == locks_.end()) {
+    LOG_PANIC("No such lock of table");
+    return;
+  }
+
+  RecordLockMap &record_locks = record_locks_iter->second;
+  record_locks.erase(rid);
+  if (record_locks.empty()) {
+    locks_.erase(record_locks_iter);
+  }
+
+  RecordLocksInTable & record_locks_in_table = table->record_locks();
+  record_locks_in_table.delete_record(rid, trx_);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 TableLocksInTable::TableLocksInTable(Table *table) : table_(table){
   mutex_ptr_ = std::make_shared<std::mutex>();
@@ -308,7 +325,7 @@ RecordLocksInRecord::RecordLocksInRecord(Table *table, const RID &rid) : table_(
   mutex_ptr_ = std::make_shared<std::mutex>();
 }
 
-void RecordLocksInRecord::lock(Trx *trx, LockRecordType type) {
+RC RecordLocksInRecord::lock(Trx *trx, LockRecordType type) {
   RC rc = RC::SUCCESS;
   std::unique_lock<std::mutex> unique_lock(*mutex_ptr_);
   do {
@@ -316,12 +333,16 @@ void RecordLocksInRecord::lock(Trx *trx, LockRecordType type) {
     if (rc == RC::LOCKED_NEED_WAIT) {
       trx->wait(unique_lock);
     }
-  } while (rc != RC::SUCCESS);
+  } while (rc == RC::LOCKED_NEED_WAIT);
+  return rc;
 }
 
 RC RecordLocksInRecord::lock_internal(Trx *trx, LockRecordType type) {
   RC rc = RC::SUCCESS;
 
+  if (deleted_) {
+    return RC::LOCKED_RESOURCE_DELETED;
+  }
   auto record_lock_iter = locks_.find(trx);
   if (record_lock_iter != locks_.end()) {
     LockRecordMeta & record_lock = record_lock_iter->second;
@@ -412,16 +433,28 @@ void RecordLocksInRecord::unlock(Trx *trx) {
   }
 }
 
+void RecordLocksInRecord::delete_record(Trx *trx) {
+  std::unique_lock<std::mutex> unique_lock(*mutex_ptr_);
+  // 加的一定是排他锁
+  locks_.erase(trx);
+  // 唤醒所有的等待锁
+  deleted_ = true;
+  for (const auto &waiting_lock : waiting_list_) {
+    waiting_lock.trx()->wakeup();
+  }
+  waiting_list_.clear();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 RecordLocksInTable::RecordLocksInTable(Table *table) : table_(table) {
 }
 
-void RecordLocksInTable::lock(Trx *trx, const RID &rid, LockRecordType type) {
+RC RecordLocksInTable::lock(Trx *trx, const RID &rid, LockRecordType type) {
   auto record_locks_iter = locks_.find(rid);
   if (record_locks_iter == locks_.end()) {
     record_locks_iter = locks_.insert(std::make_pair(rid, RecordLocksInRecord(table_, rid))).first;
   }
-  record_locks_iter->second.lock(trx, type);
+  return record_locks_iter->second.lock(trx, type);
 }
 
 void RecordLocksInTable::unlock(const RID &rid, Trx *trx) {
@@ -431,6 +464,15 @@ void RecordLocksInTable::unlock(const RID &rid, Trx *trx) {
     return;
   }
   record_locks_iter->second.unlock(trx);
+}
+
+void RecordLocksInTable::delete_record(const RID &rid, Trx *trx) {
+  auto record_locks_iter = locks_.find(rid);
+  if (record_locks_iter == locks_.end()) {
+    LOG_PANIC("Cannot find lock of rid=%d.%d", rid.page_num, rid.slot_num);
+    return;
+  }
+  record_locks_iter->second.delete_record(trx);
 }
 ////////////////////////////////////////////////////////////////////////////////
 LockManager::LockManager() {
@@ -466,29 +508,38 @@ void LockManager::lock_table(Table *table, Trx *trx, LockTableType type) {
   trx->table_locks().add_lock(table, type);
 }
 
-void LockManager::lock_record_shared(Table *table, Trx *trx, const RID &rid) {
-  lock_record(table, trx, rid, LockRecordType::SHARED);
+RC LockManager::lock_record_shared(Table *table, Trx *trx, const RID &rid) {
+  return lock_record(table, trx, rid, LockRecordType::SHARED);
 }
 
-void LockManager::lock_record_exclusive(Table *table, Trx *trx, const RID &rid) {
-  lock_record(table, trx, rid, LockRecordType::EXCLUSIVE);
+RC LockManager::lock_record_exclusive(Table *table, Trx *trx, const RID &rid) {
+  return lock_record(table, trx, rid, LockRecordType::EXCLUSIVE);
 }
 
-void LockManager::lock_record(Table *table, Trx *trx, const RID &rid, LockRecordType type) {
+RC LockManager::lock_record(Table *table, Trx *trx, const RID &rid, LockRecordType type) {
+  RC rc = RC::SUCCESS;
   // 先判断有没有对应的表锁能满足需求
   TableLocksInTrx & table_locks_in_trx = trx->table_locks();
   if ((LockRecordType::SHARED == type && table_locks_in_trx.is_locked(table, LockTableType::SHARED)) ||
       (LockRecordType::EXCLUSIVE == type && table_locks_in_trx.is_locked(table, LockTableType::EXCLUSIVE))) {
-    return;
+    return rc;
   }
 
   RecordLocksInTrx & record_locks_in_trx = trx->record_locks();
   if (record_locks_in_trx.is_locked(table, rid, type)) {
-    return;
+    return rc;
   }
   RecordLocksInTable & record_locks = table->record_locks();
-  record_locks.lock(trx, rid, type);
-  trx->record_locks().add_lock(table, rid, type);
+  rc = record_locks.lock(trx, rid, type);
+  if (rc == RC::SUCCESS) {
+    trx->record_locks().add_lock(table, rid, type);
+  }
+  return rc;
+}
+
+void LockManager::delete_record(Table *table, Trx *trx, const RID &rid) {
+  RecordLocksInTrx &record_locks_in_trx = trx->record_locks();
+  record_locks_in_trx.delete_record(table, rid);
 }
 
 void LockManager::unlock(Trx *trx) {

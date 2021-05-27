@@ -116,6 +116,7 @@ enum RCLock {
   SHAREDCACHE,
   LVIRT,
   NEED_WAIT,
+  RESOURCE_DELETED,
 };
 
 enum RCBusy {
@@ -298,6 +299,7 @@ enum RC {
   LOCKED_SHAREDCACHE = (LOCKED | (RCLock::SHAREDCACHE << 8)),
   LOCKED_VIRT = (LOCKED | (RCLock::LVIRT << 8)),
   LOCKED_NEED_WAIT = (LOCKED | (RCLock::NEED_WAIT << 8)),
+  LOCKED_RESOURCE_DELETED = (LOCKED | (RCLock::RESOURCE_DELETED << 8)),
 
   /* busy part */
   BUSY_RECOVERY = (BUSY | (RCBusy::BRECOVERY << 8)),

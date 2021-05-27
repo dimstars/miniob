@@ -106,6 +106,10 @@ public:
    */
   bool is_locked(Table *table, const RID &rid, LockRecordType type);
   void add_lock(Table *table, const RID &rid, LockRecordType type);
+  /**
+   * 某行被删除时，当前事务提交后，需要释放锁，并唤醒所有其它等待的锁
+   */
+  void delete_record(Table *table, const RID &rid);
   void unlock();
 
 private:
@@ -134,9 +138,9 @@ private:
 class RecordLocksInRecord {
 public:
   explicit RecordLocksInRecord(Table *table, const RID &rid);
-  void lock(Trx *trx, LockRecordType type);
+  RC lock(Trx *trx, LockRecordType type);
   void unlock(Trx *trx);
-
+  void delete_record(Trx *trx);
 private:
   RC lock_internal(Trx *trx, LockRecordType type);
 
@@ -144,6 +148,7 @@ private:
   std::shared_ptr<std::mutex> mutex_ptr_;
   Table *table_;
   RID rid_;
+  bool deleted_ = false;
   std::unordered_map<Trx *, LockRecordMeta> locks_;
   std::vector<LockRecordMeta> waiting_list_;
 };
@@ -151,9 +156,9 @@ private:
 class RecordLocksInTable {
 public:
   explicit RecordLocksInTable(Table *table);
-  void lock(Trx *trx, const RID &rid, LockRecordType type);
+  RC lock(Trx *trx, const RID &rid, LockRecordType type);
   void unlock(const RID &rid, Trx *trx);
-
+  void delete_record(const RID &rid, Trx *trx);
 private:
   Table *table_;
   std::unordered_map<RID, RecordLocksInRecord> locks_;
@@ -168,12 +173,13 @@ public:
   void lock_table_exclusive(Table *table, Trx *trx);
   void lock_table_intent_shared(Table *table, Trx *trx);
   void lock_table_intent_exclusive(Table *table, Trx *trx);
-  void lock_record_shared(Table *table, Trx *trx, const RID &rid);
-  void lock_record_exclusive(Table *table, Trx *trx, const RID &rid);
+  RC lock_record_shared(Table *table, Trx *trx, const RID &rid);
+  RC lock_record_exclusive(Table *table, Trx *trx, const RID &rid);
+  void delete_record(Table *table, Trx *trx, const RID &rid);
   void unlock(Trx *trx);
 private:
   void lock_table(Table *table, Trx *trx, LockTableType type);
-  void lock_record(Table *table, Trx *trx, const RID &rid, LockRecordType type); // TODO 行被删掉怎么处理
+  RC lock_record(Table *table, Trx *trx, const RID &rid, LockRecordType type); // TODO 行被删掉怎么处理
 };
 
 #endif //__OBSERVER_STORAGE_LOCK_LOCK_H_

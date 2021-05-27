@@ -165,6 +165,7 @@ RC Trx::commit() {
         }
         break;
         case Operation::Type::DELETE: {
+          LockManager::instance().delete_record(table, this, rid);
           rc = table->commit_delete(this, rid);
           if (rc != RC::SUCCESS) {
             // TODO handle rc

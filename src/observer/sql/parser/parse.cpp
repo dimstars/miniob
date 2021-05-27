@@ -17,6 +17,7 @@
 // Created by Longda on 2021/4/13.
 //
 
+#include <mutex>
 #include "handler/handler_defs.h"
 #include "yacc_sql.tab.h"
 #include "rc.h"
@@ -109,7 +110,11 @@ RC parse(const char *st, sqlstr *sqln) {
     sqln->sstr = *getSqls();
   }
 
+  static std::mutex lock;
+  lock.lock();
   hust_parse(sqln);
+  lock.unlock();
+
   if (sqln->flag == 0)
     return SQL_SYNTAX;
   else

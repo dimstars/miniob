@@ -33,6 +33,7 @@
 typedef int PageNum; // 使用Unsigned不能清晰的判断是否invalid page number
 
 //
+#define BP_INVALID_PAGE_NUM (-1)
 #define BP_PAGE_SIZE (1 << 12)
 #define BP_PAGE_DATA_SIZE (BP_PAGE_SIZE - sizeof(PageNum))
 #define BP_FILE_SUB_HDR_SIZE (sizeof(BPFileSubHeader))

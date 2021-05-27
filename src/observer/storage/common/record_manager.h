@@ -30,7 +30,7 @@ struct RID
 {
   PageNum page_num; // record's page number
   SlotNum slot_num; // record's slot number
-  bool    valid;    // true means a valid record
+  // bool    valid;    // true means a valid record
 
   bool operator== (const RID &other) const {
     return page_num == other.page_num && slot_num == other.slot_num;
@@ -48,7 +48,7 @@ struct hash<RID> {
 
 struct Record 
 {
-  bool valid; // false means the recard hasn't been load
+  // bool valid; // false means the record hasn't been load
   RID  rid;   // record's rid
   char *data; // record's data
 };

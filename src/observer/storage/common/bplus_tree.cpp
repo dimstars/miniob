@@ -499,7 +499,7 @@ RC BplusTreeHandler::insert_intern_node(PageNum parent_page,PageNum left_page,Pa
     memcpy(node->keys+i*file_header_.key_length,node->keys+(i-1)*file_header_.key_length,file_header_.key_length);
   }
   rid.page_num = right_page;
-  rid.slot_num = -1; // TODO change to invalid page num
+  rid.slot_num = BP_INVALID_PAGE_NUM; // TODO change to invalid page num
   memcpy(node->rids+insert_pos+1,&rid,sizeof(RID));
   memcpy(node->keys+insert_pos*file_header_.key_length,pkey,file_header_.key_length);
   node->key_num++;

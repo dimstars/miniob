@@ -149,7 +149,6 @@ RC RecordPageHandler::insert_record(const char *data, RID *rid) {
   if (rid) {
     rid->page_num = get_page_num();
     rid->slot_num = index;
-    rid->valid = true;
   }
 
   LOG_TRACE("Insert record. rid page_num=%d, slot num=%d", get_page_num(), index);
@@ -216,7 +215,7 @@ RC RecordPageHandler::get_record(const RID *rid, Record *rec) {
   char *data = page_handle_.frame->page.data +
       page_header_->first_record_offset + (page_header_->record_size * rid->slot_num);
 
-  rec->valid = true;
+  // rec->valid = true;
   rec->rid = *rid;
   rec->data = data; // TODO 参考table中的调用，返回record后，page可能会释放掉
   return RC::SUCCESS;
@@ -241,7 +240,7 @@ RC RecordPageHandler::get_next_record(Record *rec) {
 
   rec->rid.page_num = get_page_num();
   rec->rid.slot_num = index;
-  rec->valid = true;
+  // rec->valid = true;
 
   char *record_data = page_handle_.frame->page.data +  // TODO buffer_pool::get_data
       page_header_->first_record_offset + (index * page_header_->record_size);
@@ -425,7 +424,7 @@ RC RecordFileScanner::close_scan() {
 RC RecordFileScanner::get_first_record(Record *rec) {
   rec->rid.page_num = 1; // from 1 参考DiskBufferPool
   rec->rid.slot_num = -1;
-  rec->valid = false;
+  // rec->valid = false;
   return get_next_record(rec);
 }
 

@@ -21,17 +21,17 @@
 #define __COMMON_LANG_STRING_H__
 
 // Basic includes
-#include <cstdlib>
 #include <cxxabi.h>
+#include <stdlib.h>
+#include <signal.h>
+
+#include <cstdlib>
 #include <iostream>
 #include <set>
-#include <signal.h>
 #include <sstream>
 #include <string>
 #include <typeinfo>
 #include <vector>
-
-#include <stdlib.h>
 
 #include "common/defs.h"
 namespace common {
@@ -48,21 +48,21 @@ char *strip(char *str);
  * @param[in]   pad     decimal digits for the string padding
  * return   output 0-padded size string
  */
-std::string sizeToPadStr(int size, int pad);
+std::string size_to_pad_str(int size, int pad);
 
 //! Convert a string to upper case.
 /**
  * @param[in,out] s the string to modify
  * @return a reference to the string that was modified.
  */
-std::string &strToUpper(std::string &s);
+std::string &str_to_upper(std::string &s);
 
 //! Convert a string to lower case.
 /**
  * @param[in,out] s the string to modify
  * @return a reference to the string that was modified.
  */
-std::string &strToLower(std::string &s);
+std::string &str_to_lower(std::string &s);
 
 //! Split string str using 'delimiter's
 /**
@@ -70,29 +70,29 @@ std::string &strToLower(std::string &s);
  * @param[in]      delims     elimiter characters
  * @param[in,out] results     ector containing the split up string
  */
-void splitString(const std::string &str, std::string delim,
+void split_string(const std::string &str, std::string delim,
                  std::set<std::string> &results);
-void splitString(const std::string &str, std::string delim,
+void split_string(const std::string &str, std::string delim,
                  std::vector<std::string> &results);
-void splitString(char *str, char dim, std::vector<char *> &results,
+void split_string(char *str, char dim, std::vector<char *> &results,
                  bool keep_null = false);
 
-void mergeString(std::string &str, std::string delim,
-                 std::vector<std::string> &result, size_t resultLen = 0);
+void merge_string(std::string &str, std::string delim,
+                 std::vector<std::string> &result, size_t result_len = 0);
 /**
  * replace old with new in the string
  */
 void replace(std::string &str, const std::string &old,
-             const std::string &newStr);
+             const std::string &new_str);
 
 /*
  * binary to hexadecimal
  */
-char *bin2hex(const char *s, const int len, char *szHexBuff);
+char *bin2hex(const char *s, const int len, char *sz_hex_buff);
 /*
  * hexadecimal to binary
  */
-char *hex2bin(const char *s, char *szBinBuff, int *nDestLen);
+char *hex2bin(const char *s, char *sz_bin_buff, int *n_dest_len);
 
 //! Convert a number in a string format to a numeric value
 /**
@@ -107,7 +107,7 @@ char *hex2bin(const char *s, char *szBinBuff, int *nDestLen);
  *         number, \c false otherwise
  */
 template <class T>
-bool strToVal(const std::string &str, T &val,
+bool str_to_val(const std::string &str, T &val,
               std::ios_base &(*radix)(std::ios_base &) = std::dec);
 
 //! Convert a numeric value into its string representation
@@ -121,17 +121,17 @@ bool strToVal(const std::string &str, T &val,
  *                      (hexidecimal).
  */
 template <class T>
-void valToStr(const T &val, std::string &str,
+void val_to_str(const T &val, std::string &str,
               std::ios_base &(*radix)(std::ios_base &) = std::dec);
 
 /**
  * get type's name
  */
-template <class T> std::string getTypeName(const T &val);
+template <class T> std::string get_type_name(const T &val);
 
 // Templatized functions have to be in the header file
 template <class T>
-bool strToVal(const std::string &str, T &val,
+bool str_to_val(const std::string &str, T &val,
               std::ios_base &(*radix)(std::ios_base &)/* = std::dec */) {
   bool success = true;
   std::istringstream is(str);
@@ -143,14 +143,14 @@ bool strToVal(const std::string &str, T &val,
 }
 
 template <class T>
-void valToStr(const T &val, std::string &str,
+void val_to_str(const T &val, std::string &str,
               std::ios_base &(*radix)(std::ios_base &)/* = std::dec */) {
   std::stringstream strm;
   strm << radix << val;
   str = strm.str();
 }
 
-template <class T> std::string getTypeName(const T &val) {
+template <class T> std::string get_type_name(const T &val) {
   int status = 0;
   char *stmp = abi::__cxa_demangle(typeid(val).name(), 0, 0, &status);
   if (!stmp)

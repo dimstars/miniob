@@ -72,7 +72,7 @@ int initLog(ProcessParam *pProcessCfg, Ini &gProperties) {
   const std::string &procName = pProcessCfg->get_process_name();
   try {
     // we had better alloc one lock to do so, but simplify the logic
-    if (gLog) {
+    if (g_log) {
       return 0;
     }
 
@@ -100,7 +100,7 @@ int initLog(ProcessParam *pProcessCfg, Ini &gProperties) {
     it = logSection.find(key);
     if (it != logSection.end()) {
       int log = (int)logLevel;
-      strToVal(it->second, log);
+      str_to_val(it->second, log);
       logLevel = (LOG_LEVEL)log;
     }
 
@@ -109,16 +109,16 @@ int initLog(ProcessParam *pProcessCfg, Ini &gProperties) {
     it = logSection.find(key);
     if (it != logSection.end()) {
       int log = (int)consoleLevel;
-      strToVal(it->second, log);
+      str_to_val(it->second, log);
       consoleLevel = (LOG_LEVEL)log;
     }
 
-    LoggerFactory::initDefault(logFileName, logLevel, consoleLevel);
+    LoggerFactory::init_default(logFileName, logLevel, consoleLevel);
 
     key = ("DefaultLogModules");
     it = logSection.find(key);
     if (it != logSection.end()) {
-      gLog->SetDefaultModule(it->second);
+      g_log->set_default_module(it->second);
     }
 
     if (pProcessCfg->is_demon()) {
@@ -137,9 +137,9 @@ int initLog(ProcessParam *pProcessCfg, Ini &gProperties) {
 
 void cleanupLog() {
 
-  if (gLog) {
-    delete gLog;
-    gLog = nullptr;
+  if (g_log) {
+    delete g_log;
+    g_log = nullptr;
   }
   return;
 }

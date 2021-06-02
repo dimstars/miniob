@@ -199,7 +199,7 @@ void SedaConfig::initEventHistory() {
   key = MAX_EVENT_HISTORY_NUM;
   it = baseSection.find(key);
   if (it != baseSection.end()) {
-    strToVal(it->second, maxEventHops);
+    str_to_val(it->second, maxEventHops);
   }
   theMaxEventHops() = maxEventHops;
 
@@ -228,11 +228,11 @@ SedaConfig::status_t SedaConfig::initThreadPool() {
     std::vector<std::string> nameList;
     std::string splitTag;
     splitTag.assign(1, Ini::CFG_DELIMIT_TAG);
-    splitString(poolNames, splitTag, nameList);
+    split_string(poolNames, splitTag, nameList);
 
     int cpuNum = getCpuNum();
     std::string defaultCpuNumStr;
-    valToStr(cpuNum, defaultCpuNumStr);
+    val_to_str(cpuNum, defaultCpuNumStr);
 
     for (size_t pos = 0; pos != nameList.size(); pos++) {
       std::string &threadName = nameList[pos];
@@ -242,7 +242,7 @@ SedaConfig::status_t SedaConfig::initThreadPool() {
       std::string countStr = theGlobalProperties()->get(key, defaultCpuNumStr, threadName);
 
       int threadCount = 1;
-      strToVal(countStr, threadCount);
+      str_to_val(countStr, threadCount);
       if (threadCount < 1) {
         LOG_INFO("Thread number of  %s is %d, it is same as cpu's cores.",
                   threadName.c_str(), cpuNum);
@@ -325,7 +325,7 @@ SedaConfig::status_t SedaConfig::initStages() {
 
     std::string splitTag;
     splitTag.assign(1, Ini::CFG_DELIMIT_TAG);
-    splitString(it->second, splitTag, mStageNames);
+    split_string(it->second, splitTag, mStageNames);
 
     for (std::vector<std::string>::iterator it = mStageNames.begin();
          it != mStageNames.end(); it++) {
@@ -385,7 +385,7 @@ SedaConfig::status_t SedaConfig::genNextStages() {
       std::vector<std::string> nextStageNameList;
       std::string splitTag;
       splitTag.assign(1, Ini::CFG_DELIMIT_TAG);
-      splitString(nextStageNames, splitTag, nextStageNameList);
+      split_string(nextStageNames, splitTag, nextStageNameList);
 
       for (std::vector<std::string>::iterator nextIt =
         nextStageNameList.begin();

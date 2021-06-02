@@ -21,6 +21,7 @@
  */
 
 
+#include <netinet/in.h>
 #include <unistd.h>
 #include <iostream>
 
@@ -84,19 +85,19 @@ Server *init_server() {
   std::map<std::string, std::string>::iterator it = net_section.find(CLIENT_ADDRESS);
   if (it != net_section.end()) {
     std::string str = it->second;
-    strToVal(str, listen_addr);
+    str_to_val(str, listen_addr);
   }
 
   it = net_section.find(MAX_CONNECTION_NUM);
   if (it != net_section.end()) {
     std::string str = it->second;
-    strToVal(str, max_connection_num);
+    str_to_val(str, max_connection_num);
   }
 
   it = net_section.find(PORT);
   if (it != net_section.end()) {
     std::string str = it->second;
-    strToVal(str, port);
+    str_to_val(str, port);
   }
 
   ServerParam server_param;

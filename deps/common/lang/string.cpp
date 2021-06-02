@@ -17,22 +17,27 @@
 // Created by Longda on 2010
 //
 
-#include <algorithm>
+#include "common/lang/string.h"
+
 #include <ctype.h>
 #include <errno.h>
+#include <string.h>
+
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
-#include <string.h>
 #include <string>
 
-#include "common/lang/string.h"
+#include "common/log/log.h"
 namespace common {
 
 char *strip(char *str_) {
-  if (str_ == NULL || *str_ == 0)
+  if (str_ == NULL || *str_ == 0){
+    LOG_ERROR("The augument is invalid!");
     return str_;
+  }
 
   char *head = str_;
   while (isspace(*head))
@@ -61,55 +66,55 @@ void strip(std::string &str) {
 }
 
 // Translation functions with templates are defined in the header file
-std::string sizeToPadStr(int size, int pad) {
+std::string size_to_pad_str(int size, int pad) {
   std::ostringstream ss;
   ss << std::setw(pad) << std::setfill('0') << size;
   return ss.str();
 }
 
-std::string &strToUpper(std::string &s) {
+std::string &str_to_upper(std::string &s) {
   std::transform(s.begin(), s.end(), s.begin(), (int (*)(int)) & std::toupper);
   return s;
 }
 
-std::string &strToLower(std::string &s) {
+std::string &str_to_lower(std::string &s) {
   std::transform(s.begin(), s.end(), s.begin(), (int (*)(int)) & std::tolower);
   return s;
 }
 
-void splitString(const std::string &str, std::string delim,
+void split_string(const std::string &str, std::string delim,
                  std::set<std::string> &results) {
-  int cutAt;
-  std::string tmpStr(str);
-  while ((cutAt = tmpStr.find_first_of(delim)) != (signed)tmpStr.npos) {
-    if (cutAt > 0) {
-      results.insert(tmpStr.substr(0, cutAt));
+  int cut_at;
+  std::string tmp_str(str);
+  while ((cut_at = tmp_str.find_first_of(delim)) != (signed)tmp_str.npos) {
+    if (cut_at > 0) {
+      results.insert(tmp_str.substr(0, cut_at));
     }
-    tmpStr = tmpStr.substr(cutAt + 1);
+    tmp_str = tmp_str.substr(cut_at + 1);
   }
 
-  if (tmpStr.length() > 0) {
-    results.insert(tmpStr);
+  if (tmp_str.length() > 0) {
+    results.insert(tmp_str);
   }
 }
 
-void splitString(const std::string &str, std::string delim,
+void split_string(const std::string &str, std::string delim,
                  std::vector<std::string> &results) {
-  int cutAt;
-  std::string tmpStr(str);
-  while ((cutAt = tmpStr.find_first_of(delim)) != (signed)tmpStr.npos) {
-    if (cutAt > 0) {
-      results.push_back(tmpStr.substr(0, cutAt));
+  int cut_at;
+  std::string tmp_str(str);
+  while ((cut_at = tmp_str.find_first_of(delim)) != (signed)tmp_str.npos) {
+    if (cut_at > 0) {
+      results.push_back(tmp_str.substr(0, cut_at));
     }
-    tmpStr = tmpStr.substr(cutAt + 1);
+    tmp_str = tmp_str.substr(cut_at + 1);
   }
 
-  if (tmpStr.length() > 0) {
-    results.push_back(tmpStr);
+  if (tmp_str.length() > 0) {
+    results.push_back(tmp_str);
   }
 }
 
-void splitString(char *str, char dim, std::vector<char *> &results,
+void split_string(char *str, char dim, std::vector<char *> &results,
                  bool keep_null) {
   char *p = str;
   char *l = p;
@@ -127,20 +132,20 @@ void splitString(char *str, char dim, std::vector<char *> &results,
   return;
 }
 
-void mergeString(std::string &str, std::string delim,
-                 std::vector<std::string> &source, size_t resultLen ){
+void merge_string(std::string &str, std::string delim,
+                 std::vector<std::string> &source, size_t result_len){
 
   std::ostringstream ss;
   if (source.empty() ) {
     str = ss.str();
-    return ;
+    return;
   }
 
-  if (resultLen == 0 || resultLen > source.size()) {
-    resultLen = source.size();
+  if (result_len == 0 || result_len > source.size()) {
+    result_len = source.size();
   }
 
-  for (int i = 0; i < resultLen; i++) {
+  for (int i = 0; i < result_len; i++) {
     if (i == 0) {
       ss << source[i];
     }else {
@@ -154,8 +159,8 @@ void mergeString(std::string &str, std::string delim,
 }
 
 void replace(std::string &str, const std::string &old,
-             const std::string &newStr) {
-  if (old.compare(newStr) == 0) {
+             const std::string &new_str) {
+  if (old.compare(new_str) == 0) {
     return;
   }
 
@@ -170,59 +175,59 @@ void replace(std::string &str, const std::string &old,
   std::string result;
 
   size_t index;
-  size_t lastIndex = 0;
+  size_t last_index = 0;
 
-  while ((index = str.find(old, lastIndex)) != std::string::npos) {
-    result += str.substr(lastIndex, index - lastIndex);
-    result += newStr;
-    lastIndex = index + old.length();
+  while ((index = str.find(old, last_index)) != std::string::npos) {
+    result += str.substr(last_index, index - last_index);
+    result += new_str;
+    last_index = index + old.length();
   }
 
-  result += str.substr(lastIndex, str.length() - lastIndex + 1);
+  result += str.substr(last_index, str.length() - last_index + 1);
 
   str = result;
 
   return;
 }
 
-char *bin2hex(const char *s, const int len, char *szHexBuff) {
-  int nLen = 0;
-  unsigned char *pEnd = (unsigned char *)s + len;
-  for (unsigned char *p = (unsigned char *)s; p < pEnd; p++) {
-    nLen += sprintf(szHexBuff + nLen, "%02x", *p);
+char *bin2hex(const char *s, const int len, char *sz_hex_buff) {
+  int n_len = 0;
+  unsigned char *p_end = (unsigned char *)s + len;
+  for (unsigned char *p = (unsigned char *)s; p < p_end; p++) {
+    n_len += sprintf(sz_hex_buff + n_len, "%02x", *p);
   }
 
-  szHexBuff[nLen] = '\0';
-  return szHexBuff;
+  sz_hex_buff[n_len] = '\0';
+  return sz_hex_buff;
 }
 
-char *hex2bin(const char *s, char *szBinBuff, int *nDestLen) {
+char *hex2bin(const char *s, char *sz_bin_buff, int *n_destLen) {
   char buff[3];
-  char *pSrc;
-  int nSrcLen;
-  char *pDest;
-  char *pDestEnd;
+  char *p_src;
+  int n_srcLen;
+  char *p_dest;
+  char *p_dest_end;
 
-  nSrcLen = strlen(s);
-  if (nSrcLen == 0) {
-    *nDestLen = 0;
-    szBinBuff[0] = '\0';
-    return szBinBuff;
+  n_srcLen = strlen(s);
+  if (n_srcLen == 0) {
+    *n_destLen = 0;
+    sz_bin_buff[0] = '\0';
+    return sz_bin_buff;
   }
 
-  *nDestLen = nSrcLen / 2;
-  pSrc = (char *)s;
+  *n_destLen = n_srcLen / 2;
+  p_src = (char *)s;
   buff[2] = '\0';
 
-  pDestEnd = szBinBuff + (*nDestLen);
-  for (pDest = szBinBuff; pDest < pDestEnd; pDest++) {
-    buff[0] = *pSrc++;
-    buff[1] = *pSrc++;
-    *pDest = (char)strtol(buff, NULL, 16);
+  p_dest_end = sz_bin_buff + (*n_destLen);
+  for (p_dest = sz_bin_buff; p_dest < p_dest_end; p_dest++) {
+    buff[0] = *p_src++;
+    buff[1] = *p_src++;
+    *p_dest = (char)strtol(buff, NULL, 16);
   }
 
-  *pDest = '\0';
-  return szBinBuff;
+  *p_dest = '\0';
+  return sz_bin_buff;
 }
 
 bool is_blank(const char *s) {

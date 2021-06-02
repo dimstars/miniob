@@ -41,7 +41,7 @@ int main() {
 
   std::string temp(p);
   long long target = 0;
-  strToVal(temp, target);
+  str_to_val(temp, target);
 
   EXPECT_EQ(pid, target);
 }

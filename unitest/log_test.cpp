@@ -40,9 +40,9 @@ int LogTest::init(const std::string &logFile) {
 
 
 
-  LoggerFactory::initDefault(logFile);
+  LoggerFactory::init_default(logFile);
 
-  gLog->SetRotateType(LOG_ROTATE_BYSIZE);
+  g_log->set_rotate_type(LOG_ROTATE_BYSIZE);
 
   return 0;
 }
@@ -62,7 +62,7 @@ void checkRotate() {
   LogTest test;
 
   test.init();
-  ASSERT_EQ(gLog->GetRotateType(), LOG_ROTATE_BYSIZE);
+  ASSERT_EQ(g_log->get_rotate_type(), LOG_ROTATE_BYSIZE);
 
   int index = 30;
   test.log_loop(&index);
@@ -79,23 +79,23 @@ void testEnableTest() {
   test.init();
 
 
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_PANIC, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_ERR, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_WARN, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_INFO, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_DEBUG, __FILE__), false);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_TRACE, __FILE__), false);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_LAST, __FILE__), false);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_PANIC, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_ERR, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_WARN, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_INFO, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_DEBUG, __FILE__), false);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_TRACE, __FILE__), false);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_LAST, __FILE__), false);
 
-  gLog->SetDefaultModule(__FILE__);
+  g_log->set_default_module(__FILE__);
 
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_PANIC, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_ERR, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_WARN, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_INFO, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_DEBUG, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_TRACE, __FILE__), true);
-  ASSERT_EQ(gLog->CheckOutput(LOG_LEVEL_LAST, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_PANIC, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_ERR, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_WARN, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_INFO, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_DEBUG, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_TRACE, __FILE__), true);
+  ASSERT_EQ(g_log->check_output(LOG_LEVEL_LAST, __FILE__), true);
 }
 
 TEST(testEnableTest, CheckEnableTest)

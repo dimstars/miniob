@@ -68,7 +68,7 @@ bool MetricsStage::setProperties() {
   std::string key = METRCS_REPORT_INTERVAL;
   std::map<std::string, std::string>::iterator it = section.find(key);
   if (it != section.end()) {
-    strToVal(it->second, metricReportInterval);
+    str_to_val(it->second, metricReportInterval);
   }
 
   return true;

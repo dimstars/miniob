@@ -42,30 +42,30 @@ namespace common {
 void strip(std::string &str);
 char *strip(char *str);
 
-//! Convert an integer size in a padded string
 /**
+ * Convert an integer size in a padded string
  * @param[in]   size    size to be converted and 0 padded
  * @param[in]   pad     decimal digits for the string padding
  * return   output 0-padded size string
  */
 std::string size_to_pad_str(int size, int pad);
 
-//! Convert a string to upper case.
 /**
+ * Convert a string to upper case.
  * @param[in,out] s the string to modify
  * @return a reference to the string that was modified.
  */
 std::string &str_to_upper(std::string &s);
 
-//! Convert a string to lower case.
 /**
+ * Convert a string to lower case.
  * @param[in,out] s the string to modify
  * @return a reference to the string that was modified.
  */
 std::string &str_to_lower(std::string &s);
 
-//! Split string str using 'delimiter's
 /**
+ * Split string str using 'delimiter's
  * @param[in]      str        the string to be split up
  * @param[in]      delims     elimiter characters
  * @param[in,out] results     ector containing the split up string
@@ -85,17 +85,17 @@ void merge_string(std::string &str, std::string delim,
 void replace(std::string &str, const std::string &old,
              const std::string &new_str);
 
-/*
+/**
  * binary to hexadecimal
  */
-char *bin2hex(const char *s, const int len, char *sz_hex_buff);
-/*
+char *bin_to_hex(const char *s, const int len, char *hex_buff);
+/**
  * hexadecimal to binary
  */
-char *hex2bin(const char *s, char *sz_bin_buff, int *n_dest_len);
+char *hex_to_bin(const char *s, char *bin_buff, int *dest_len);
 
-//! Convert a number in a string format to a numeric value
 /**
+ * Convert a number in a string format to a numeric value
  * @param[in]   str     input number string
  * @param[out]  val     output value
  * @param[in]   radix   an optional parameter that specifies the
@@ -110,8 +110,8 @@ template <class T>
 bool str_to_val(const std::string &str, T &val,
               std::ios_base &(*radix)(std::ios_base &) = std::dec);
 
-//! Convert a numeric value into its string representation
 /**
+ * Convert a numeric value into its string representation
  * @param[in]   val     numeric value
  * @param[out]  str     string representation of the numeric value
  * @param[in]   radix   an optional parameter that specifies the
@@ -129,7 +129,6 @@ void val_to_str(const T &val, std::string &str,
  */
 template <class T> std::string get_type_name(const T &val);
 
-// Templatized functions have to be in the header file
 template <class T>
 bool str_to_val(const std::string &str, T &val,
               std::ios_base &(*radix)(std::ios_base &)/* = std::dec */) {

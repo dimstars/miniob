@@ -309,7 +309,7 @@ int LoggerFactory::init(const std::string &log_file, Log **logger,
                         LOG_ROTATE rotate_type) {
   Log *log = new (std::nothrow) Log(log_file, log_level, console_level);
   if (log == nullptr) {
-    std::cout << "Error" << std::endl;
+    std::cout << "Error: fail to construct a log object!" << std::endl;
     return -1;
   }
   log->set_rotate_type(rotate_type);

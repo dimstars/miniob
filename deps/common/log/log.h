@@ -167,34 +167,34 @@ class LoggerFactory {
 
 extern Log *g_log;
 
-#define LOG_HEAD(prefix, level)                                                \
+#define LOG_HEAD(prefix, level)                                                 \
   if (common::g_log) {                                                          \
-    time_t now_time;                                                           \
-    time(&now_time);                                                           \
-    struct tm *p = localtime(&now_time);                                       \
+    time_t now_time;                                                            \
+    time(&now_time);                                                            \
+    struct tm *p = localtime(&now_time);                                        \
     char sz_head[64] = {0};                                                     \
-    if (p) {                                                                   \
+    if (p) {                                                                    \
       sprintf(sz_head, "%d-%d-%d %d:%d:%u pid:%u tid:%llx ", p->tm_year + 1900, \
-              p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec,     \
-              (u32_t)getpid(), gettid());                                      \
+              p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec,      \
+              (u32_t)getpid(), gettid());                                       \
       common::g_log->rotate(p->tm_year + 1900, p->tm_mon + 1, p->tm_mday);      \
-    }                                                                          \
+    }                                                                           \
     snprintf(prefix, sizeof(prefix), "[%s %s %s %s %u]>>", sz_head,             \
-            (common::g_log)->prefix_msg(level), __FILE__,                        \
-             __FUNCTION__, (u32_t)__LINE__);                                   \
+            (common::g_log)->prefix_msg(level), __FILE__,                       \
+             __FUNCTION__, (u32_t)__LINE__);                                    \
   }
 
-#define LOG_OUTPUT(level, fmt, ...)                                            \
-  do {                                                                         \
-    using namespace common;                                                    \
-    if (g_log && g_log->check_output(level, __FILE__)) {                          \
-      char prefix[ONE_KILO] = {0};                                             \
-      LOG_HEAD(prefix, level);                                                 \
+#define LOG_OUTPUT(level, fmt, ...)                                             \
+  do {                                                                          \
+    using namespace common;                                                     \
+    if (g_log && g_log->check_output(level, __FILE__)) {                        \
+      char prefix[ONE_KILO] = {0};                                              \
+      LOG_HEAD(prefix, level);                                                  \
       g_log->output(level, __FILE__, prefix, fmt, ##__VA_ARGS__);               \
-    }                                                                          \
+    }                                                                           \
   } while (0)
 
-#define LOG_DEFAULT(fmt, ...)                                                  \
+#define LOG_DEFAULT(fmt, ...)                                                   \
   LOG_OUTPUT(common::g_log->get_log_level(), fmt, ##__VA_ARGS__)
 #define LOG_PANIC(fmt, ...) LOG_OUTPUT(common::LOG_LEVEL_PANIC, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) LOG_OUTPUT(common::LOG_LEVEL_ERR, fmt, ##__VA_ARGS__)
@@ -279,7 +279,7 @@ int Log::out(const LOG_LEVEL console_level, const LOG_LEVEL log_level, T &msg) {
 #define ASSERT(expression, description, ...)                                   \
   do {                                                                         \
     if (!(expression)) {                                                       \
-      if (common::g_log) {                                                      \
+      if (common::g_log) {                                                     \
         LOG_PANIC(description, ##__VA_ARGS__);                                 \
         LOG_PANIC("\n");                                                       \
       }                                                                        \

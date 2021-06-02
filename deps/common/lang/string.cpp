@@ -190,44 +190,44 @@ void replace(std::string &str, const std::string &old,
   return;
 }
 
-char *bin2hex(const char *s, const int len, char *sz_hex_buff) {
-  int n_len = 0;
-  unsigned char *p_end = (unsigned char *)s + len;
-  for (unsigned char *p = (unsigned char *)s; p < p_end; p++) {
-    n_len += sprintf(sz_hex_buff + n_len, "%02x", *p);
+char *bin_to_hex(const char *s, const int len, char *hex_buff) {
+  int new_len = 0;
+  unsigned char *end = (unsigned char *)s + len;
+  for (unsigned char *p = (unsigned char *)s; p < end; p++) {
+    new_len += sprintf(hex_buff + new_len, "%02x", *p);
   }
 
-  sz_hex_buff[n_len] = '\0';
-  return sz_hex_buff;
+  hex_buff[new_len] = '\0';
+  return hex_buff;
 }
 
-char *hex2bin(const char *s, char *sz_bin_buff, int *n_destLen) {
+char *hex_to_bin(const char *s, char *bin_buff, int *dest_len) {
   char buff[3];
-  char *p_src;
-  int n_srcLen;
+  char *src;
+  int src_len;
   char *p_dest;
   char *p_dest_end;
 
-  n_srcLen = strlen(s);
-  if (n_srcLen == 0) {
-    *n_destLen = 0;
-    sz_bin_buff[0] = '\0';
-    return sz_bin_buff;
+  src_len = strlen(s);
+  if (src_len == 0) {
+    *dest_len = 0;
+    bin_buff[0] = '\0';
+    return bin_buff;
   }
 
-  *n_destLen = n_srcLen / 2;
-  p_src = (char *)s;
+  *dest_len = src_len / 2;
+  src = (char *)s;
   buff[2] = '\0';
 
-  p_dest_end = sz_bin_buff + (*n_destLen);
-  for (p_dest = sz_bin_buff; p_dest < p_dest_end; p_dest++) {
-    buff[0] = *p_src++;
-    buff[1] = *p_src++;
+  p_dest_end = bin_buff + (*dest_len);
+  for (p_dest = bin_buff; p_dest < p_dest_end; p_dest++) {
+    buff[0] = *src++;
+    buff[1] = *src++;
     *p_dest = (char)strtol(buff, NULL, 16);
   }
 
   *p_dest = '\0';
-  return sz_bin_buff;
+  return bin_buff;
 }
 
 bool is_blank(const char *s) {

@@ -45,7 +45,7 @@ public:
 
   std::string toString() {
     std::string ret;
-    valToStr(value, ret);
+    val_to_str(value, ret);
     return ret;
   }
 

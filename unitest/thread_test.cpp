@@ -93,7 +93,7 @@ int ThreadTest::create() {
   pthread_t tid[10];
   memset(tid, 0, sizeof(tid));
 
-  LoggerFactory::initDefault("testthread.log");
+  LoggerFactory::init_default("testthread.log");
 
   int threadNum = 0;
   for (; threadNum < 10; threadNum++) {

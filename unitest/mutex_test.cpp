@@ -61,7 +61,7 @@ void *runDeadLock(void *ctx) {
 }
 
 void testDeadlockCheck() {
-  LoggerFactory::initDefault("testmutex.log");
+  LoggerFactory::init_default("testmutex.log");
 
   for (int i = 0; i < 4; i++) {
 

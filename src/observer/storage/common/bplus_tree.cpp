@@ -428,6 +428,7 @@ RC BplusTreeHandler::insert_into_leaf_after_split(PageNum leaf_page, const char 
 
   new_key=(char *)malloc(file_header_.key_length);
   if(new_key == nullptr){
+    LOG_ERROR("Failed to alloc memory for new key. size=%d", file_header_.key_length);
     return RC::NOMEM;
   }
   memcpy(new_key,new_node->keys,file_header_.key_length);
@@ -550,18 +551,23 @@ RC BplusTreeHandler::insert_intern_node_after_split(PageNum inter_page,PageNum l
   // print();
 
   temp_keys=(char *)malloc(file_header_.key_length*file_header_.order);
-  if(temp_keys==nullptr){
+  if(temp_keys == nullptr){
+    LOG_ERROR("Failed to alloc memory for temp keys. size=%d", 
+              file_header_.key_length * file_header_.order);
     return RC::NOMEM;
   }
 
-  temp_pointers=(RID *)malloc((file_header_.order+1)*sizeof(RID));
-  if(temp_pointers==nullptr){
+  temp_pointers = (RID *)malloc((file_header_.order + 1) * sizeof(RID));
+  if(temp_pointers == nullptr){
+    LOG_ERROR("Failed to alloc memory for temp pointers. size=%d", 
+              (file_header_.order + 1) * sizeof(RID));
     free(temp_keys);
     return RC::NOMEM;
   }
 
   new_key=(char *)malloc(file_header_.key_length);
   if(new_key==nullptr){
+    LOG_ERROR("Failed to alloc memory for new key. size=%d", file_header_.key_length);
     free(temp_keys);
     free(temp_pointers);
     return RC::NOMEM;
@@ -794,6 +800,7 @@ RC BplusTreeHandler::insert_entry(const char *pkey, const RID *rid) {
   }
   key=(char *)malloc(file_header_.key_length);
   if(key == nullptr){
+    LOG_ERROR("Failed to alloc memory for key. size=%d", file_header_.key_length);
     return RC::NOMEM;
   }
   memcpy(key,pkey,file_header_.attr_length);
@@ -859,6 +866,7 @@ RC BplusTreeHandler::get_entry(const char *pkey,RID *rid) {
 
   key=(char *)malloc(file_header_.key_length);
   if(key == nullptr){
+    LOG_ERROR("Failed to alloc memory for key. size=%d", file_header_.key_length);
     return RC::NOMEM;
   }
   memcpy(key,pkey,file_header_.attr_length);
@@ -1037,6 +1045,7 @@ RC BplusTreeHandler::coalesce_node(PageNum leaf_page,PageNum right_page)
 
   tmp_key=(char *)malloc(file_header_.key_length);
   if(tmp_key== nullptr){
+    LOG_ERROR("Failed to alloc memory for key. size=%d", file_header_.key_length);
     return RC::NOMEM;
   }
   memcpy(tmp_key,parent->keys+k*file_header_.key_length,file_header_.key_length);
@@ -1435,6 +1444,7 @@ RC BplusTreeHandler::delete_entry(const char *data, const RID *rid) {
   char *pkey;
   pkey=(char *)malloc(file_header_.key_length);
   if(nullptr == pkey){
+    LOG_ERROR("Failed to alloc memory for key. size=%d", file_header_.key_length);
     return RC::NOMEM;
   }
   memcpy(pkey,data,file_header_.attr_length);
@@ -1546,6 +1556,7 @@ RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, 
   rid.slot_num = -1;
   pkey=(char *)malloc(file_header_.key_length);
   if(pkey == nullptr){
+    LOG_ERROR("Failed to alloc memory for key. size=%d", file_header_.key_length);
     return RC::NOMEM;
   }
   memcpy(pkey, key, file_header_.attr_length);
@@ -1711,6 +1722,7 @@ RC BplusTreeScanner::open(CompOp comp_op,const char *value) {
 
   char *value_copy =(char *)malloc(index_handler_.file_header_.attr_length);
   if(value_copy == nullptr){
+    LOG_ERROR("Failed to alloc memory for value. size=%d", index_handler_.file_header_.attr_length);
     return RC::NOMEM;
   }
   memcpy(value_copy, value, index_handler_.file_header_.attr_length);

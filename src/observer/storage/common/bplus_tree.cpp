@@ -1534,8 +1534,6 @@ RC BplusTreeHandler::print_tree() {
   return SUCCESS;
 }
 
-int CompareKey(const char *pdata, const char *pkey,AttrType attrType,int attr_length);
-
 RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, PageNum *page_num, int *rididx) {
   BPPageHandle page_handle;
   IndexNode *node;
@@ -1668,45 +1666,6 @@ RC BplusTreeHandler::get_first_leaf_page(PageNum *leaf_page) {
     return rc;
   }
   return SUCCESS;
-}
-int CompareKey(const char *pdata, const char *pkey,AttrType attr_type,int attr_length) { // TODO 简化
-  int i1,i2;
-  float f1,f2;
-  const char *s1,*s2;
-  switch(attr_type){
-    case ints: {
-      i1 = *(int *) pdata;
-      i2 = *(int *) pkey;
-      if (i1 > i2)
-        return 1;
-      if (i1 < i2)
-        return -1;
-      if (i1 == i2)
-        return 0;
-    }
-    break;
-    case floats: {
-      f1 = *(float *) pdata;
-      f2 = *(float *) pkey;
-      if (f1 > f2)
-        return 1;
-      if (f1 < f2)
-        return -1;
-      if (f1 == f2)
-        return 0;
-    }
-    break;
-    case chars: {
-      s1 = pdata;
-      s2 = pkey;
-      return strncmp(s1, s2, attr_length);
-    }
-    break;
-    default:{
-      LOG_PANIC("Unknown attr type: %d", attr_type);
-    }
-  }
-  return -2;//This means error happens
 }
 
 BplusTreeScanner::BplusTreeScanner(BplusTreeHandler &index_handler) : index_handler_(index_handler){

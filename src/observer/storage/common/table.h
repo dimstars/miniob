@@ -33,8 +33,6 @@ class Index;
 class IndexScanner;
 class RecordDeleter;
 class Trx;
-class TableLocksInTable;
-class RecordLocksInTable;
 
 class Table {
 public:
@@ -80,10 +78,6 @@ public:
   RC rollback_insert(Trx *trx, const RID &rid);
   RC rollback_delete(Trx *trx, const RID &rid);
 
-public:
-  TableLocksInTable & table_locks();
-  RecordLocksInTable &record_locks();
-
 private:
   RC scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context));
   RC scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context));
@@ -113,8 +107,6 @@ private:
   int                     file_id_;
   RecordFileHandler *     record_handler_;   /// 记录操作
   std::vector<Index *>    indexes_;
-  TableLocksInTable *     table_locks_ = nullptr;
-  RecordLocksInTable *    record_locks_ = nullptr;
 };
 
 #endif // __OBSERVER_STORAGE_COMMON_TABLE_H__

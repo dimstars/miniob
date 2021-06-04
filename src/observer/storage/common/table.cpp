@@ -31,15 +31,11 @@
 #include "storage/common/index.h"
 #include "storage/common/bplus_tree_index.h"
 #include "storage/trx/trx.h"
-#include "storage/lock/lock.h"
 
 Table::Table() : 
     data_buffer_pool_(nullptr),
     file_id_(-1),
     record_handler_(nullptr) {
-
-  table_locks_ = new TableLocksInTable(this);
-  record_locks_ = new RecordLocksInTable(this);
 }
 
 Table::~Table() {
@@ -51,10 +47,6 @@ Table::~Table() {
     data_buffer_pool_ = nullptr;
   }
 
-  delete table_locks_;
-  table_locks_ = nullptr;
-  delete record_locks_;
-  record_locks_ = nullptr;
   LOG_INFO("Table has been closed: %s", name());
 }
 
@@ -196,7 +188,6 @@ RC Table::insert_record(Trx *trx, Record *record) {
   RC rc = RC::SUCCESS;
 
   if (trx != nullptr) {
-    LockManager::instance().lock_table_intent_exclusive(this, trx); // TODO drop table时，会影响这个方法
     trx->init_trx_info(this, *record);
   }
   rc = record_handler_->insert_record(record->data, table_meta_.record_size(), &record->rid);
@@ -206,14 +197,6 @@ RC Table::insert_record(Trx *trx, Record *record) {
   }
 
   if (trx != nullptr) {
-    RC rc_lock = LockManager::instance().lock_record_exclusive(this, trx, record->rid);
-    if (rc_lock != RC::SUCCESS) {
-      LOG_PANIC("Lock record failed when inserting record. rid=%d.%d, rc=%d:%s",
-                record->rid.page_num, record->rid.slot_num, rc_lock, strrc(rc_lock));
-      record_handler_->delete_record(&record->rid);
-      return RC::LOCKED_LOCK;
-    }
-
     rc = trx->insert_record(this, record);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to log operation(insertion) to trx");
@@ -366,10 +349,6 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
     limit = INT_MAX;
   }
 
-  if (trx != nullptr) {
-    LockManager::instance().lock_table_intent_shared(this, trx);
-  }
-
   IndexScanner *index_scanner = find_index_for_scan(filter);
   if (index_scanner != nullptr) {
     return scan_record_by_index(trx, index_scanner, filter, limit, context, record_reader);
@@ -388,9 +367,6 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   rc = scanner.get_first_record(&record);
   for ( ; RC::SUCCESS == rc && record_count < limit; rc = scanner.get_next_record(&record)) {
     if (trx == nullptr || trx->is_visible(this, &record)) {
-      if (trx != nullptr && LockManager::instance().lock_record_shared(this, trx, record.rid) != RC::SUCCESS) {
-        continue;
-      }
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {
         break;
@@ -432,9 +408,6 @@ RC Table::scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter 
     }
 
     if ((trx == nullptr || trx->is_visible(this, &record)) && (filter == nullptr || filter->filter(record))) {
-      if (trx != nullptr && LockManager::instance().lock_record_shared(this, trx, rid) != RC::SUCCESS) {
-        continue;
-      }
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {
         LOG_TRACE("Record reader break the table scanning. rc=%d:%s", rc, strrc(rc));
@@ -486,8 +459,6 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   if (rc != RC::SUCCESS) {
     return rc;
   }
-
-  LockManager::instance().lock_table_exclusive(this, trx);
 
   // 创建索引相关数据
   BplusTreeIndex *index = new BplusTreeIndex();
@@ -830,13 +801,6 @@ RC Table::delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count) {
 RC Table::delete_record(Trx *trx, Record *record) {
   RC rc = RC::SUCCESS;
   if (trx != nullptr) {
-    LockManager::instance().lock_table_intent_exclusive(this, trx); // TODO drop table时，会影响这个方法
-    RC rc_lock = LockManager::instance().lock_record_exclusive(this, trx, record->rid);
-    if (rc_lock != RC::SUCCESS) {
-      LOG_TRACE("Lock record failed. may be deleted, rid=%d.%d,rc=%d:%s",
-                record->rid.page_num, record->rid.slot_num, rc_lock, strrc(rc_lock));
-      return rc;
-    }
     rc = trx->delete_record(this, record);
   } else {
     rc = delete_entry_of_indexes(record->data, record->rid, false);// TODO 重复代码 refer to commit_delete
@@ -990,12 +954,4 @@ RC Table::sync() {
   }
   LOG_INFO("Sync table over. table=%s", name());
   return rc;
-}
-
-TableLocksInTable & Table::table_locks() {
-  return *table_locks_;
-}
-
-RecordLocksInTable & Table::record_locks() {
-  return *record_locks_;
 }

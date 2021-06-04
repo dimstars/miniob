@@ -20,7 +20,6 @@
 #include <atomic>
 
 #include "storage/trx/trx.h"
-#include "storage/lock/lock.h"
 #include "storage/common/table.h"
 #include "storage/common/record_manager.h"
 #include "storage/common/field_meta.h"
@@ -51,15 +50,9 @@ int Trx::trx_field_len() {
 }
 
 Trx::Trx() {
-  table_locks_ = new TableLocksInTrx(this);
-  record_locks_ = new RecordLocksInTrx(this);
 }
 
 Trx::~Trx() {
-  delete table_locks_;
-  table_locks_ = nullptr;
-  delete record_locks_;
-  record_locks_ = nullptr;
 }
 
 RC Trx::insert_record(Table *table, Record *record) {
@@ -165,7 +158,6 @@ RC Trx::commit() {
         }
         break;
         case Operation::Type::DELETE: {
-          LockManager::instance().delete_record(table, this, rid);
           rc = table->commit_delete(this, rid);
           if (rc != RC::SUCCESS) {
             // TODO handle rc
@@ -184,7 +176,6 @@ RC Trx::commit() {
 
   operations_.clear();
   trx_id_ = 0;
-  LockManager::instance().unlock(this);
   return rc;
 }
 
@@ -228,7 +219,6 @@ RC Trx::rollback() {
 
   operations_.clear();
   trx_id_ = 0;
-  LockManager::instance().unlock(this);
   return rc;
 }
 
@@ -263,19 +253,4 @@ void Trx::start_if_not_started() {
   if (trx_id_ == 0) {
     trx_id_ = next_trx_id();
   }
-}
-
-TableLocksInTrx &Trx::table_locks() {
-  return *table_locks_;
-}
-RecordLocksInTrx &Trx::record_locks() {
-  return *record_locks_;
-}
-
-void Trx::wait(std::unique_lock<std::mutex> &mutex) {
-  lock_waiter_.wait(mutex);
-}
-
-void Trx::wakeup() {
-  lock_waiter_.notify_one();
 }

@@ -30,7 +30,6 @@
 #include "storage/common/bplus_tree.h"
 #include "storage/common/table.h"
 #include "storage/common/condition_filter.h"
-#include "storage/lock/lock.h"
 
 DefaultHandler &DefaultHandler::get_default() {
   static DefaultHandler handler;

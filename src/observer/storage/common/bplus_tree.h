@@ -23,39 +23,37 @@
 #include "record_manager.h"
 #include "storage/default/disk_buffer_pool.h"
 
-typedef struct {
+struct IndexFileHeader {
   int attr_length;
   int key_length;
   AttrType attr_type;
   PageNum root_page; // 初始时，root_page一定是1
-  // PageNum first_leaf;
   int node_num;
   int order;
-} IndexFileHeader;
+};
 
-typedef struct {
+struct IndexNode {
   int is_leaf;
   int key_num;
   PageNum parent;
-  // PageNum brother;
   char *keys;
   RID *rids;
-} IndexNode;
+};
 
-typedef struct TreeNode {
+struct TreeNode {
   int key_num;
   char **keys;
   TreeNode *parent;
   TreeNode *sibling;
   TreeNode *first_child;
-} TreeNode;
+};
 
-typedef struct {
+struct Tree {
   AttrType attr_type;
   int attr_length;
   int order;
   TreeNode *root;
-} Tree;
+};
 
 class BplusTreeHandler {
 public:
@@ -116,6 +114,9 @@ protected:
 
   RC find_first_index_satisfied(CompOp comp_op, const char *pkey, PageNum *page_num, int *rididx);
   RC get_first_leaf_page(PageNum *leaf_page);
+
+private:
+  IndexNode *get_index_node(char *page_data) const;
 
 private:
   DiskBufferPool  * disk_buffer_pool_ = nullptr;

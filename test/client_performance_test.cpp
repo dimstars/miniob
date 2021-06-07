@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
   }
 
   MetricsRegistry &metricRegistry = get_g_metrics_registry();
-  ConsoleReporter *consoleReporter = g_console_reporter();
+  ConsoleReporter *consoleReporter = get_g_console_reporter();
   metricRegistry.add_reporter(consoleReporter);
 
   Meter  *tpsMeter = new Meter();

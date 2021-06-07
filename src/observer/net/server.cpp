@@ -77,7 +77,7 @@ Server::~Server() {
 void Server::init(){
   session_stage_ = theSedaConfig()->getStage(SESSION_STAGE_NAME);
 
-  MetricsRegistry &metricsRegistry = g_metrics_registry();
+  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
   if (Server::read_socket_metric_ == nullptr) {
     Server::read_socket_metric_ = new SimpleTimer();
     metricsRegistry.register_metric(READ_SOCKET_METRIC_TAG, Server::read_socket_metric_);

@@ -26,7 +26,7 @@
 
 namespace common {
 
-ConsoleReporter *g_console_reporter() {
+ConsoleReporter *get_g_console_reporter() {
   static ConsoleReporter *instance = new ConsoleReporter();
 
   return instance;

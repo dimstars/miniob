@@ -20,10 +20,11 @@
 #if !defined(__COMMON_CONF_INI_H__)
 #define __COMMON_CONF_INI_H__
 
+#include <stdio.h>
+
 #include <iostream>
 #include <map>
 #include <set>
-#include <stdio.h>
 #include <string>
 
 namespace common {
@@ -130,7 +131,7 @@ class Ini {
 /**
  * Global configurate propertis
  */
-Ini *&g_properties();
+Ini *&get_g_properties();
 //********************************************************************
 
 }// namespace common

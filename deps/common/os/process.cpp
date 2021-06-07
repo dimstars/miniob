@@ -19,10 +19,11 @@
 
 #include <fcntl.h>
 #include <string.h>
-#include <string>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+
+#include <string>
 
 #include "common/io/io.h"
 #include "common/log/log.h"

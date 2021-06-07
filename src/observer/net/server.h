@@ -21,7 +21,6 @@
 #define __OBSERVER_NET_SERVER_H__
 
 #include "common/defs.h"
-
 #include "common/metrics/metrics.h"
 #include "common/seda/stage.h"
 #include "net/connection_context.h"

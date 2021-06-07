@@ -18,8 +18,9 @@
 //
 
 #include <errno.h>
-#include <fstream>
 #include <string.h>
+
+#include <fstream>
 
 #include "common/conf/ini.h"
 #include "common/defs.h"
@@ -229,7 +230,7 @@ void Ini::to_string(std::string &output_str) {
 }
 
 //! Accessor function which wraps global properties object
-Ini *&g_properties() {
+Ini *&get_g_properties() {
   static Ini *g_properties = new Ini();
   return g_properties;
 }

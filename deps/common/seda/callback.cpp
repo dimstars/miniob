@@ -18,11 +18,11 @@
 //
 
 // Include Files
+#include "common/seda/callback.h"
+
 #include <assert.h>
 
 #include "common/log/log.h"
-
-#include "common/seda/callback.h"
 #include "common/seda/stage.h"
 #include "common/seda/stage_event.h"
 namespace common {
@@ -72,20 +72,20 @@ void CompletionCallback::eventDone(StageEvent *ev) {
   if (evHistFlag) {
     ev->saveStage(targetStage, StageEvent::CALLBACK_EV);
   }
-  targetStage->callbackEvent(ev, context);
+  targetStage->callback_event(ev, context);
 }
 
 //! Reschedule callback on target stage thread
 void CompletionCallback::eventReschedule(StageEvent *ev) {
-  targetStage->addEvent(ev);
+  targetStage->add_event(ev);
 }
 
 void CompletionCallback::eventTimeout(StageEvent *ev) {
-  LOG_DEBUG("to call eventTimeout for stage %s", targetStage->getName());
+  LOG_DEBUG("to call eventTimeout for stage %s", targetStage->get_name());
   if (evHistFlag) {
     ev->saveStage(targetStage, StageEvent::TIMEOUT_EV);
   }
-  targetStage->timeoutEvent(ev, context);
+  targetStage->timeout_event(ev, context);
 }
 
 } //namespace common

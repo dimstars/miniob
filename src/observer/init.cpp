@@ -146,21 +146,21 @@ void cleanup_log() {
 
 int prepare_init_seda() {
   static StageFactory session_stage_factory("SessionStage",
-                                          &SessionStage::makeStage);
+                                          &SessionStage::make_stage);
   static StageFactory resolve_stage_factory("ResolveStage",
-                                          &ResolveStage::makeStage);
+                                          &ResolveStage::make_stage);
   static StageFactory query_cache_stage_factory("QueryCacheStage",
-                                             &QueryCacheStage::makeStage);
-  static StageFactory parse_stage_factory("ParseStage", &ParseStage::makeStage);
+                                             &QueryCacheStage::make_stage);
+  static StageFactory parse_stage_factory("ParseStage", &ParseStage::make_stage);
   static StageFactory plan_cache_factory("PlanCacheStage",
-                                       &PlanCacheStage::makeStage);
+                                       &PlanCacheStage::make_stage);
   static StageFactory optimize_factory("OptimizeStage",
-                                      &OptimizeStage::makeStage);
-  static StageFactory execute_factory("ExecuteStage", &ExecuteStage::makeStage);
+                                      &OptimizeStage::make_stage);
+  static StageFactory execute_factory("ExecuteStage", &ExecuteStage::make_stage);
   static StageFactory default_storage_factory("DefaultStorageStage",
-                                            &DefaultStorageStage::makeStage);
+                                            &DefaultStorageStage::make_stage);
   static StageFactory mem_storage_factory("MemStorageStage",
-                                        &MemStorageStage::makeStage);
+                                        &MemStorageStage::make_stage);
   return 0;
 }
 

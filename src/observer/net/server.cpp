@@ -135,7 +135,7 @@ void Server::recv(int fd, short ev, void *arg) {
   }
 
   SessionEvent *sev = new SessionEvent(client);
-  session_stage_->addEvent(sev);
+  session_stage_->add_event(sev);
 }
 
 int Server::send(ConnectionContext *client, const char *buf, int data_len) {

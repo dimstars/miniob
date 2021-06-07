@@ -38,19 +38,19 @@ ResolveStage::ResolveStage(const char *tag) : Stage(tag) {}
 ResolveStage::~ResolveStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *ResolveStage::makeStage(const std::string &tag) {
+Stage *ResolveStage::make_stage(const std::string &tag) {
   ResolveStage *stage = new (std::nothrow) ResolveStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new ResolveStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool ResolveStage::setProperties() {
-  //  std::string stageNameStr(stageName);
+bool ResolveStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
   //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
@@ -65,7 +65,7 @@ bool ResolveStage::setProperties() {
 bool ResolveStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
   queryCacheStage = *(stgp++);
 
   LOG_TRACE("Exit");
@@ -79,19 +79,19 @@ void ResolveStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void ResolveStage::handleEvent(StageEvent *event) {
+void ResolveStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   SQLStageEvent *sql_event = static_cast<SQLStageEvent *>(event);
 
   // do nothing here
-  queryCacheStage->handleEvent(sql_event);
+  queryCacheStage->handle_event(sql_event);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void ResolveStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void ResolveStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   LOG_TRACE("Exit\n");

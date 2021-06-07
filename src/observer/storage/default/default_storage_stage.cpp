@@ -59,19 +59,19 @@ DefaultStorageStage::~DefaultStorageStage() {
 }
 
 //! Parse properties, instantiate a stage object
-Stage *DefaultStorageStage::makeStage(const std::string &tag) {
+Stage *DefaultStorageStage::make_stage(const std::string &tag) {
   DefaultStorageStage *stage = new (std::nothrow) DefaultStorageStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new DefaultStorageStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool DefaultStorageStage::setProperties() {
-  std::string stageNameStr(stageName);
+bool DefaultStorageStage::set_properties() {
+  std::string stageNameStr(stage_name_);
   std::map<std::string, std::string> section = 
       get_g_properties()->get(stageNameStr);
   
@@ -138,7 +138,7 @@ void DefaultStorageStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void DefaultStorageStage::handleEvent(StageEvent *event) {
+void DefaultStorageStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
   TimerStat timerStat(*queryMetric);
 
@@ -148,7 +148,7 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
   SessionEvent *session_event = storage_event->exe_event()->sql_event()->session_event();
 
   Session *session = session_event->get_client()->session;
-  const char *current_db = session->current_db().c_str();
+  const char *current_db = session->get_current_db().c_str();
 
   Trx *current_trx = session->current_trx();
 
@@ -245,7 +245,7 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
   LOG_TRACE("Exit\n");
 }
 
-void DefaultStorageStage::callbackEvent(StageEvent *event,
+void DefaultStorageStage::callback_event(StageEvent *event,
                                         CallbackContext *context) {
   LOG_TRACE("Enter\n");
   event->doneImmediate();

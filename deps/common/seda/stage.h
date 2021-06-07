@@ -39,26 +39,26 @@ class CallbackContext;
 /**
  * The Stage class consists of a queue of events and a link to a
  * Threadpool.  The threads in the pool handle the events on the queue.
- * The key method of the Stage class is handleEvent(), which is abstract.
- * Each subclass of Stage will fill in the handleEvent() method with
- * appropriate code for that stage. The expected behavior of handleEvent()
+ * The key method of the Stage class is handle_event(), which is abstract.
+ * Each subclass of Stage will fill in the handle_event() method with
+ * appropriate code for that stage. The expected behavior of handle_event()
  * is to perform stage-specific processing for the event argument, and
  * complete by passing the event on to the queue of the next appropriate
- * stage. Occasionally, handleEvent may cause a new event to be created,
+ * stage. Occasionally, handle_event may cause a new event to be created,
  * or the current event to be freed.  The generic Stage class handles
  * maintenance of the event queue, and scheduling the stage on the runqueue
  * of the Threadpool as long as events are in the queue.
  * Subclasses of Stage may also add data members that represent
- * stage-specific state and are accessed from the handleEvent() method.
+ * stage-specific state and are accessed from the handle_event() method.
  * <p>
  * A stage can register a callback on an event that it passes to another
  * stage later in the pipeline.  When the callback is invoked, it calls
- * the callbackEvent() virtual function from the stage that set the
+ * the callback_event() virtual function from the stage that set the
  * callback.
  * <p>
- * An event is an argument to the handleEvent() method.
+ * An event is an argument to the handle_event() method.
  * The Event class is generic and is intended to be specialized by
- * subclasses in order to represent real events.  handleEvent() is
+ * subclasses in order to represent real events.  handle_event() is
  * expected to use C++ introspection (dynamic cast) to determine the
  * specific sub-class of event that it is dealing with on each invocation.
  * <p>
@@ -77,11 +77,11 @@ class CallbackContext;
  * in the pipeline when the SedaConfig object is destroyed.
  *
  * There are three virtual functions that allow a stage class to customize
- * the initialization/finalization process.  setProperties() is called
+ * the initialization/finalization process.  set_properties() is called
  * by the SedaConfig object immediately after the stage is created, and
  * is used to pass stage-specific configuration options via a Properties
  * class.  initialize() is called from connect().  The purpose of
- * initialize() is to allow the stage class to verify that the nextStageList
+ * initialize() is to allow the stage class to verify that the next_stage_list_
  * contains valid stages (number, type, etc), and to initialize any stage
  * state (such as aliases for members of the next stage list) prior to
  * stage connection.  cleanup() is called from disconnect to allow the
@@ -106,7 +106,7 @@ class Stage {
   /**
    * @return reference to the Threadpool for this Stage
    */
-  Threadpool *getPool() { return thPool; }
+  Threadpool *get_pool() { return th_pool_; }
 
   //! Push stage to the list of the next stages
   /**
@@ -115,13 +115,13 @@ class Stage {
    * @pre  stage not connected
    * @post added a new stage
    */
-  void pushStage(Stage *);
+  void push_stage(Stage *);
 
   //! Get name of the stage
   /**
    * @return return the name of this stage which is the class name
    */
-  const char *getName();
+  const char *get_name();
 
   //! Set threadpool
   /**
@@ -130,7 +130,7 @@ class Stage {
    * @pre  stage not connected
    * @post seed threadpool for this stage
    */
-  void setPool(Threadpool *);
+  void set_pool(Threadpool *);
 
   //! Connect this stage to pipeline and threadpool
   /**
@@ -143,9 +143,9 @@ class Stage {
    * @param[in]     pool      Threadpool which will handle events
    *
    * @pre  stage is not connected
-   * @post nextStageList == original stageList
+   * @post next_stage_list_ == original stageList
    * @post stageList is empty
-   * @post thPool == pool
+   * @post th_pool_ == pool
    * @return TRUE if the connection succeeded, else FALSE
    */
   bool connect();
@@ -155,17 +155,17 @@ class Stage {
    * Block stage from being scheduled.  Wait for currently processing
    * and queued events to complete, then disconnect from the threadpool.
    * Disconnect the output of this stage from the inputs of the stages in
-   * the nextStageList.
+   * the next_stage_list_.
    *
    * @pre    stage is connected
-   * @post   nextStageList empty
-   * @post   thPool NULL
+   * @post   next_stage_list_ empty
+   * @post   th_pool_ NULL
    * @post   stage is not connected
    */
   void disconnect();
 
   //! Add an event to the queue.
-  //! This will trigger thread switch, you can use handleEvent without thread switch
+  //! This will trigger thread switch, you can use handle_event without thread switch
   /**
    * @param[in] event Event to add to queue.
    *
@@ -174,7 +174,7 @@ class Stage {
    * @post event must not be de-referenced by caller after return
    * @post event ref count on stage is incremented
    */
-  void addEvent(StageEvent *event);
+  void add_event(StageEvent *event);
 
   //! Query length of queue
   /**
@@ -192,7 +192,7 @@ class Stage {
   /**
    * @return true if stage is connected
    */
-  bool isConnected() const { return connected; }
+  bool is_connected() const { return connected_; }
 
   //! Perform Stage-specific processing for an event
   //! Processing one event without swtich thread.
@@ -204,7 +204,7 @@ class Stage {
    *
    * @post  event must not be de-referenced by caller after return
    */
-  virtual void handleEvent(StageEvent *event) = 0;
+  virtual void handle_event(StageEvent *event) = 0;
 
   //! Perform Stage-specific callback processing for an event
   /**
@@ -213,16 +213,16 @@ class Stage {
    *
    * @param[in] event Pointer to event that initiated the callback.
    */
-  virtual void callbackEvent(StageEvent *event, CallbackContext *context) = 0;
+  virtual void callback_event(StageEvent *event, CallbackContext *context) = 0;
 
   //! Perform Stage-specific callback processing for a timed out event
   /**
    * A stage only need to implement this interface if the down-stream
    * stages support event timeout detection.
    */
-  virtual void timeoutEvent(StageEvent *event, CallbackContext *context) {
-    LOG_INFO("get a timed out evnet in %s timeoutEvent\n", stageName);
-    this->callbackEvent(event, context);
+  virtual void timeout_event(StageEvent *event, CallbackContext *context) {
+    LOG_INFO("get a timed out evnet in %s timeout_event\n", stage_name_);
+    this->callback_event(event, context);
   }
 
   //! parse properties, instantiate a summation stage object
@@ -231,7 +231,7 @@ class Stage {
    * @post initializing the class members
    * @return Stage instantiated object
    */
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
  protected:
   //! Constructor
@@ -252,7 +252,7 @@ class Stage {
    * @return first event on queue.
    * @post  first event on queue is removed from queue.
    */
-  StageEvent *removeEvent();
+  StageEvent *remove_event();
 
   //! Release ref on stage from event.
   /**
@@ -260,11 +260,11 @@ class Stage {
    *
    * @post event ref count on stage is decremented
    */
-  void releaseEvent();
+  void release_event();
 
   //! Initialize stage params and validate outputs
   /**
-   * Validate the nextStageList according to the requirements of the
+   * Validate the next_stage_list_ according to the requirements of the
    * specific stage.  Initialize stage specific params.  Pure virtual
    * member function.
    *
@@ -279,7 +279,7 @@ class Stage {
    * @post initializing the class members
    * @return Stage instantiated object
    */
-  virtual bool setProperties() { return true; }
+  virtual bool set_properties() { return true; }
 
   //! Prepare to disconnect the stage.
   /**
@@ -288,7 +288,7 @@ class Stage {
    *  from the pipeline.  Most stages will not need to implement
    *  this function.
    */
-  virtual void disconnectPrepare() { return; }
+  virtual void disconnect_prepare() { return; }
 
   //! Cleanup stage after disconnection
   /**
@@ -300,40 +300,40 @@ class Stage {
   // implementation state
 
  private:
-  std::deque<StageEvent *> eventList; //!< event queue
-  mutable pthread_mutex_t listMutex;  //!< protects the event queue
-  pthread_cond_t disconnectCond;      //!< wait here for disconnect
-  bool connected;                     //!< is stage connected to pool?
-  unsigned long eventRef;             //!< # of outstanding events
-  Threadpool *thPool;                 //!< Threadpool for this stage
+  std::deque<StageEvent *> event_list_; //!< event queue
+  mutable pthread_mutex_t list_mutex_;  //!< protects the event queue
+  pthread_cond_t disconnect_cond_;      //!< wait here for disconnect
+  bool connected_;                     //!< is stage connected to pool?
+  unsigned long event_ref_;             //!< # of outstanding events
+  Threadpool *th_pool_;                 //!< Threadpool for this stage
 
  protected:
-  char *stageName; //!< name of stage
+  char *stage_name_; //!< name of stage
 
   // pipeline state
 
-  std::list<Stage *> nextStageList; //!< next stage(s) in the pipeline
+  std::list<Stage *> next_stage_list_; //!< next stage(s) in the pipeline
 
   friend class Threadpool;
 };
 
-inline void Stage::setPool(Threadpool *th) {
+inline void Stage::set_pool(Threadpool *th) {
   ASSERT((th != NULL), "threadpool not available for stage %s",
-         this->getName());
-  ASSERT(!connected, "attempt to set threadpool while connected: %s",
-         this->getName());
-  thPool = th;
+         this->get_name());
+  ASSERT(!connected_, "attempt to set threadpool while connected: %s",
+         this->get_name());
+  th_pool_ = th;
 }
 
-inline void Stage::pushStage(Stage *st) {
+inline void Stage::push_stage(Stage *st) {
   ASSERT((st != NULL), "next stage not available for stage %s",
-         this->getName());
-  ASSERT(!connected, "attempt to set push stage while connected: %s",
-         this->getName());
-  nextStageList.push_back(st);
+         this->get_name());
+  ASSERT(!connected_, "attempt to set push stage while connected: %s",
+         this->get_name());
+  next_stage_list_.push_back(st);
 }
 
-inline const char *Stage::getName() { return stageName; }
+inline const char *Stage::get_name() { return stage_name_; }
 
 } //namespace common
 #endif // __COMMON_SEDA_STAGE_H__

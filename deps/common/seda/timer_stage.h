@@ -281,7 +281,7 @@ class TimerCancelEvent : public TimerEvent {
 class TimerStage : public Stage {
  public:
   ~TimerStage();
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
   /**
    *  \brief Return the number of events that have been registered
@@ -291,11 +291,11 @@ class TimerStage : public Stage {
 
  protected:
   TimerStage(const char *tag);
-  bool setProperties();
+  bool set_properties();
   bool initialize();
-  void handleEvent(StageEvent *event);
-  void callbackEvent(StageEvent *event, CallbackContext *context);
-  void disconnectPrepare();
+  void handle_event(StageEvent *event);
+  void callback_event(StageEvent *event, CallbackContext *context);
+  void disconnect_prepare();
 
   // For ordering the keys in the timer_queue.
   static bool timerTokenLessThan(const TimerToken &tt1, const TimerToken &tt2);

@@ -37,19 +37,19 @@ OptimizeStage::OptimizeStage(const char *tag) : Stage(tag) {}
 OptimizeStage::~OptimizeStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *OptimizeStage::makeStage(const std::string &tag) {
+Stage *OptimizeStage::make_stage(const std::string &tag) {
   OptimizeStage *stage = new (std::nothrow) OptimizeStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new OptimizeStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool OptimizeStage::setProperties() {
-  //  std::string stageNameStr(stageName);
+bool OptimizeStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
   //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
@@ -64,7 +64,7 @@ bool OptimizeStage::setProperties() {
 bool OptimizeStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
   executeStage = *(stgp++);
 
   LOG_TRACE("Exit");
@@ -78,17 +78,17 @@ void OptimizeStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void OptimizeStage::handleEvent(StageEvent *event) {
+void OptimizeStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   // TODO optimize sql plan, here just pass the event to the next stage
-  executeStage->handleEvent(event);
+  executeStage->handle_event(event);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void OptimizeStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void OptimizeStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   LOG_TRACE("Exit\n");

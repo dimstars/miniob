@@ -163,7 +163,7 @@ void SedaConfig::cleanup() {
     while (iter != end) {
       if (iter->second != NULL) {
         Stage *stg = iter->second;
-        if (stg->isConnected()) {
+        if (stg->is_connected()) {
           stg->disconnect();
         }
       }
@@ -341,7 +341,7 @@ SedaConfig::status_t SedaConfig::initStages() {
         return INITFAIL;
       }
       mStages[stageName] = stage;
-      stage->setPool(t);
+      stage->set_pool(t);
 
       LOG_INFO("Stage %s use threadpool %s.",
                stageName.c_str(), threadName.c_str());
@@ -392,7 +392,7 @@ SedaConfig::status_t SedaConfig::genNextStages() {
            nextIt != nextStageNameList.end(); nextIt++) {
         std::string &nextStageName = *nextIt;
         Stage *nextStage = mStages[nextStageName];
-        stage->pushStage(nextStage);
+        stage->push_stage(nextStage);
       }
 
     } // end for stage
@@ -439,9 +439,9 @@ void SedaConfig::clearConfig() {
     if (s_iter->second != NULL) {
 
       Stage *stg = s_iter->second;
-      LOG_INFO("Stage %s deleted.", stg->getName());
-      ASSERT((!stg->isConnected()), "%s%s", "Stage connected in clearConfig ",
-             stg->getName());
+      LOG_INFO("Stage %s deleted.", stg->get_name());
+      ASSERT((!stg->is_connected()), "%s%s", "Stage connected in clearConfig ",
+             stg->get_name());
       delete stg;
       s_iter->second = NULL;
     }

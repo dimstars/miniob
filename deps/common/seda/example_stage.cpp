@@ -37,19 +37,19 @@ ExampleStage::ExampleStage(const char *tag) : Stage(tag) {}
 ExampleStage::~ExampleStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *ExampleStage::makeStage(const std::string &tag) {
+Stage *ExampleStage::make_stage(const std::string &tag) {
   ExampleStage *stage = new ExampleStage(tag.c_str());
   if (stage == NULL) {
     LOG_ERROR("new ExampleStage failed");
     return NULL;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool ExampleStage::setProperties() {
-  //  std::string stageNameStr(stageName);
+bool ExampleStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
   //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
@@ -64,7 +64,7 @@ bool ExampleStage::setProperties() {
 bool ExampleStage::initialize() {
   LOG_TRACE("Enter");
 
-  //  std::list<Stage*>::iterator stgp = nextStageList.begin();
+  //  std::list<Stage*>::iterator stgp = next_stage_list_.begin();
   //  mTimerStage = *(stgp++);
   //  mCommStage = *(stgp++);
 
@@ -79,14 +79,14 @@ void ExampleStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void ExampleStage::handleEvent(StageEvent *event) {
+void ExampleStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void ExampleStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void ExampleStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   LOG_TRACE("Exit\n");

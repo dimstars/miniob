@@ -33,7 +33,7 @@ Session::~Session() {
   trx_ = nullptr;
 }
 
-const std::string &Session::current_db() const {
+const std::string &Session::get_current_db() const {
   return current_db_;
 }
 void Session::set_current_db(const std::string &dbname) {

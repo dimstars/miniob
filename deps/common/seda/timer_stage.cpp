@@ -228,10 +228,10 @@ TimerStage::~TimerStage() {
   return;
 }
 
-Stage *TimerStage::makeStage(const std::string &tag) {
+Stage *TimerStage::make_stage(const std::string &tag) {
   TimerStage *s = new TimerStage(tag.c_str());
   ASSERT(s != NULL, "Failed to instantiate stage.");
-  if (!s->setProperties()) {
+  if (!s->set_properties()) {
     LOG_PANIC("failed to set properties.\n");
     delete s;
     s = NULL;
@@ -240,14 +240,14 @@ Stage *TimerStage::makeStage(const std::string &tag) {
   return s;
 }
 
-bool TimerStage::setProperties() {
+bool TimerStage::set_properties() {
   // No configuration is stored in the system properties.
   return true;
 }
 
 bool TimerStage::initialize() {
   // The TimerStage does not send messages to any other stage.
-  ASSERT(nextStageList.size() == 0, "Invalid NextStages list.");
+  ASSERT(next_stage_list_.size() == 0, "Invalid NextStages list.");
 
   // Start the thread to maintain the timer
   const pthread_attr_t *thread_attrs = NULL;
@@ -262,7 +262,7 @@ bool TimerStage::initialize() {
 
 u32_t TimerStage::getNumEvents() { return num_events; }
 
-void TimerStage::disconnectPrepare() {
+void TimerStage::disconnect_prepare() {
   LOG_INFO("received signal to initiate shutdown.\n");
   pthread_mutex_lock(&timer_mutex);
   shutdown = true;
@@ -278,7 +278,7 @@ void TimerStage::disconnectPrepare() {
   return;
 }
 
-void TimerStage::handleEvent(StageEvent *event) {
+void TimerStage::handle_event(StageEvent *event) {
   TimerEvent *e = dynamic_cast<TimerEvent *>(event);
   if (e == NULL) {
     LOG_WARN("received event of unexpected type: typeid=%s\n",
@@ -301,7 +301,7 @@ void TimerStage::handleEvent(StageEvent *event) {
   return;
 }
 
-void TimerStage::callbackEvent(StageEvent *e, CallbackContext *ctx) { return; }
+void TimerStage::callback_event(StageEvent *e, CallbackContext *ctx) { return; }
 
 void TimerStage::registerTimer(TimerRegisterEvent &reg_ev) {
   const TimerToken tt(reg_ev.getTime());

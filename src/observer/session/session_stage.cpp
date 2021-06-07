@@ -17,10 +17,10 @@
 // Created by Longda on 2021/4/13.
 //
 
+#include "session_stage.h"
+
 #include <string.h>
 #include <string>
-
-#include "session_stage.h"
 
 #include "common/conf/ini.h"
 #include "common/log/log.h"
@@ -38,27 +38,27 @@ using namespace common;
 
 const std::string SessionStage::SQL_METRIC_TAG = "SessionStage.sql";
 
-//! Constructor
+// Constructor
 SessionStage::SessionStage(const char *tag)
-    : Stage(tag), resolveStage(nullptr), sqlMetric(nullptr) {}
+    : Stage(tag), resolve_stage_(nullptr), sql_metric_(nullptr) {}
 
-//! Destructor
+// Destructor
 SessionStage::~SessionStage() {}
 
-//! Parse properties, instantiate a stage object
-Stage *SessionStage::makeStage(const std::string &tag) {
+// Parse properties, instantiate a stage object
+Stage *SessionStage::make_stage(const std::string &tag) {
   SessionStage *stage = new (std::nothrow) SessionStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new ExecutorStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
-//! Set properties for this object set in stage specific properties
-bool SessionStage::setProperties() {
-  //  std::string stageNameStr(stageName);
+// Set properties for this object set in stage specific properties
+bool SessionStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
   //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
@@ -69,45 +69,45 @@ bool SessionStage::setProperties() {
   return true;
 }
 
-//! Initialize stage params and validate outputs
+// Initialize stage params and validate outputs
 bool SessionStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
-  resolveStage = *(stgp++);
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
+  resolve_stage_ = *(stgp++);
 
   MetricsRegistry &metricsRegistry = get_g_metrics_registry();
-  sqlMetric = new SimpleTimer();
-  metricsRegistry.register_metric(SQL_METRIC_TAG, sqlMetric);
+  sql_metric_ = new SimpleTimer();
+  metricsRegistry.register_metric(SQL_METRIC_TAG, sql_metric_);
   LOG_TRACE("Exit");
   return true;
 }
 
-//! Cleanup after disconnection
+// Cleanup after disconnection
 void SessionStage::cleanup() {
   LOG_TRACE("Enter");
 
   MetricsRegistry &metricsRegistry = get_g_metrics_registry();
-  if (sqlMetric != nullptr) {
+  if (sql_metric_ != nullptr) {
     metricsRegistry.unregister(SQL_METRIC_TAG);
-    delete sqlMetric;
-    sqlMetric = nullptr;
+    delete sql_metric_;
+    sql_metric_ = nullptr;
   }
 
   LOG_TRACE("Exit");
 }
 
-void SessionStage::handleEvent(StageEvent *event) {
+void SessionStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   // right now, we just support only one event.
-  handleRequest(event);
+  handle_request(event);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void SessionStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void SessionStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   SessionEvent *sev = dynamic_cast<SessionEvent *>(event);
@@ -125,11 +125,11 @@ void SessionStage::callbackEvent(StageEvent *event, CallbackContext *context) {
   return;
 }
 
-void SessionStage::handleRequest(StageEvent *event) {
+void SessionStage::handle_request(StageEvent *event) {
 
   SessionEvent *sev = dynamic_cast<SessionEvent *>(event);
 
-  TimerStat sqlStat(*sqlMetric);
+  TimerStat sqlStat(*sql_metric_);
   std::string sql = sev->get_request_buf();
   if (common::is_blank(sql.c_str())) {
     sev->doneImmediate();
@@ -147,7 +147,7 @@ void SessionStage::handleRequest(StageEvent *event) {
   sev->pushCallback(cb);
 
   SQLStageEvent *sql_event = new SQLStageEvent(sev, sql);
-  resolveStage->handleEvent(sql_event);
+  resolve_stage_->handle_event(sql_event);
 
   // TODO it will write data directly
 }

@@ -17,10 +17,10 @@
 // Created by Longda on 2021
 //
 
+#include "net/server.h"
+
 #include <arpa/inet.h>
 #include <errno.h>
-
-#include <common/metrics/metrics_registry.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -31,14 +31,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "net/server.h"
-
 #include "common/lang/mutex.h"
 #include "common/log/log.h"
 #include "common/seda/seda_config.h"
 #include "event/session_event.h"
-#include "ini_setting.h"
 #include "session/session.h"
+#include "ini_setting.h"
+#include <common/metrics/metrics_registry.h>
 
 using namespace common;
 static const std::string READ_SOCKET_METRIC_TAG = "SessionStage.readsocket";
@@ -78,15 +77,15 @@ Server::~Server() {
 void Server::init(){
   session_stage_ = theSedaConfig()->getStage(SESSION_STAGE_NAME);
 
-  MetricsRegistry &metricsRegistry = theGlobalMetricsRegistry();
+  MetricsRegistry &metricsRegistry = g_metrics_registry();
   if (Server::read_socket_metric_ == nullptr) {
     Server::read_socket_metric_ = new SimpleTimer();
-    metricsRegistry.registerMetric(READ_SOCKET_METRIC_TAG, Server::read_socket_metric_);
+    metricsRegistry.register_metric(READ_SOCKET_METRIC_TAG, Server::read_socket_metric_);
   }
 
   if (Server::write_socket_metric_ == nullptr) {
     Server::write_socket_metric_ = new SimpleTimer();
-    metricsRegistry.registerMetric(WRITE_SOCKET_METRIC_TAG, Server::write_socket_metric_);
+    metricsRegistry.register_metric(WRITE_SOCKET_METRIC_TAG, Server::write_socket_metric_);
   }  
 }
 
@@ -108,7 +107,7 @@ int Server::set_non_block(int fd) {
 
 void Server::close_connection(ConnectionContext *client_context) {
   LOG_INFO("Close connection of %s.", client_context->addr);
-  event_del(&client_context->readEvent);
+  event_del(&client_context->read_event);
   ::close(client_context->fd);
   delete client_context->session;
   client_context->session = nullptr;
@@ -187,9 +186,9 @@ void Server::accept(int fd, short ev, void *arg) {
     ::close(client_fd);
     return;
   }
-  std::stringstream addross;
-  addross << ip_addr << ":" << addr.sin_port;
-  std::string addr_str = addross.str();
+  std::stringstream address;
+  address << ip_addr << ":" << addr.sin_port;
+  std::string addr_str = address.str();
 
   ret = instance->set_non_block(client_fd);
   if (ret < 0) {
@@ -214,10 +213,10 @@ void Server::accept(int fd, short ev, void *arg) {
   strncpy(client_context->addr, addr_str.c_str(), sizeof(client_context->addr));
   pthread_mutex_init(&client_context->mutex, nullptr);
 
-  event_set(&client_context->readEvent, client_context->fd, EV_READ | EV_PERSIST,
+  event_set(&client_context->read_event, client_context->fd, EV_READ | EV_PERSIST,
             recv, client_context);
 
-  ret = event_base_set(instance->event_base_, &client_context->readEvent);
+  ret = event_base_set(instance->event_base_, &client_context->read_event);
   if (ret < 0) {
     LOG_ERROR(
             "Failed to do event_base_set for read event of %s into libevent, %s",
@@ -227,7 +226,7 @@ void Server::accept(int fd, short ev, void *arg) {
     return;
   }
 
-  ret = event_add(&client_context->readEvent, nullptr);
+  ret = event_add(&client_context->read_event, nullptr);
   if (ret < 0) {
     LOG_ERROR("Failed to event_add for read event of %s into libevent, %s",
               client_context->addr, strerror(errno));

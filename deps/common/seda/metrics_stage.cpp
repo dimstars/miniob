@@ -61,7 +61,7 @@ Stage *MetricsStage::makeStage(const std::string &tag) {
 bool MetricsStage::setProperties() {
   std::string stageNameStr(stageName);
   std::map<std::string, std::string> section =
-      g_properties()->get(stageNameStr);
+      get_g_properties()->get(stageNameStr);
 
   metricReportInterval = DateTime::SECONDS_PER_MIN;
 
@@ -129,7 +129,7 @@ void MetricsStage::handleEvent(StageEvent *event) {
 void MetricsStage::callbackEvent(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
-  MetricsRegistry &metricsRegistry = theGlobalMetricsRegistry();
+  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
 
   metricsRegistry.snapshot();
   metricsRegistry.report();

@@ -32,11 +32,11 @@ namespace common {
 class Gauge : public Metric {
 public:
   // user implement snapshot function
-  void setSnapshot(Snapshot *value) { snapshotValue = value; }
+  void set_snapshot(Snapshot *value) { snapshot_value_ = value; }
 };
 
 class Counter : public Metric {
-  void setSnapshot(SnapshotBasic<long> *value) { snapshotValue = value; }
+  void set_snapshot(SnapshotBasic<long> *value) { snapshot_value_ = value; }
 };
 
 class Meter : public Metric {
@@ -50,8 +50,8 @@ public:
   void snapshot();
 
 protected:
-  std::atomic<long> value;
-  long snapshotTick;
+  std::atomic<long> value_;
+  long snapshot_tick_;
 };
 
 // SimpleTimer just get tps and meanvalue
@@ -67,7 +67,7 @@ public:
   void snapshot();
 
 protected:
-  std::atomic<long> times;
+  std::atomic<long> times_;
 };
 
 // Histogram metric is complicated, in normal case ,
@@ -96,22 +96,22 @@ public:
   void update(double ms);
 
 protected:
-  std::atomic<long> value;
-  long snapshotTick;
+  std::atomic<long> value_;
+  long snapshot_tick_;
 };
 // update ms
 class TimerStat {
 public:
-  TimerStat(SimpleTimer &st);
+  TimerStat(SimpleTimer &st_);
 
   ~TimerStat();
   void start();
   void end();
 
 public:
-  SimpleTimer &st;
-  long startTick;
-  long endTick;
+  SimpleTimer &st_;
+  long start_tick_;
+  long end_tick_;
 };
 
 } // namespace common

@@ -28,10 +28,10 @@ class Metric {
 public:
   virtual void snapshot() = 0;
 
-  virtual Snapshot *getSnapshot() { return snapshotValue; }
+  virtual Snapshot *get_snapshot() { return snapshot_value_; }
 
 protected:
-  Snapshot *snapshotValue;
+  Snapshot *snapshot_value_;
 };
 
 }//namespace common

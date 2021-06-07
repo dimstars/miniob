@@ -28,10 +28,10 @@ public:
   TimerSnapshot();
   virtual ~TimerSnapshot();
 
-  double getTps();
-  void setTps(double tps);
+  double get_tps();
+  void set_tps(double tps);
 
-  std::string toString();
+  std::string to_string();
 protected:
   double tps;
 };

@@ -17,25 +17,27 @@
 // Created by Longda on 2021/4/20.
 //
 
-#include <string>
-#include "common/metrics/metric.h"
 #include "common/metrics/log_reporter.h"
+
+#include <string>
+
+#include "common/metrics/metric.h"
 #include "common/log/log.h"
 
 
 namespace common {
 
-LogReporter* theGlobalLogReporter() {
+LogReporter* get_g_log_reporter() {
   static LogReporter* instance = new LogReporter();
 
   return instance;
 }
 
  void LogReporter::report(const std::string &tag, Metric *metric) {
-  Snapshot *snapshot = metric->getSnapshot();
+  Snapshot *snapshot = metric->get_snapshot();
 
   if (snapshot != NULL) {
-    LOG_INFO("%s:%s", tag.c_str(), snapshot->toString().c_str());
+    LOG_INFO("%s:%s", tag.c_str(), snapshot->to_string().c_str());
   }else {
     LOG_WARN("There is no snapshot of %s metrics.", tag.c_str());
   }

@@ -63,7 +63,7 @@ Stage *ExecuteStage::makeStage(const std::string &tag) {
 //! Set properties for this object set in stage specific properties
 bool ExecuteStage::setProperties() {
   //  std::string stageNameStr(stageName);
-  //  std::map<std::string, std::string> section = g_properties()->get(
+  //  std::map<std::string, std::string> section = theGlobalProperties()->get(
   //    stageNameStr);
   //
   //  std::map<std::string, std::string>::iterator it;

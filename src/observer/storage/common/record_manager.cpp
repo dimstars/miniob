@@ -18,7 +18,6 @@
 //
 #include "storage/common/record_manager.h"
 #include "rc.h"
-#include "handler/handler_defs.h"
 #include "common/log/log.h"
 #include "common/lang/bitmap.h"
 #include "condition_filter.h"

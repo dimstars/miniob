@@ -23,7 +23,7 @@
 #include <string>
 
 #include "rc.h"
-#include "handler/handler_defs.h"
+#include "sql/parser/parse_defs.h"
 
 namespace Json {
 class Value;

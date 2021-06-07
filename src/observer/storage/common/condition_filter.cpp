@@ -18,7 +18,6 @@
 //
 
 #include "condition_filter.h"
-#include "handler/handler_defs.h"
 #include "record_manager.h"
 #include "common/log/log.h"
 #include "storage/common/table.h"

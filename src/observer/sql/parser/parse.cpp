@@ -18,7 +18,7 @@
 //
 
 #include <mutex>
-#include "handler/handler_defs.h"
+#include "sql/parser/parse.h"
 #include "yacc_sql.tab.h"
 #include "rc.h"
 
@@ -26,9 +26,9 @@ Selects *getSelects();
 Condition *getCondition();
 RelAttr *getRelAttr();
 Value *getValue();
-union sqls *getSqls();
-sqlstr *getSqlstr();
-RC parse(char *st, sqlstr *sqln);
+union Queries *getSqls();
+Query *getSqlstr();
+RC parse(char *st, Query *sqln);
 
 int i;
 // allocate struct of condition
@@ -83,36 +83,28 @@ Selects *getSelects() {
   return se;
 }
 // allocate union of sqls
-union sqls *getSqls() {
-  union sqls *sql;
-  sql = (union sqls *)malloc(sizeof(union sqls));
+union Queries *getSqls() {
+  union Queries *sql;
+  sql = (union Queries *)malloc(sizeof(union Queries));
   (sql)->selection = *getSelects();
   (sql)->errors = (char *)malloc(sizeof(char) * MAX_ERROR_MESSAGE);
   memset(sql->errors, 0, sizeof(char) * MAX_ERROR_MESSAGE);
   return sql;
 }
-sqlstr *getSqlstr() {
-  sqlstr *sq;
-  sq = (sqlstr *)malloc(sizeof(sqlstr));
+Query *getSqlstr() {
+  Query *sq;
+  sq = (Query *)malloc(sizeof(Query));
   (sq)->flag = SCF_ERROR;
   (sq)->sstr = *getSqls();
   return sq;
 }
 
-extern "C" int hust_parse(sqlstr *sqls);
-extern "C" void scan_string(const char *str);
+extern "C" int sql_parse(const char *st, Query  *sqls);
 
-RC parse(const char *st, sqlstr *sqln) {
-
-  scan_string(st);
-
-  if (sqln->flag == -1) {
-    sqln->sstr = *getSqls();
-  }
-
+RC parse(const char *st, Query *sqln) {
   static std::mutex lock;
   lock.lock();
-  hust_parse(sqln);
+  sql_parse(st, sqln);
   lock.unlock();
 
   if (sqln->flag == 0)

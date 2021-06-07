@@ -30,7 +30,6 @@
 #include "event/session_event.h"
 #include "event/sql_event.h"
 #include "sql/parser/parse.h"
-#include "handler/handler_defs.h"
 #include "event/execution_plan_event.h"
 
 using namespace common;
@@ -116,7 +115,7 @@ StageEvent *ParseStage::handleRequest(StageEvent *event) {
   SQLStageEvent *sql_event = static_cast<SQLStageEvent *>(event);
   const std::string &sql = sql_event->get_sql();
   
-  sqlstr *result = new sqlstr;
+  Query *result = new Query;
   RC ret = parse(sql.c_str(), result);
   if (ret != RC::SUCCESS) {
     // TODO set error information to event

@@ -143,7 +143,7 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
   TimerStat timerStat(*queryMetric);
 
   StorageEvent *storage_event = static_cast<StorageEvent *>(event);
-  sqlstr *sql = storage_event->exe_event()->sqls();
+  Query *sql = storage_event->exe_event()->sqls();
 
   SessionEvent *session_event = storage_event->exe_event()->sql_event()->session_event();
 
@@ -226,6 +226,7 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
         ss << "No such table: " << table_name << std::endl;
       }
       snprintf(response, sizeof(response), "%s", ss.str().c_str());
+      free((char *)(sql->sstr.desc_table.relation_name));
     }
     break;
   default:

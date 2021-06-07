@@ -20,6 +20,7 @@
 #include "storage/default/disk_buffer_pool.h"
 #include "rc.h"
 #include "common/log/log.h"
+#include "sql/parser/parse_defs.h"
 
 IndexNode * BplusTreeHandler::get_index_node(char *page_data) const {
   IndexNode *node = (IndexNode  *)(page_data + sizeof(IndexFileHeader));

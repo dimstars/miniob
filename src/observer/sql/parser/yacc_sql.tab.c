@@ -165,14 +165,38 @@
 #line 2 "yacc_sql.y"
 
 
-#include "handler/handler_defs.h"
+#include "sql/parser/parse_defs.h"
+#include "sql/parser/yacc_sql.tab.h"
+#include "sql/parser/lex.yy.h"
 // #include "common/log/log.h" // TODO 包含C++中的头文件
 
 extern char * position;
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
-extern int yylex(void);
+
+typedef struct ParserContext {
+  Query * ssql;
+	int select_length;
+  int condition_length;
+  int from_length;
+  int value_length;
+  Value values[MAX_NUM];
+  Condition conditions[MAX_NUM];
+  CompOp comp;
+	char id[MAX_NUM];
+	yyscan_t scanner;
+} ParserContext;
+
+#define YYPARSE_PARAM _context
+#define YYLEX_PARAM &yylval, ((ParserContext *)_context)->scanner
+#define yyerror(msg) my_yyerror(msg, YYPARSE_PARAM)
+#define CONTEXT context(_context)
+
+ParserContext *context(void *_context) {
+	return (ParserContext *)_context;
+}
+
 //获取子串
 char *substr(const char *s,int n1,int n2)/*从s中提取下标为n1~n2的字符组成一个新字符串，然后返回这个新串的首地址*/
 {
@@ -184,30 +208,16 @@ char *substr(const char *s,int n1,int n2)/*从s中提取下标为n1~n2的字符�
 	sp[j]=0;
 	return sp;
 }
-  sqlstr *ssql;
-  struct _Condition wherecondi[MAX_NUM];
 
-	/*临时中间变量*/
-int whereleng=0; 
-int fromleng=0;
-int selectleng=0;
-int valueleng=0;
-int i;
-char get_id[MAX_NUM];
-char *temp;
+void my_yyerror(const char *str, ParserContext *context) {
 
-Value valueT[MAX_NUM];
-
-int compOpT;
-void yyerror(const char *str) {
-
-	ssql->flag=0;
-	whereleng=0; 
-  fromleng=0;
-  selectleng=0;
-	valueleng=0;
-  ssql->sstr.insertion.value_num = 0;
-	ssql->sstr.errors=position;
+	context->ssql->flag=0;
+	context->condition_length = 0;
+	context->from_length = 0;
+	context->select_length = 0;
+	context->value_length = 0;
+  context->ssql->sstr.insertion.value_num = 0;
+	context->ssql->sstr.errors = position;
 	printf("parse sql failed. error=%s", str);
 }
 
@@ -233,7 +243,7 @@ void yyerror(const char *str) {
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 91 "yacc_sql.y"
+#line 101 "yacc_sql.y"
 {
     struct _Attr *attr;
 	  struct _Condition *condition1;
@@ -244,7 +254,7 @@ typedef union YYSTYPE
     float floats;
 }
 /* Line 193 of yacc.c.  */
-#line 248 "yacc_sql.tab.c"
+#line 258 "yacc_sql.tab.c"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
@@ -257,7 +267,7 @@ typedef union YYSTYPE
 
 
 /* Line 216 of yacc.c.  */
-#line 261 "yacc_sql.tab.c"
+#line 271 "yacc_sql.tab.c"
 
 #ifdef short
 # undef short
@@ -574,14 +584,14 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   116,   116,   118,   122,   123,   124,   125,   126,   127,
-     128,   129,   130,   131,   132,   133,   134,   135,   136,   137,
-     155,   160,   165,   171,   177,   183,   189,   195,   201,   208,
-     217,   223,   233,   235,   239,   246,   255,   258,   259,   260,
-     263,   273,   288,   290,   296,   302,   308,   318,   330,   344,
-     365,   369,   373,   378,   380,   384,   390,   392,   396,   398,
-     402,   404,   409,   421,   434,   445,   458,   470,   482,   495,
-     496,   497,   498,   499,   500
+       0,   126,   126,   128,   132,   133,   134,   135,   136,   137,
+     138,   139,   140,   141,   142,   143,   144,   145,   146,   147,
+     151,   156,   161,   167,   173,   179,   185,   191,   197,   204,
+     214,   221,   232,   234,   238,   246,   256,   259,   260,   261,
+     264,   273,   289,   291,   296,   302,   308,   318,   331,   346,
+     368,   372,   376,   381,   383,   387,   393,   395,   399,   401,
+     405,   407,   412,   425,   439,   451,   465,   478,   491,   505,
+     506,   507,   508,   509,   510
 };
 #endif
 
@@ -1583,181 +1593,179 @@ yyreduce:
   switch (yyn)
     {
         case 20:
-#line 155 "yacc_sql.y"
+#line 151 "yacc_sql.y"
     {
-        ssql->flag=SCF_EXIT;//"exit";
+        CONTEXT->ssql->flag=SCF_EXIT;//"exit";
     }
     break;
 
   case 21:
-#line 160 "yacc_sql.y"
+#line 156 "yacc_sql.y"
     {
-        ssql->flag=SCF_HELP;//"help";
+        CONTEXT->ssql->flag=SCF_HELP;//"help";
     }
     break;
 
   case 22:
-#line 165 "yacc_sql.y"
+#line 161 "yacc_sql.y"
     {
-      ssql->flag = SCF_SYNC;
+      CONTEXT->ssql->flag = SCF_SYNC;
     }
     break;
 
   case 23:
-#line 171 "yacc_sql.y"
+#line 167 "yacc_sql.y"
     {
-      ssql->flag = SCF_BEGIN;
+      CONTEXT->ssql->flag = SCF_BEGIN;
     }
     break;
 
   case 24:
-#line 177 "yacc_sql.y"
+#line 173 "yacc_sql.y"
     {
-      ssql->flag = SCF_COMMIT;
+      CONTEXT->ssql->flag = SCF_COMMIT;
     }
     break;
 
   case 25:
-#line 183 "yacc_sql.y"
+#line 179 "yacc_sql.y"
     {
-      ssql->flag = SCF_ROLLBACK;
+      CONTEXT->ssql->flag = SCF_ROLLBACK;
     }
     break;
 
   case 26:
-#line 189 "yacc_sql.y"
+#line 185 "yacc_sql.y"
     {
-        ssql->flag=SCF_DROP_TABLE;//"drop_table";
-        ssql->sstr.drop_table.relation_name =(yyvsp[(3) - (4)].string);
+        CONTEXT->ssql->flag = SCF_DROP_TABLE;//"drop_table";
+        CONTEXT->ssql->sstr.drop_table.relation_name = (yyvsp[(3) - (4)].string);
     }
     break;
 
   case 27:
-#line 195 "yacc_sql.y"
+#line 191 "yacc_sql.y"
     {
-      ssql->flag=SCF_SHOW_TABLES;
+      CONTEXT->ssql->flag = SCF_SHOW_TABLES;
     }
     break;
 
   case 28:
-#line 201 "yacc_sql.y"
+#line 197 "yacc_sql.y"
     {
-      ssql->flag = SCF_DESC_TABLE;
-      ssql->sstr.desc_table.relation_name = (yyvsp[(2) - (3)].string);
+      CONTEXT->ssql->flag = SCF_DESC_TABLE;
+      CONTEXT->ssql->sstr.desc_table.relation_name = (yyvsp[(2) - (3)].string);
     }
     break;
 
   case 29:
-#line 208 "yacc_sql.y"
+#line 205 "yacc_sql.y"
     {
-																							        ssql->flag=SCF_CREATE_INDEX;//"create_index";
-																							        ssql->sstr.create_index.index_name =(yyvsp[(3) - (9)].string);
-																							        ssql->sstr.create_index.relation_name =(yyvsp[(5) - (9)].string);
-																							        ssql->sstr.create_index.attribute_name =(yyvsp[(7) - (9)].string);
-																							    }
+			CONTEXT->ssql->flag = SCF_CREATE_INDEX;//"create_index";
+			CONTEXT->ssql->sstr.create_index.index_name =(yyvsp[(3) - (9)].string);
+			CONTEXT->ssql->sstr.create_index.relation_name =(yyvsp[(5) - (9)].string);
+			CONTEXT->ssql->sstr.create_index.attribute_name =(yyvsp[(7) - (9)].string);
+		}
     break;
 
   case 30:
-#line 217 "yacc_sql.y"
+#line 215 "yacc_sql.y"
     {
-											        ssql->flag=SCF_DROP_INDEX;//"drop_index";
-											        ssql->sstr.drop_index.index_name =(yyvsp[(3) - (4)].string);
-											    }
+			CONTEXT->ssql->flag=SCF_DROP_INDEX;//"drop_index";
+			CONTEXT->ssql->sstr.drop_index.index_name =(yyvsp[(3) - (4)].string);
+		}
     break;
 
   case 31:
-#line 223 "yacc_sql.y"
+#line 222 "yacc_sql.y"
     {
 	
-																																		ssql->flag=SCF_CREATE_TABLE;//"create_table";
-																																		ssql->sstr.create_table.relation_name =(yyvsp[(3) - (8)].string);
-																																		ssql->sstr.create_table.attribute_count =valueleng;
-																																		//临时变量清零	
-																																		valueleng=0;
-																																		
-																																	    }
+			CONTEXT->ssql->flag=SCF_CREATE_TABLE;//"create_table";
+			CONTEXT->ssql->sstr.create_table.relation_name =(yyvsp[(3) - (8)].string);
+			CONTEXT->ssql->sstr.create_table.attribute_count = CONTEXT->value_length;
+			//临时变量清零	
+			CONTEXT->value_length = 0;
+	
+		}
     break;
 
   case 33:
-#line 235 "yacc_sql.y"
+#line 234 "yacc_sql.y"
     {    }
     break;
 
   case 34:
 #line 239 "yacc_sql.y"
     {
-																ssql->sstr.create_table.attributes[valueleng].name =(char*)malloc(sizeof(char)); // TODO FATAL
-																strcpy(ssql->sstr.create_table.attributes[valueleng].name,get_id); 
-																ssql->sstr.create_table.attributes[valueleng].type = (yyvsp[(2) - (5)].number);  
-																ssql->sstr.create_table.attributes[valueleng].length = (yyvsp[(4) - (5)].number);
-																valueleng++;
-															    }
+			CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char)); // TODO FATAL
+			strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
+			CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type = (yyvsp[(2) - (5)].number);  
+			CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length = (yyvsp[(4) - (5)].number);
+			CONTEXT->value_length++;
+		}
     break;
 
   case 35:
-#line 246 "yacc_sql.y"
+#line 247 "yacc_sql.y"
     {
-															ssql->sstr.create_table.attributes[valueleng].name=(char*)malloc(sizeof(char));
-															strcpy(ssql->sstr.create_table.attributes[valueleng].name,get_id); 
-															ssql->sstr.create_table.attributes[valueleng].type=(yyvsp[(2) - (2)].number);  
-															ssql->sstr.create_table.attributes[valueleng].length=4;
-															valueleng++;
-														    }
+			CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
+			strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
+			CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type=(yyvsp[(2) - (2)].number);  
+			CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length=4; // default attribute length
+			CONTEXT->value_length++;
+		}
     break;
 
   case 36:
-#line 255 "yacc_sql.y"
+#line 256 "yacc_sql.y"
     {(yyval.number) = (yyvsp[(1) - (1)].number);}
     break;
 
   case 37:
-#line 258 "yacc_sql.y"
-    { (yyval.number)=2; }
+#line 259 "yacc_sql.y"
+    { (yyval.number)=INTS; }
     break;
 
   case 38:
-#line 259 "yacc_sql.y"
-    { (yyval.number)=1; }
+#line 260 "yacc_sql.y"
+    { (yyval.number)=CHARS; }
     break;
 
   case 39:
-#line 260 "yacc_sql.y"
-    { (yyval.number)=3; }
+#line 261 "yacc_sql.y"
+    { (yyval.number)=FLOATS; }
     break;
 
   case 40:
-#line 263 "yacc_sql.y"
+#line 265 "yacc_sql.y"
     {
-				 temp=(yyvsp[(1) - (1)].string); 
-				for(i=0;i<MAX_NUM;i++){
-				get_id[i]=*(temp+i);
-				}
-			}
+		char *temp=(yyvsp[(1) - (1)].string); 
+		snprintf(CONTEXT->id, sizeof(CONTEXT->id), "%s", temp);
+	}
     break;
 
   case 41:
-#line 273 "yacc_sql.y"
+#line 274 "yacc_sql.y"
     {
-        valueT[valueleng++] = *(yyvsp[(6) - (9)].value1);
+			int i;
+			CONTEXT->values[CONTEXT->value_length++] = *(yyvsp[(6) - (9)].value1);
 
-        ssql->flag=SCF_INSERT;//"insert";
-        ssql->sstr.insertion.relation_name = (yyvsp[(3) - (9)].string);
-        ssql->sstr.insertion.value_num = valueleng;
-        for(i=0;i<valueleng;i++){
-        ssql->sstr.insertion.values[i] = valueT[i];
+			CONTEXT->ssql->flag=SCF_INSERT;//"insert";
+			CONTEXT->ssql->sstr.insertion.relation_name = (yyvsp[(3) - (9)].string);
+			CONTEXT->ssql->sstr.insertion.value_num = CONTEXT->value_length;
+			for(i = 0; i < CONTEXT->value_length; i++){
+				CONTEXT->ssql->sstr.insertion.values[i] = CONTEXT->values[i];
       }
 
       //临时变量清零
-      valueleng=0;
-      //	free(valueT);
+      CONTEXT->value_length=0;
     }
     break;
 
   case 43:
-#line 290 "yacc_sql.y"
+#line 291 "yacc_sql.y"
     { 
-  			 valueT[valueleng++] = *(yyvsp[(2) - (3)].value1);
-	}
+  		CONTEXT->values[CONTEXT->value_length++] = *(yyvsp[(2) - (3)].value1);
+	  }
     break;
 
   case 44:
@@ -1792,262 +1800,262 @@ yyreduce:
     break;
 
   case 47:
-#line 318 "yacc_sql.y"
+#line 319 "yacc_sql.y"
     {
-	
-	ssql->flag=SCF_DELETE;//"delete";
-	ssql->sstr.deletion.relation_name = (yyvsp[(3) - (5)].string);
-	for(i=0;i<whereleng;i++){
-	ssql->sstr.deletion.conditions[i]=wherecondi[i];
-	}
-	ssql->sstr.deletion.condition_num = whereleng;
-	whereleng=0;	
+		  int i;
+			CONTEXT->ssql->flag = SCF_DELETE;//"delete";
+			CONTEXT->ssql->sstr.deletion.relation_name = (yyvsp[(3) - (5)].string);
+			for(i = 0; i < CONTEXT->condition_length; i++){
+				CONTEXT->ssql->sstr.deletion.conditions[i] = CONTEXT->conditions[i];
+			}
+			CONTEXT->ssql->sstr.deletion.condition_num = CONTEXT->condition_length;
+			CONTEXT->condition_length = 0;	
     }
     break;
 
   case 48:
-#line 330 "yacc_sql.y"
+#line 332 "yacc_sql.y"
     {
-	
-											ssql->flag=SCF_UPDATE;//"update";
-											ssql->sstr.update.relation_name = (yyvsp[(2) - (8)].string);
-											ssql->sstr.update.value = *(yyvsp[(6) - (8)].value1);
-											ssql->sstr.update.attribute_name = (yyvsp[(4) - (8)].string);
-											for(i=0;i<whereleng;i++){
-											  ssql->sstr.update.conditions[i]=wherecondi[i];
-											}
-											ssql->sstr.update.condition_num =whereleng;
-											whereleng=0;
-										    }
+			int i;
+			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
+			CONTEXT->ssql->sstr.update.relation_name = (yyvsp[(2) - (8)].string);
+			CONTEXT->ssql->sstr.update.value = *(yyvsp[(6) - (8)].value1);
+			CONTEXT->ssql->sstr.update.attribute_name = (yyvsp[(4) - (8)].string);
+			for(i = 0; i < CONTEXT->condition_length; i++){
+				CONTEXT->ssql->sstr.update.conditions[i] = CONTEXT->conditions[i];
+			}
+			CONTEXT->ssql->sstr.update.condition_num = CONTEXT->condition_length;
+			CONTEXT->condition_length = 0;
+		}
     break;
 
   case 49:
-#line 344 "yacc_sql.y"
+#line 347 "yacc_sql.y"
     {
-      
-            ssql->sstr.selection.relations[fromleng++]=(yyvsp[(4) - (7)].string);
+			int i;
+			CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=(yyvsp[(4) - (7)].string);
 
-            for(i=0;i<whereleng;i++){
-              ssql->sstr.selection.conditions[i]=wherecondi[i];
-            }
+			for(i =0; i < CONTEXT->condition_length; i++){
+				CONTEXT->ssql->sstr.selection.conditions[i] = CONTEXT->conditions[i];
+			}
 
-            ssql->flag=SCF_SELECT;//"select";
-            ssql->sstr.selection.attr_num = selectleng;
-            ssql->sstr.selection.relation_num = fromleng;
-            ssql->sstr.selection.condition_num =whereleng;
+			CONTEXT->ssql->flag=SCF_SELECT;//"select";
+			CONTEXT->ssql->sstr.selection.attr_num = CONTEXT->select_length;
+			CONTEXT->ssql->sstr.selection.relation_num = CONTEXT->from_length;
+			CONTEXT->ssql->sstr.selection.condition_num = CONTEXT->condition_length;
 
-            //临时变量清零
-            whereleng=0;
-            fromleng=0;
-            selectleng=0;
-        }
+			//临时变量清零
+			CONTEXT->condition_length=0;
+			CONTEXT->from_length=0;
+			CONTEXT->select_length=0;
+	}
     break;
 
   case 50:
-#line 365 "yacc_sql.y"
+#line 368 "yacc_sql.y"
     {  // TODO 处理这里的内存泄露问题
-         ssql->sstr.selection.attributes[selectleng].attribute_name ="*";
-         ssql->sstr.selection.attributes[selectleng++].relation_name =NULL;
+         CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].attribute_name ="*";
+         CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name =NULL;
        }
     break;
 
   case 51:
-#line 369 "yacc_sql.y"
+#line 372 "yacc_sql.y"
     {
-        ssql->sstr.selection.attributes[selectleng].attribute_name=(yyvsp[(1) - (2)].string);
-        ssql->sstr.selection.attributes[selectleng++].relation_name=NULL;
+        CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].attribute_name=(yyvsp[(1) - (2)].string);
+        CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name=NULL;
       }
     break;
 
   case 52:
-#line 373 "yacc_sql.y"
+#line 376 "yacc_sql.y"
     {
-        ssql->sstr.selection.attributes[selectleng].attribute_name=(yyvsp[(3) - (4)].string);
-        ssql->sstr.selection.attributes[selectleng++].relation_name=(yyvsp[(1) - (4)].string);
+        CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].attribute_name=(yyvsp[(3) - (4)].string);
+        CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name=(yyvsp[(1) - (4)].string);
       }
     break;
 
   case 54:
-#line 380 "yacc_sql.y"
+#line 383 "yacc_sql.y"
     {
-     	  ssql->sstr.selection.attributes[selectleng].relation_name = NULL;
-        ssql->sstr.selection.attributes[selectleng++].attribute_name=(yyvsp[(2) - (3)].string);
+     	  CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].relation_name = NULL;
+        CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].attribute_name=(yyvsp[(2) - (3)].string);
       }
     break;
 
   case 55:
-#line 384 "yacc_sql.y"
+#line 387 "yacc_sql.y"
     {
-        ssql->sstr.selection.attributes[selectleng].attribute_name=(yyvsp[(4) - (5)].string);
-        ssql->sstr.selection.attributes[selectleng++].relation_name=(yyvsp[(2) - (5)].string);
+        CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length].attribute_name=(yyvsp[(4) - (5)].string);
+        CONTEXT->ssql->sstr.selection.attributes[CONTEXT->select_length++].relation_name=(yyvsp[(2) - (5)].string);
   	  }
     break;
 
   case 57:
-#line 392 "yacc_sql.y"
+#line 395 "yacc_sql.y"
     {	
-				ssql->sstr.selection.relations[fromleng++]=(yyvsp[(2) - (3)].string);
+				CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=(yyvsp[(2) - (3)].string);
 		  }
     break;
 
   case 59:
-#line 398 "yacc_sql.y"
+#line 401 "yacc_sql.y"
     {	
-				wherecondi[whereleng++]=*(yyvsp[(2) - (3)].condition1);
+				CONTEXT->conditions[CONTEXT->condition_length++]=*(yyvsp[(2) - (3)].condition1);
 			}
     break;
 
   case 61:
-#line 404 "yacc_sql.y"
+#line 407 "yacc_sql.y"
     {
-				wherecondi[whereleng++]=*(yyvsp[(2) - (3)].condition1);
+				CONTEXT->conditions[CONTEXT->condition_length++]=*(yyvsp[(2) - (3)].condition1);
 			}
     break;
 
   case 62:
-#line 409 "yacc_sql.y"
+#line 413 "yacc_sql.y"
     {
-									(yyval.condition1) = ( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->left_is_attr = 1;
-									(yyval.condition1)->left_attr.relation_name = NULL;
-									(yyval.condition1)->left_attr.attribute_name= (yyvsp[(1) - (3)].string);
-									(yyval.condition1)->comp = compOpT;
-									(yyval.condition1)->right_is_attr = 0;
-									(yyval.condition1)->right_attr.relation_name = NULL;
-									(yyval.condition1)->right_attr.attribute_name = NULL;
-									(yyval.condition1)->right_value = *(yyvsp[(3) - (3)].value1);
+			(yyval.condition1) = ( Condition *)malloc(sizeof( Condition));
+			(yyval.condition1)->left_is_attr = 1;
+			(yyval.condition1)->left_attr.relation_name = NULL;
+			(yyval.condition1)->left_attr.attribute_name= (yyvsp[(1) - (3)].string);
+			(yyval.condition1)->comp = CONTEXT->comp;
+			(yyval.condition1)->right_is_attr = 0;
+			(yyval.condition1)->right_attr.relation_name = NULL;
+			(yyval.condition1)->right_attr.attribute_name = NULL;
+			(yyval.condition1)->right_value = *(yyvsp[(3) - (3)].value1);
 
-								    }
+		}
     break;
 
   case 63:
-#line 421 "yacc_sql.y"
+#line 426 "yacc_sql.y"
     {
-									(yyval.condition1) = ( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->left_is_attr = 0;
-									(yyval.condition1)->left_attr.relation_name=NULL;
-									(yyval.condition1)->left_attr.attribute_name=NULL;
-									(yyval.condition1)->left_value = *(yyvsp[(1) - (3)].value1);
-									(yyval.condition1)->comp = compOpT;
-									(yyval.condition1)->right_is_attr = 0;
-									(yyval.condition1)->right_attr.relation_name = NULL;
-									(yyval.condition1)->right_attr.attribute_name = NULL;
-									(yyval.condition1)->right_value = *(yyvsp[(3) - (3)].value1);
+			(yyval.condition1) = ( Condition *)malloc(sizeof( Condition));
+			(yyval.condition1)->left_is_attr = 0;
+			(yyval.condition1)->left_attr.relation_name=NULL;
+			(yyval.condition1)->left_attr.attribute_name=NULL;
+			(yyval.condition1)->left_value = *(yyvsp[(1) - (3)].value1);
+			(yyval.condition1)->comp = CONTEXT->comp;
+			(yyval.condition1)->right_is_attr = 0;
+			(yyval.condition1)->right_attr.relation_name = NULL;
+			(yyval.condition1)->right_attr.attribute_name = NULL;
+			(yyval.condition1)->right_value = *(yyvsp[(3) - (3)].value1);
 
-								    }
+		}
     break;
 
   case 64:
-#line 434 "yacc_sql.y"
+#line 440 "yacc_sql.y"
     {
-									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->left_is_attr = 1;
-									(yyval.condition1)->left_attr.relation_name=NULL;
-									(yyval.condition1)->left_attr.attribute_name=(yyvsp[(1) - (3)].string);
-									(yyval.condition1)->comp = compOpT;
-									(yyval.condition1)->right_is_attr = 1;
-									(yyval.condition1)->right_attr.relation_name=NULL;
-									(yyval.condition1)->right_attr.attribute_name=(yyvsp[(3) - (3)].string);
+			(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
+			(yyval.condition1)->left_is_attr = 1;
+			(yyval.condition1)->left_attr.relation_name=NULL;
+			(yyval.condition1)->left_attr.attribute_name=(yyvsp[(1) - (3)].string);
+			(yyval.condition1)->comp = CONTEXT->comp;
+			(yyval.condition1)->right_is_attr = 1;
+			(yyval.condition1)->right_attr.relation_name=NULL;
+			(yyval.condition1)->right_attr.attribute_name=(yyvsp[(3) - (3)].string);
 
-								    }
+		}
     break;
 
   case 65:
-#line 445 "yacc_sql.y"
+#line 452 "yacc_sql.y"
     {
-									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->left_is_attr = 0;
-									(yyval.condition1)->left_attr.relation_name=NULL;
-									(yyval.condition1)->left_attr.attribute_name=NULL;
-									(yyval.condition1)->left_value = *(yyvsp[(1) - (3)].value1);
-									(yyval.condition1)->comp=compOpT;
-									
-									(yyval.condition1)->right_is_attr = 1;
-									(yyval.condition1)->right_attr.relation_name=NULL;
-									(yyval.condition1)->right_attr.attribute_name=(yyvsp[(3) - (3)].string);
-								
-								    }
+			(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
+			(yyval.condition1)->left_is_attr = 0;
+			(yyval.condition1)->left_attr.relation_name=NULL;
+			(yyval.condition1)->left_attr.attribute_name=NULL;
+			(yyval.condition1)->left_value = *(yyvsp[(1) - (3)].value1);
+			(yyval.condition1)->comp=CONTEXT->comp;
+			
+			(yyval.condition1)->right_is_attr = 1;
+			(yyval.condition1)->right_attr.relation_name=NULL;
+			(yyval.condition1)->right_attr.attribute_name=(yyvsp[(3) - (3)].string);
+		
+		}
     break;
 
   case 66:
-#line 458 "yacc_sql.y"
+#line 466 "yacc_sql.y"
     {
-									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->left_is_attr = 1;
-									(yyval.condition1)->left_attr.relation_name=(yyvsp[(1) - (5)].string);
-									(yyval.condition1)->left_attr.attribute_name=(yyvsp[(3) - (5)].string);
-									(yyval.condition1)->comp=compOpT;
-									(yyval.condition1)->right_is_attr = 0;   //属性值
-									(yyval.condition1)->right_attr.relation_name=NULL;
-									(yyval.condition1)->right_attr.attribute_name=NULL;
-									(yyval.condition1)->right_value =*(yyvsp[(5) - (5)].value1);			
+			(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
+			(yyval.condition1)->left_is_attr = 1;
+			(yyval.condition1)->left_attr.relation_name=(yyvsp[(1) - (5)].string);
+			(yyval.condition1)->left_attr.attribute_name=(yyvsp[(3) - (5)].string);
+			(yyval.condition1)->comp=CONTEXT->comp;
+			(yyval.condition1)->right_is_attr = 0;   //属性值
+			(yyval.condition1)->right_attr.relation_name=NULL;
+			(yyval.condition1)->right_attr.attribute_name=NULL;
+			(yyval.condition1)->right_value =*(yyvsp[(5) - (5)].value1);			
 							
-    											}
+    }
     break;
 
   case 67:
-#line 470 "yacc_sql.y"
+#line 479 "yacc_sql.y"
     {
-									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->left_is_attr = 0;//属性值
-									(yyval.condition1)->left_attr.relation_name=NULL;
-									(yyval.condition1)->left_attr.attribute_name=NULL;
-									(yyval.condition1)->left_value = *(yyvsp[(1) - (5)].value1);
-									(yyval.condition1)->comp =compOpT;
-									(yyval.condition1)->right_is_attr = 1;//属性
-									(yyval.condition1)->right_attr.relation_name = (yyvsp[(3) - (5)].string);
-									(yyval.condition1)->right_attr.attribute_name = (yyvsp[(5) - (5)].string);
+			(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
+			(yyval.condition1)->left_is_attr = 0;//属性值
+			(yyval.condition1)->left_attr.relation_name=NULL;
+			(yyval.condition1)->left_attr.attribute_name=NULL;
+			(yyval.condition1)->left_value = *(yyvsp[(1) - (5)].value1);
+			(yyval.condition1)->comp =CONTEXT->comp;
+			(yyval.condition1)->right_is_attr = 1;//属性
+			(yyval.condition1)->right_attr.relation_name = (yyvsp[(3) - (5)].string);
+			(yyval.condition1)->right_attr.attribute_name = (yyvsp[(5) - (5)].string);
 									
-    						}
+    }
     break;
 
   case 68:
-#line 482 "yacc_sql.y"
+#line 492 "yacc_sql.y"
     {
-									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->left_is_attr = 1;		//属性
-									(yyval.condition1)->left_attr.relation_name=(yyvsp[(1) - (7)].string);
-									(yyval.condition1)->left_attr.attribute_name=(yyvsp[(3) - (7)].string);
-									(yyval.condition1)->comp =compOpT;
-									(yyval.condition1)->right_is_attr = 1;		//属性
-									(yyval.condition1)->right_attr.relation_name=(yyvsp[(5) - (7)].string);
-									(yyval.condition1)->right_attr.attribute_name=(yyvsp[(7) - (7)].string);								
-    											}
+			(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
+			(yyval.condition1)->left_is_attr = 1;		//属性
+			(yyval.condition1)->left_attr.relation_name=(yyvsp[(1) - (7)].string);
+			(yyval.condition1)->left_attr.attribute_name=(yyvsp[(3) - (7)].string);
+			(yyval.condition1)->comp =CONTEXT->comp;
+			(yyval.condition1)->right_is_attr = 1;		//属性
+			(yyval.condition1)->right_attr.relation_name=(yyvsp[(5) - (7)].string);
+			(yyval.condition1)->right_attr.attribute_name=(yyvsp[(7) - (7)].string);								
+    }
     break;
 
   case 69:
-#line 495 "yacc_sql.y"
-    { compOpT = EQUAL_TO; }
+#line 505 "yacc_sql.y"
+    { CONTEXT->comp = EQUAL_TO; }
     break;
 
   case 70:
-#line 496 "yacc_sql.y"
-    { compOpT = LESS_THAN; }
+#line 506 "yacc_sql.y"
+    { CONTEXT->comp = LESS_THAN; }
     break;
 
   case 71:
-#line 497 "yacc_sql.y"
-    { compOpT = GREAT_THAN; }
+#line 507 "yacc_sql.y"
+    { CONTEXT->comp = GREAT_THAN; }
     break;
 
   case 72:
-#line 498 "yacc_sql.y"
-    { compOpT = LESS_EQUAL; }
+#line 508 "yacc_sql.y"
+    { CONTEXT->comp = LESS_EQUAL; }
     break;
 
   case 73:
-#line 499 "yacc_sql.y"
-    { compOpT = GREAT_EQUAL; }
+#line 509 "yacc_sql.y"
+    { CONTEXT->comp = GREAT_EQUAL; }
     break;
 
   case 74:
-#line 500 "yacc_sql.y"
-    { compOpT = NOT_EQUAL; }
+#line 510 "yacc_sql.y"
+    { CONTEXT->comp = NOT_EQUAL; }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 2051 "yacc_sql.tab.c"
+#line 2059 "yacc_sql.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2261,11 +2269,19 @@ yyreturn:
 }
 
 
-#line 503 "yacc_sql.y"
+#line 513 "yacc_sql.y"
 
 //_____________________________________________________________________
-int hust_parse( sqlstr *sqls){
-	ssql=sqls;
-	return yyparse();
+extern void scan_string(const char *str, yyscan_t scanner);
+
+int sql_parse(const char *s, Query *sqls){
+	ParserContext context;
+	memset(&context, 0, sizeof(context));
+	yylex_init(&context.scanner);
+	context.ssql = sqls;
+	scan_string(s, context.scanner);
+	int result = yyparse(&context);
+	yylex_destroy(context.scanner);
+	return result;
 }
 

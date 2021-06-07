@@ -19,7 +19,7 @@
 
 #ifndef __OBSERVER_SQL_EXECUTOR_H_
 #define __OBSERVER_SQL_EXECUTOR_H_
-#include "handler/handler_defs.h"
+#include "sql/parser/parse.h"
 #include "rc.h"
 // TODO remove this
 typedef struct SelResult {

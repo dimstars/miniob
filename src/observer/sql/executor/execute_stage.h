@@ -21,7 +21,7 @@
 #define __OBSERVER_SQL_EXECUTE_STAGE_H__
 
 #include "common/seda/stage.h"
-#include "handler/handler_defs.h"
+#include "sql/parser/parse.h"
 #include "rc.h"
 
 class SessionEvent;
@@ -43,7 +43,7 @@ protected:
                      common::CallbackContext *context);
 
   void handleRequest(common::StageEvent *event);
-  RC do_select(const char *db, sqlstr *sql, SessionEvent *session_event);
+  RC do_select(const char *db, Query *sql, SessionEvent *session_event);
 protected:
 private:
   Stage *defaultStorageStage;

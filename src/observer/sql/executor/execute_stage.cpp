@@ -114,7 +114,7 @@ void ExecuteStage::callbackEvent(StageEvent *event, CallbackContext *context) {
 void ExecuteStage::handleRequest(common::StageEvent *event) {
   ExecutionPlanEvent *exe_event = static_cast<ExecutionPlanEvent *>(event);
   SessionEvent *session_event = exe_event->sql_event()->session_event();
-  sqlstr *sql = exe_event->sqls();
+  Query *sql = exe_event->sqls();
   const char *current_db = session_event->get_client()->session->current_db().c_str();
 
   switch (sql->flag) {
@@ -207,7 +207,7 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right) {
     }
   }
 }
-RC ExecuteStage::do_select(const char *db, sqlstr *sql, SessionEvent *session_event) {
+RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
   // 制作简单的查询树
   // 目前仅支持 select xxx from table1, tableN where condition1, conditionN
   // 简化成：

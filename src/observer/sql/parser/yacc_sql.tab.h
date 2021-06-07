@@ -136,7 +136,7 @@
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 91 "yacc_sql.y"
+#line 101 "yacc_sql.y"
 {
     struct _Attr *attr;
 	  struct _Condition *condition1;

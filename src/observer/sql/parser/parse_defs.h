@@ -14,14 +14,11 @@
    51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA */
 
 //
-// Created by Longda on 2021/4/14.
+// Created by wangyunlai.wyl on 2021/6/7.
 //
 
-#ifndef __OBSERVER_HANDLER_HANDLER_DEFS_H__
-#define __OBSERVER_HANDLER_HANDLER_DEFS_H__
-
-#include <stdlib.h>
-#include <string.h>
+#ifndef __OBSERVER_SQL_PARSER_PARSE_DEFS_H__
+#define __OBSERVER_SQL_PARSER_PARSE_DEFS_H__
 
 #define MAX_NUM 20
 #define MAX_REL_NAME 20
@@ -138,8 +135,7 @@ typedef struct {
   const char *relation_name;
 } DescTable;
 
-// union of sql_structs
-union sqls {
+union Queries {
   Selects selection;
   Inserts insertion;
   Deletes deletion;
@@ -173,9 +169,9 @@ enum SqlCommandFlag {
   SCF_EXIT
 };
 // struct of flag and sql_struct
-typedef struct _sqlstr {
+typedef struct Query {
   enum SqlCommandFlag flag;
-  union sqls sstr;
-}sqlstr;
+  union Queries sstr;
+} Query;
 
-#endif //__OBSERVER_HANDLER_HANDLER_DEFS_H__
+#endif // __OBSERVER_SQL_PARSER_PARSE_DEFS_H__

@@ -24,7 +24,7 @@
 #include <unordered_map>
 
 #include "rc.h"
-#include "handler/handler_defs.h"
+#include "sql/parser/parse_defs.h"
 
 class Table;
 

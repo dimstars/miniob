@@ -39,7 +39,7 @@ namespace common {
 
 #define RWRR (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
-std::string getProcessName(const char *progName) {
+std::string get_process_name(const char *progName) {
   std::string processName;
 
   int bufLen = strlen(progName);

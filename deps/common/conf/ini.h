@@ -130,7 +130,7 @@ class Ini {
 /**
  * Global configurate propertis
  */
-Ini *&theGlobalProperties();
+Ini *&the_global_properties();
 //********************************************************************
 
 }// namespace common

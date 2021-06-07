@@ -32,11 +32,13 @@ public:
   Server(ServerParam input_server_param);
   ~Server();
 
-  int serve();
-  void shutdown();
+public:
+  static void init();
+  static int send(ConnectionContext *client, const char *buf, int data_len);
 
 public:
-  static int send(ConnectionContext *client, const char *buf, int data_len);
+  int serve();
+  void shutdown();
 
 private:
   static void accept(int fd, short ev, void *arg);
@@ -46,7 +48,6 @@ private:
 
 private:
   int set_non_block(int fd);
-
   int start();
 
 private:

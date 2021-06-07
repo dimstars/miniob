@@ -27,7 +27,7 @@ namespace common {
  * @param[in]   progFullName  process full name with full path
  * @return      process_name_   process name without directory path
  */
-std::string getProcessName(const char *progFullName);
+std::string get_process_name(const char *progFullName);
 //! Runs the service as a daemon
 /**
  * Backgrounds the calling service as a system daemon by detaching it from

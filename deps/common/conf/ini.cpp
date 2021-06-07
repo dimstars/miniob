@@ -229,7 +229,7 @@ void Ini::toString(std::string &outputStr) {
 }
 
 //! Accessor function which wraps global properties object
-Ini *&theGlobalProperties() {
+Ini *&the_global_properties() {
   static Ini *gProperties = new Ini();
   return gProperties;
 }

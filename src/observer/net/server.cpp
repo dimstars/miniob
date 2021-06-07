@@ -67,6 +67,15 @@ Server::Server(ServerParam input_server_param) : server_param_(input_server_para
   server_socket_ = 0;
   event_base_ = nullptr;
   listen_ev_ = nullptr;
+}
+
+Server::~Server() {
+  if (started_) {
+    shutdown();
+  }
+}
+
+void Server::init(){
   session_stage_ = theSedaConfig()->getStage(SESSION_STAGE_NAME);
 
   MetricsRegistry &metricsRegistry = theGlobalMetricsRegistry();
@@ -78,13 +87,7 @@ Server::Server(ServerParam input_server_param) : server_param_(input_server_para
   if (Server::write_socket_metric_ == nullptr) {
     Server::write_socket_metric_ = new SimpleTimer();
     metricsRegistry.registerMetric(WRITE_SOCKET_METRIC_TAG, Server::write_socket_metric_);
-  }
-}
-
-Server::~Server() {
-  if (started_) {
-    shutdown();
-  }
+  }  
 }
 
 int Server::set_non_block(int fd) {

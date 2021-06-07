@@ -192,21 +192,21 @@ int init(ProcessParam *processParam) {
   theSwVersion();
 
   // Read Configuration files
-  rc = theGlobalProperties()->load(processParam->get_conf());
+  rc = the_global_properties()->load(processParam->get_conf());
   if (rc) {
     std::cerr << "Failed to load configuration files" << std::endl;
     return rc;
   }
 
   // Init tracer
-  rc = initLog(processParam, *theGlobalProperties());
+  rc = initLog(processParam, *the_global_properties());
   if (rc) {
     std::cerr << "Failed to init Log" << std::endl;
     return rc;
   }
 
   std::string confData;
-  theGlobalProperties()->toString(confData);
+  the_global_properties()->toString(confData);
   LOG_INFO("Output configuration \n%s", confData.c_str());
 
   // seda is used for backend async event handler
@@ -240,9 +240,9 @@ int init(ProcessParam *processParam) {
 
 void cleanupUtil() {
 
-  if (nullptr != theGlobalProperties()) {
-    delete theGlobalProperties();
-    theGlobalProperties() = nullptr;
+  if (nullptr != the_global_properties()) {
+    delete the_global_properties();
+    the_global_properties() = nullptr;
   }
 
   LOG_INFO("Shutdown Cleanly!");

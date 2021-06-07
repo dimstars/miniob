@@ -61,7 +61,7 @@ Stage *MetricsStage::makeStage(const std::string &tag) {
 bool MetricsStage::setProperties() {
   std::string stageNameStr(stageName);
   std::map<std::string, std::string> section =
-      theGlobalProperties()->get(stageNameStr);
+      the_global_properties()->get(stageNameStr);
 
   metricReportInterval = DateTime::SECONDS_PER_MIN;
 

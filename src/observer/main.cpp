@@ -43,7 +43,7 @@ void usage() {
 }
 
 void parse_parameter(int argc, char **argv) {
-  std::string process_name = getProcessName(argv[0]);
+  std::string process_name = get_process_name(argv[0]);
 
   ProcessParam *process_param = the_process_param();
 
@@ -76,7 +76,7 @@ void parse_parameter(int argc, char **argv) {
 
 Server *init_server() {
   std::map<std::string, std::string> net_section =
-      theGlobalProperties()->get(NET);
+      the_global_properties()->get(NET);
 
   long listen_addr = INADDR_ANY;
   long max_connection_num = MAX_CONNECTION_NUM_DEFAULT;
@@ -106,7 +106,6 @@ Server *init_server() {
   server_param.port = port;
 
   Server *server = new Server(server_param);
-
   return server;
 }
 
@@ -133,6 +132,7 @@ int main(int argc, char **argv) {
   }
 
   g_server = init_server();
+  Server::init();
   g_server->serve();
 
   LOG_INFO("Server stopped");

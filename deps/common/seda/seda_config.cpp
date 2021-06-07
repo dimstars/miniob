@@ -178,7 +178,7 @@ void SedaConfig::cleanup() {
 
 void SedaConfig::initEventHistory() {
   std::map<std::string, std::string> baseSection =
-    the_global_properties()->get(SEDA_BASE_NAME);
+    g_properties()->get(SEDA_BASE_NAME);
   std::map<std::string, std::string>::iterator it;
   std::string key;
 
@@ -212,7 +212,7 @@ SedaConfig::status_t SedaConfig::initThreadPool() {
   try {
 
     std::map<std::string, std::string> baseSection =
-      the_global_properties()->get(SEDA_BASE_NAME);
+      g_properties()->get(SEDA_BASE_NAME);
     std::map<std::string, std::string>::iterator it;
     std::string key;
 
@@ -239,7 +239,7 @@ SedaConfig::status_t SedaConfig::initThreadPool() {
 
       // get count number
       key = COUNT;
-      std::string countStr = the_global_properties()->get(key, defaultCpuNumStr, threadName);
+      std::string countStr = g_properties()->get(key, defaultCpuNumStr, threadName);
 
       int threadCount = 1;
       str_to_val(countStr, threadCount);
@@ -282,7 +282,7 @@ std::string SedaConfig::getThreadPool(std::string &stageName) {
   std::string ret = DEFAULT_THREAD_POOL;
   // Get thread pool
   std::map<std::string, std::string> stageSection =
-      the_global_properties()->get(stageName);
+      g_properties()->get(stageName);
   std::map<std::string, std::string>::iterator itt;
   std::string threadPoolId = THREAD_POOL_ID;
   itt = stageSection.find(threadPoolId);
@@ -310,7 +310,7 @@ std::string SedaConfig::getThreadPool(std::string &stageName) {
 SedaConfig::status_t SedaConfig::initStages() {
   try {
     std::map<std::string, std::string> baseSection =
-      the_global_properties()->get(SEDA_BASE_NAME);
+      g_properties()->get(SEDA_BASE_NAME);
     std::map<std::string, std::string>::iterator it;
     std::string key;
 
@@ -372,7 +372,7 @@ SedaConfig::status_t SedaConfig::genNextStages() {
       Stage *stage = mStages[stageName];
 
       std::map<std::string, std::string> stageSection =
-        the_global_properties()->get(stageName);
+        g_properties()->get(stageName);
       std::map<std::string, std::string>::iterator it;
       std::string nextStageId = NEXT_STAGES;
       it = stageSection.find(nextStageId);

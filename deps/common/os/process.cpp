@@ -39,33 +39,33 @@ namespace common {
 
 #define RWRR (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
-std::string get_process_name(const char *progName) {
-  std::string processName;
+std::string get_process_name(const char *prog_name) {
+  std::string process_name;
 
-  int bufLen = strlen(progName);
+  int buf_len = strlen(prog_name);
 
-  assert(bufLen);
+  assert(buf_len);
 
-  char *buf = new char[bufLen + 1];
+  char *buf = new char[buf_len + 1];
   if (buf == NULL) {
     std::cerr << "Failed to alloc memory for program name."
               << SYS_OUTPUT_FILE_POS << SYS_OUTPUT_ERROR << std::endl;
     return "";
   }
-  memset(buf, 0, bufLen + 1);
-  strncpy(buf, progName, bufLen);
+  memset(buf, 0, buf_len + 1);
+  strncpy(buf, prog_name, buf_len);
 
-  processName = basename(buf);
+  process_name = basename(buf);
 
   delete[] buf;
-  return processName;
+  return process_name;
 }
 
 // Background the process by detaching it from the console and redirecting
 // std in, out, and err to /dev/null
-int daemonizeService(bool closeStdStreams) {
+int daemonize_service(bool close_std_streams) {
   int nochdir = 1;
-  int noclose = closeStdStreams ? 0 : 1;
+  int noclose = close_std_streams ? 0 : 1;
   int rc = daemon(nochdir, noclose);
   // Here after the fork; the parent is dead and setsid() is called
   if (rc != 0) {
@@ -74,20 +74,20 @@ int daemonizeService(bool closeStdStreams) {
   return rc;
 }
 
-int daemonizeService(const char *stdOutFile, const char *stdErrFile) {
-  int rc = daemonizeService(false);
+int daemonize_service(const char *std_out_file, const char *std_err_file) {
+  int rc = daemonize_service(false);
 
   if (rc != 0) {
     std::cerr << "Error: \n";
     return rc;
   }
 
-  sysLogRedirect(stdOutFile, stdErrFile);
+  sys_log_redirect(std_out_file, std_err_file);
 
   return 0;
 }
 
-void sysLogRedirect(const char *stdOutFile, const char *stdErrFile) {
+void sys_log_redirect(const char *std_out_file, const char *std_err_file) {
   int rc = 0;
 
   // Redirect stdin to /dev/null
@@ -103,37 +103,37 @@ void sysLogRedirect(const char *stdOutFile, const char *stdErrFile) {
     tv.tv_sec = 0;
   }
 
-  int stdErrFlag, stdOutFlag;
+  int std_err_flag, std_out_flag;
   // Always use append-write. And if not exist, create it.
-  stdErrFlag = stdOutFlag = O_CREAT | O_APPEND | O_WRONLY;
+  std_err_flag = std_out_flag = O_CREAT | O_APPEND | O_WRONLY;
 
-  std::string errFile = getAboslutPath(stdErrFile);
+  std::string err_file = getAboslutPath(std_err_file);
 
-  // Redirect stderr to stdErrFile
+  // Redirect stderr to std_err_file
   struct stat st;
-  rc = stat(errFile.c_str(), &st);
+  rc = stat(err_file.c_str(), &st);
   if (rc != 0 || st.st_size > MAX_ERR_OUTPUT) {
     // file may not exist or oversize
-    stdErrFlag |= O_TRUNC; // Remove old content if any.
+    std_err_flag |= O_TRUNC; // Remove old content if any.
   }
 
-  int errfd = open(errFile.c_str(), stdErrFlag, RWRR);
+  int errfd = open(err_file.c_str(), std_err_flag, RWRR);
   dup2(errfd, STDERR_FILENO);
   close(errfd);
   setvbuf(stderr, NULL, _IONBF, 0); // Make sure stderr is not buffering
   std::cerr << "Process " << getpid() << " built error output at " << tv.tv_sec
             << std::endl;
 
-  std::string outFile = getAboslutPath(stdOutFile);
+  std::string outFile = getAboslutPath(std_out_file);
 
   // Redirect stdout to outFile.c_str()
   rc = stat(outFile.c_str(), &st);
   if (rc != 0 || st.st_size > MAX_STD_OUTPUT) {
     // file may not exist or oversize
-    stdOutFlag |= O_TRUNC; // Remove old content if any.
+    std_out_flag |= O_TRUNC; // Remove old content if any.
   }
 
-  int outfd = open(outFile.c_str(), stdOutFlag, RWRR);
+  int outfd = open(outFile.c_str(), std_out_flag, RWRR);
   dup2(outfd, STDOUT_FILENO);
   close(outfd);
   setvbuf(stdout, NULL, _IONBF, 0); // Make sure stdout not buffering

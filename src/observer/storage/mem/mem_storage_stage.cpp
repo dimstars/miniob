@@ -51,7 +51,7 @@ Stage *MemStorageStage::makeStage(const std::string &tag) {
 //! Set properties for this object set in stage specific properties
 bool MemStorageStage::setProperties() {
   //  std::string stageNameStr(stageName);
-  //  std::map<std::string, std::string> section = the_global_properties()->get(
+  //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
   //  std::map<std::string, std::string>::iterator it;

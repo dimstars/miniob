@@ -29,33 +29,33 @@
 namespace common {
 
 const std::string Ini::DEFAULT_SECTION = std::string("");
-const std::map<std::string, std::string> Ini::mEmptyMap;
+const std::map<std::string, std::string> Ini::empty_map_;
 
 Ini::Ini() {}
 
 Ini::~Ini() {}
 
-void Ini::insertSession(const std::string &sessionName) {
-  std::map<std::string, std::string> sessionMap;
+void Ini::insert_session(const std::string &session_name) {
+  std::map<std::string, std::string> session_map;
   std::pair < std::string, std::map < std::string, std::string >> entry =
                                                      std::pair < std::string, std::map < std::string, std::string
-    >> (sessionName,
-      sessionMap);
+    >> (session_name,
+      session_map);
 
-  mSections.insert(entry);
+  sections_.insert(entry);
 }
 
-std::map<std::string, std::string> *Ini::switchSession(
-  const std::string &sessionName) {
-  SessionsMap::iterator it = mSections.find(sessionName);
-  if (it != mSections.end()) {
+std::map<std::string, std::string> *Ini::switch_session(
+  const std::string &session_name) {
+  SessionsMap::iterator it = sections_.find(session_name);
+  if (it != sections_.end()) {
     return &it->second;
   }
 
-  insertSession(sessionName);
+  insert_session(session_name);
 
-  it = mSections.find(sessionName);
-  if (it != mSections.end()) {
+  it = sections_.find(session_name);
+  if (it != sections_.end()) {
     return &it->second;
   }
 
@@ -65,9 +65,9 @@ std::map<std::string, std::string> *Ini::switchSession(
 
 const std::map<std::string, std::string> &Ini::get(
   const std::string &section) {
-  SessionsMap::iterator it = mSections.find(section);
-  if (it == mSections.end()) {
-    return mEmptyMap;
+  SessionsMap::iterator it = sections_.find(section);
+  if (it == sections_.end()) {
+    return empty_map_;
   }
 
   return it->second;
@@ -75,10 +75,10 @@ const std::map<std::string, std::string> &Ini::get(
 
 std::string Ini::get(const std::string &key, const std::string &defaultValue,
                      const std::string &section) {
-  std::map<std::string, std::string> sectionMap = get(section);
+  std::map<std::string, std::string> section_map = get(section);
 
-  std::map<std::string, std::string>::iterator it = sectionMap.find(key);
-  if (it == sectionMap.end()) {
+  std::map<std::string, std::string>::iterator it = section_map.find(key);
+  if (it == section_map.end()) {
     return defaultValue;
   }
 
@@ -87,110 +87,110 @@ std::string Ini::get(const std::string &key, const std::string &defaultValue,
 
 int Ini::put(const std::string &key, const std::string &value,
              const std::string &section) {
-  std::map<std::string, std::string> *pSectionMap = switchSession(section);
+  std::map<std::string, std::string> *section_map = switch_session(section);
 
-  pSectionMap->insert(std::pair<std::string, std::string>(key, value));
+  section_map->insert(std::pair<std::string, std::string>(key, value));
 
   return 0;
 }
 
-int Ini::insertEntry(std::map<std::string, std::string> *sessionMap,
+int Ini::insert_entry(std::map<std::string, std::string> *session_map,
                      const std::string &line) {
-  if (sessionMap == nullptr) {
+  if (session_map == nullptr) {
     std::cerr << __FILE__ << __FUNCTION__ << " session map is null"
               << std::endl;
     return -1;
   }
-  size_t equalPos = line.find_first_of('=');
-  if (equalPos == std::string::npos) {
+  size_t equal_pos = line.find_first_of('=');
+  if (equal_pos == std::string::npos) {
     std::cerr << __FILE__ << __FUNCTION__ << "Invalid configuration line "
               << line << std::endl;
     return -1;
   }
 
-  std::string key = line.substr(0, equalPos);
-  std::string value = line.substr(equalPos + 1);
+  std::string key = line.substr(0, equal_pos);
+  std::string value = line.substr(equal_pos + 1);
 
   strip(key);
   strip(value);
 
-  sessionMap->insert(std::pair<std::string, std::string>(key, value));
+  session_map->insert(std::pair<std::string, std::string>(key, value));
 
   return 0;
 }
 
-int Ini::load(const std::string &fileName) {
+int Ini::load(const std::string &file_name) {
   std::ifstream ifs;
 
   try {
 
-    bool continueLastLine = false;
+    bool continue_last_line = false;
 
-    std::map<std::string, std::string> *currentSession =
-      switchSession(DEFAULT_SECTION);
+    std::map<std::string, std::string> *current_session =
+      switch_session(DEFAULT_SECTION);
 
     char line[MAX_CFG_LINE_LEN];
 
-    std::string lineEntry;
+    std::string line_entry;
 
-    ifs.open(fileName.c_str());
+    ifs.open(file_name.c_str());
     while (ifs.good()) {
 
       memset(line, 0, sizeof(line));
 
       ifs.getline(line, sizeof(line));
 
-      char *readBuf = strip(line);
+      char *read_buf = strip(line);
 
-      if (strlen(readBuf) == 0) {
+      if (strlen(read_buf) == 0) {
         // empty line
         continue;
       }
 
-      if (readBuf[0] == CFG_COMMENT_TAG) {
+      if (read_buf[0] == CFG_COMMENT_TAG) {
         // comments line
         continue;
       }
 
-      if (readBuf[0] == CFG_SESSION_START_TAG &&
-        readBuf[strlen(readBuf) - 1] == CFG_SESSION_END_TAG) {
+      if (read_buf[0] == CFG_SESSION_START_TAG &&
+        read_buf[strlen(read_buf) - 1] == CFG_SESSION_END_TAG) {
 
-        readBuf[strlen(readBuf) - 1] = '\0';
-        std::string sessionName = std::string(readBuf + 1);
+        read_buf[strlen(read_buf) - 1] = '\0';
+        std::string session_name = std::string(read_buf + 1);
 
-        currentSession = switchSession(sessionName);
+        current_session = switch_session(session_name);
 
         continue;
       }
 
-      if (continueLastLine == false) {
+      if (continue_last_line == false) {
         // don't need continue last line
-        lineEntry = readBuf;
+        line_entry = read_buf;
       } else {
-        lineEntry += readBuf;
+        line_entry += read_buf;
       }
 
-      if (readBuf[strlen(readBuf) - 1] == CFG_CONTINUE_TAG) {
+      if (read_buf[strlen(read_buf) - 1] == CFG_CONTINUE_TAG) {
         // this line isn't finished, need continue
-        continueLastLine = true;
+        continue_last_line = true;
 
         // remove the last character
-        lineEntry = lineEntry.substr(0, lineEntry.size() -1);
+        line_entry = line_entry.substr(0, line_entry.size() -1);
         continue;
       } else {
-        continueLastLine = false;
-        insertEntry(currentSession, lineEntry);
+        continue_last_line = false;
+        insert_entry(current_session, line_entry);
       }
     }
     ifs.close();
 
-    mFileNames.insert(fileName);
-    std::cout << "Successfully load " << fileName << std::endl;
+    file_names_.insert(file_name);
+    std::cout << "Successfully load " << file_name << std::endl;
   } catch (...) {
     if (ifs.is_open()) {
       ifs.close();
     }
-    std::cerr << "Failed to load " << fileName << SYS_OUTPUT_ERROR
+    std::cerr << "Failed to load " << file_name << SYS_OUTPUT_ERROR
               << std::endl;
     return -1;
   }
@@ -198,40 +198,40 @@ int Ini::load(const std::string &fileName) {
   return 0;
 }
 
-void Ini::toString(std::string &outputStr) {
-  outputStr.clear();
+void Ini::to_string(std::string &output_str) {
+  output_str.clear();
 
-  outputStr += "Begin dump configuration\n";
+  output_str += "Begin dump configuration\n";
 
-  for (SessionsMap::iterator it = mSections.begin(); it != mSections.end();
+  for (SessionsMap::iterator it = sections_.begin(); it != sections_.end();
        it++) {
-    outputStr += CFG_SESSION_START_TAG;
-    outputStr += it->first;
-    outputStr += CFG_SESSION_END_TAG;
-    outputStr += "\n";
+    output_str += CFG_SESSION_START_TAG;
+    output_str += it->first;
+    output_str += CFG_SESSION_END_TAG;
+    output_str += "\n";
 
-    std::map<std::string, std::string> &sectionMap = it->second;
+    std::map<std::string, std::string> &section_map = it->second;
 
-    for (std::map<std::string, std::string>::iterator subIt =
-      sectionMap.begin();
-         subIt != sectionMap.end(); subIt++) {
-      outputStr += subIt->first;
-      outputStr += "=";
-      outputStr += subIt->second;
-      outputStr += "\n";
+    for (std::map<std::string, std::string>::iterator sub_it =
+      section_map.begin();
+         sub_it != section_map.end(); sub_it++) {
+      output_str += sub_it->first;
+      output_str += "=";
+      output_str += sub_it->second;
+      output_str += "\n";
     }
-    outputStr += "\n";
+    output_str += "\n";
   }
 
-  outputStr += "Finish dump configuration \n";
+  output_str += "Finish dump configuration \n";
 
   return;
 }
 
 //! Accessor function which wraps global properties object
-Ini *&the_global_properties() {
-  static Ini *gProperties = new Ini();
-  return gProperties;
+Ini *&g_properties() {
+  static Ini *g_properties = new Ini();
+  return g_properties;
 }
 
 } //namespace common

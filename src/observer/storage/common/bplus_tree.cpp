@@ -159,7 +159,7 @@ int CompareKey(const char *pdata, const char *pkey,AttrType attr_type,int attr_l
   float f1,f2;
   const char *s1,*s2;
   switch(attr_type){
-    case ints: {
+    case INTS: {
       i1 = *(int *) pdata;
       i2 = *(int *) pkey;
       if (i1 > i2)
@@ -170,7 +170,7 @@ int CompareKey(const char *pdata, const char *pkey,AttrType attr_type,int attr_l
         return 0;
     }
       break;
-    case floats: {
+    case FLOATS: {
       f1 = *(float *) pdata;
       f2 = *(float *) pkey;
       if (f1 > f2)
@@ -181,7 +181,7 @@ int CompareKey(const char *pdata, const char *pkey,AttrType attr_type,int attr_l
         return 0;
     }
       break;
-    case chars: {
+    case CHARS: {
       s1 = pdata;
       s2 = pkey;
       return strncmp(s1, s2, attr_length);
@@ -1542,7 +1542,7 @@ RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, 
   RC rc;
   int i,tmp;
   RID rid;
-  if(compop == LessT || compop == LEqual || compop == NEqual){
+  if(compop == LESS_THAN || compop == LESS_EQUAL || compop == NOT_EQUAL){
     rc = get_first_leaf_page(page_num);
     if(rc != SUCCESS){
       return rc;
@@ -1582,7 +1582,7 @@ RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, 
     node = get_index_node(pdata);
     for(i = 0; i < node->key_num; i++){
       tmp=CompareKey(node->keys+i*file_header_.key_length,key,file_header_.attr_type,file_header_.attr_length);
-      if(compop == EQual||compop == GEqual){
+      if(compop == EQUAL_TO ||compop == GREAT_THAN){
         if(tmp>=0){
           rc = disk_buffer_pool_->get_page_num(&page_handle, page_num);
           if(rc != SUCCESS){
@@ -1596,7 +1596,7 @@ RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, 
           return SUCCESS;
         }
       }
-      if(compop == GreatT){
+      if(compop == GREAT_THAN){
         if(tmp > 0){
           rc = disk_buffer_pool_->get_page_num(&page_handle, page_num);
           if(rc!=SUCCESS){
@@ -1815,15 +1815,15 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
 
   AttrType  attr_type = index_handler_.file_header_.attr_type;
   switch(attr_type){
-    case ints:
+    case INTS:
       i1=*(int *)pkey;
       i2=*(int *)value_;
       break;
-    case floats:
+    case FLOATS:
       f1=*(float *)pkey;
       f2=*(float *)value_;
       break;
-    case chars:
+    case CHARS:
       s1=pkey;
       s2=value_;
       break;
@@ -1835,90 +1835,90 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
 
   int attr_length = index_handler_.file_header_.attr_length;
   switch(comp_op_){
-    case EQual:
+    case EQUAL_TO:
       switch(attr_type){
-        case ints:
+        case INTS:
           flag=(i1==i2);
           break;
-        case floats:
+        case FLOATS:
           flag=(f1==f2);
           break;
-        case chars:
+        case CHARS:
           flag=(strncmp(s1,s2,attr_length)==0);
           break;
         default:
           LOG_PANIC("Unknown attr type: %d", attr_type);
       }
       break;
-    case LessT:
+    case LESS_THAN:
       switch(attr_type){
-        case ints:
+        case INTS:
           flag=(i1<i2);
           break;
-        case floats:
+        case FLOATS:
           flag=(f1<f2);
           break;
-        case chars:
+        case CHARS:
           flag=(strncmp(s1,s2,attr_length)<0);
           break;
         default:
           LOG_PANIC("Unknown attr type: %d", attr_type);
       }
       break;
-    case GreatT:
+    case GREAT_THAN:
       switch(attr_type){
-        case ints:
+        case INTS:
           flag=(i1>i2);
           break;
-        case floats:
+        case FLOATS:
           flag=(f1>f2);
           break;
-        case chars:
+        case CHARS:
           flag=(strncmp(s1,s2,attr_length)>0);
           break;
         default:
           LOG_PANIC("Unknown attr type: %d", attr_type);
       }
       break;
-    case LEqual:
+    case LESS_EQUAL:
       switch(attr_type){
-        case ints:
+        case INTS:
           flag=(i1<=i2);
           break;
-        case floats:
+        case FLOATS:
           flag=(f1<=f2);
           break;
-        case chars:
+        case CHARS:
           flag=(strncmp(s1,s2,attr_length)<=0);
           break;
         default:
           LOG_PANIC("Unknown attr type: %d", attr_type);
       }
       break;
-    case GEqual:
+    case GREAT_EQUAL:
       switch(attr_type){
-        case ints:
+        case INTS:
           flag=(i1>=i2);
           break;
-        case floats:
+        case FLOATS:
           flag=(f1>=f2);
           break;
-        case chars:
+        case CHARS:
           flag=(strncmp(s1,s2,attr_length)>=0);
           break;
         default:
           LOG_PANIC("Unknown attr type: %d", attr_type);
       }
       break;
-    case NEqual:
+    case NOT_EQUAL:
       switch(attr_type){
-        case ints:
+        case INTS:
           flag=(i1!=i2);
           break;
-        case floats:
+        case FLOATS:
           flag=(f1!=f2);
           break;
-        case chars:
+        case CHARS:
           flag=(strncmp(s1,s2,attr_length)!=0);
           break;
         default:

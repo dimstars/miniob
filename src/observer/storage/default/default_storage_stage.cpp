@@ -158,40 +158,41 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
   switch (sql->flag)
   {
   case SCF_INSERT: { // insert into
-      const Inserts &inserts = sql->sstr.ins;
-      const char *table_name = inserts.relName;
-      rc = handler_->insert_record(current_trx, current_db, table_name, inserts.nValues, inserts.values);
+      const Inserts &inserts = sql->sstr.insertion;
+      const char *table_name = inserts.relation_name;
+      rc = handler_->insert_record(current_trx, current_db, table_name, inserts.value_num, inserts.values);
       snprintf(response, sizeof(response), "%s\n", strrc(rc));
     }
     break;
   case SCF_UPDATE: {
-      const Updates &updates = sql->sstr.upd;
-      const char *table_name = updates.relName;
-      const char *field_name = updates.attrName;
+      const Updates &updates = sql->sstr.update;
+      const char *table_name = updates.relation_name;
+      const char *field_name = updates.attribute_name;
       int updated_count = 0;
       rc = handler_->update_record(current_trx, current_db, table_name, field_name, &updates.value,
-                                   updates.nConditions, updates.conditions, &updated_count);
+                                   updates.condition_num, updates.conditions, &updated_count);
       snprintf(response, sizeof(response), "%s. %d record(s) updated\n", strrc(rc), updated_count);
     }
     break;
   case SCF_DELETE: {
-      const Deletes &deletes = sql->sstr.del;
-      const char *table_name = deletes.relName;
+      const Deletes &deletes = sql->sstr.deletion;
+      const char *table_name = deletes.relation_name;
       int deleted_count = 0;
-      rc = handler_->delete_record(current_trx, current_db, table_name, deletes.nConditions, deletes.conditions, &deleted_count);
+      rc = handler_->delete_record(current_trx, current_db, table_name, deletes.condition_num, deletes.conditions, &deleted_count);
       snprintf(response, sizeof(response), "%s. %d record(s) deleted\n", strrc(rc), deleted_count);
     }
     break;
   case SCF_CREATE_TABLE: { // create table
-      const CreateTable &create_table = sql->sstr.cret;
-      rc = handler_->create_table(current_db, create_table.relName, 
-              create_table.attrCount, create_table.attributes);
+      const CreateTable &create_table = sql->sstr.create_table;
+      rc = handler_->create_table(current_db, create_table.relation_name, 
+              create_table.attribute_count, create_table.attributes);
       snprintf(response, sizeof(response), "%s\n", strrc(rc));
     }
     break;
   case SCF_CREATE_INDEX: {
-      const CreateIndex &create_index = sql->sstr.crei;
-      rc = handler_->create_index(current_trx, current_db, create_index.relName, create_index.indexName, create_index.attrName);
+      const CreateIndex &create_index = sql->sstr.create_index;
+      rc = handler_->create_index(current_trx, current_db, create_index.relation_name, 
+                                  create_index.index_name, create_index.attribute_name);
       snprintf(response, sizeof(response), "%s\n", strrc(rc));
     }
     break;
@@ -216,7 +217,7 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
     }
     break;
   case SCF_DESC_TABLE: {
-      const char *table_name = sql->sstr.desc_table.table_name;
+      const char *table_name = sql->sstr.desc_table.relation_name;
       Table *table = handler_->find_table(current_db, table_name);
       std::stringstream ss;
       if (table != nullptr) {

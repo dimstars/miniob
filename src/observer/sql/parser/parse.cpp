@@ -35,22 +35,22 @@ int i;
 Condition *getCondition() {
   Condition *condition;
   condition = (Condition *)malloc(sizeof(Condition));
-  condition->lhsAttr = *getRelAttr();
-  condition->rhsAttr = *getRelAttr();
-  condition->lhsValue = *getValue();
-  condition->rhsValue = *getValue();
-  condition->bLhsIsAttr = -1;
-  condition->bRhsIsAttr = -1;
+  condition->left_attr = *getRelAttr();
+  condition->right_attr = *getRelAttr();
+  condition->left_value = *getValue();
+  condition->right_value = *getValue();
+  condition->left_is_attr = -1;
+  condition->right_is_attr = -1;
   return condition;
 }
 // allocate struct of relattr
 RelAttr *getRelAttr() {
   RelAttr *relAttr;
   relAttr = (RelAttr *)malloc(sizeof(RelAttr));
-  relAttr->relName = (char *)malloc(sizeof(char) * MAX_REL_NAME);
-  memset(relAttr->relName, 0, sizeof(char) * MAX_REL_NAME);
-  relAttr->attrName = (char *)malloc(sizeof(char) * MAX_ATTR_NAME);
-  memset(relAttr->attrName, 0, sizeof(char) * MAX_ATTR_NAME);
+  relAttr->relation_name = (char *)malloc(sizeof(char) * MAX_REL_NAME);
+  memset(relAttr->relation_name, 0, sizeof(char) * MAX_REL_NAME);
+  relAttr->attribute_name = (char *)malloc(sizeof(char) * MAX_ATTR_NAME);
+  memset(relAttr->attribute_name, 0, sizeof(char) * MAX_ATTR_NAME);
   return relAttr;
 }
 // allocate struct of value,the default type is int
@@ -58,25 +58,25 @@ Value *getValue() {
   Value *value = (Value *)malloc(sizeof(Value));
   value->data = (void *)malloc(sizeof(char) * MAX_DATA);
   memset(value->data, 0, sizeof(char) * MAX_DATA);
-  value->type = ints;
+  value->type = INTS;
   return value;
 }
 // allocate struct of select
 Selects *getSelects() {
   Selects *se;
   se = (Selects *)malloc(sizeof(Selects));
-  (se)->nSelAttrs = 0;
+  (se)->attr_num = 0;
   /*
   for (i = 0; i < MAX_NUM; i++) {
     (se)->selAttrs[i] = getRelAttr();
   }
    */
-  (se)->nRelations = 0;
+  (se)->relation_num = 0;
   for (i = 0; i < MAX_NUM; i++) {
     (se)->relations[i] = (char *)malloc(sizeof(char));
     memset(se->relations[i], 0, sizeof(char));
   }
-  (se)->nConditions = 0;
+  (se)->condition_num = 0;
   for (i = 0; i < MAX_NUM; i++) {
     (se)->conditions[i] = *getCondition();
   }
@@ -86,7 +86,7 @@ Selects *getSelects() {
 union sqls *getSqls() {
   union sqls *sql;
   sql = (union sqls *)malloc(sizeof(union sqls));
-  (sql)->sel = *getSelects();
+  (sql)->selection = *getSelects();
   (sql)->errors = (char *)malloc(sizeof(char) * MAX_ERROR_MESSAGE);
   memset(sql->errors, 0, sizeof(char) * MAX_ERROR_MESSAGE);
   return sql;

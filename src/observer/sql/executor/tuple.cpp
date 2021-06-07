@@ -225,17 +225,17 @@ void TupleRecordConverter::add_record(const char *record) {
     const FieldMeta *field_meta = table_meta.field(field.field_name());
     // assert field_meta !=nullptr
     switch (field_meta->type()) {
-      case ints: {
+      case INTS: {
         int value = *(int*)(record + field_meta->offset());
         tuple.add(value);
       }
       break;
-      case floats: {
+      case FLOATS: {
         float value = *(float *)(record + field_meta->offset());
         tuple.add(value);
       }
         break;
-      case chars: {
+      case CHARS: {
         const char *s = record + field_meta->offset();  // TODO 现在当做Cstring来处理
         tuple.add(s, field_meta->len());
       }

@@ -206,7 +206,7 @@ void yyerror(const char *str) {
   fromleng=0;
   selectleng=0;
 	valueleng=0;
-  ssql->sstr.ins.nValues=0;
+  ssql->sstr.insertion.value_num = 0;
 	ssql->sstr.errors=position;
 	printf("parse sql failed. error=%s", str);
 }
@@ -1628,7 +1628,7 @@ yyreduce:
 #line 189 "yacc_sql.y"
     {
         ssql->flag=SCF_DROP_TABLE;//"drop_table";
-        ssql->sstr.drt.relName=(yyvsp[(3) - (4)].string);
+        ssql->sstr.drop_table.relation_name =(yyvsp[(3) - (4)].string);
     }
     break;
 
@@ -1643,7 +1643,7 @@ yyreduce:
 #line 201 "yacc_sql.y"
     {
       ssql->flag = SCF_DESC_TABLE;
-      ssql->sstr.desc_table.table_name = (yyvsp[(2) - (3)].string);
+      ssql->sstr.desc_table.relation_name = (yyvsp[(2) - (3)].string);
     }
     break;
 
@@ -1651,9 +1651,9 @@ yyreduce:
 #line 208 "yacc_sql.y"
     {
 																							        ssql->flag=SCF_CREATE_INDEX;//"create_index";
-																							        ssql->sstr.crei.indexName=(yyvsp[(3) - (9)].string);
-																							        ssql->sstr.crei.relName=(yyvsp[(5) - (9)].string);
-																							        ssql->sstr.crei.attrName=(yyvsp[(7) - (9)].string);
+																							        ssql->sstr.create_index.index_name =(yyvsp[(3) - (9)].string);
+																							        ssql->sstr.create_index.relation_name =(yyvsp[(5) - (9)].string);
+																							        ssql->sstr.create_index.attribute_name =(yyvsp[(7) - (9)].string);
 																							    }
     break;
 
@@ -1661,7 +1661,7 @@ yyreduce:
 #line 217 "yacc_sql.y"
     {
 											        ssql->flag=SCF_DROP_INDEX;//"drop_index";
-											        ssql->sstr.dri.indexName=(yyvsp[(3) - (4)].string);
+											        ssql->sstr.drop_index.index_name =(yyvsp[(3) - (4)].string);
 											    }
     break;
 
@@ -1670,8 +1670,8 @@ yyreduce:
     {
 	
 																																		ssql->flag=SCF_CREATE_TABLE;//"create_table";
-																																		ssql->sstr.cret.relName=(yyvsp[(3) - (8)].string);
-																																		ssql->sstr.cret.attrCount=valueleng;
+																																		ssql->sstr.create_table.relation_name =(yyvsp[(3) - (8)].string);
+																																		ssql->sstr.create_table.attribute_count =valueleng;
 																																		//临时变量清零	
 																																		valueleng=0;
 																																		
@@ -1686,10 +1686,10 @@ yyreduce:
   case 34:
 #line 239 "yacc_sql.y"
     {
-																ssql->sstr.cret.attributes[valueleng].attrName=(char*)malloc(sizeof(char)); // TODO FATAL
-																strcpy(ssql->sstr.cret.attributes[valueleng].attrName,get_id); 
-																ssql->sstr.cret.attributes[valueleng].attrType=(yyvsp[(2) - (5)].number);  
-																ssql->sstr.cret.attributes[valueleng].attrLength=(yyvsp[(4) - (5)].number);
+																ssql->sstr.create_table.attributes[valueleng].name =(char*)malloc(sizeof(char)); // TODO FATAL
+																strcpy(ssql->sstr.create_table.attributes[valueleng].name,get_id); 
+																ssql->sstr.create_table.attributes[valueleng].type = (yyvsp[(2) - (5)].number);  
+																ssql->sstr.create_table.attributes[valueleng].length = (yyvsp[(4) - (5)].number);
 																valueleng++;
 															    }
     break;
@@ -1697,10 +1697,10 @@ yyreduce:
   case 35:
 #line 246 "yacc_sql.y"
     {
-															ssql->sstr.cret.attributes[valueleng].attrName=(char*)malloc(sizeof(char));
-															strcpy(ssql->sstr.cret.attributes[valueleng].attrName,get_id); 
-															ssql->sstr.cret.attributes[valueleng].attrType=(yyvsp[(2) - (2)].number);  
-															ssql->sstr.cret.attributes[valueleng].attrLength=4;
+															ssql->sstr.create_table.attributes[valueleng].name=(char*)malloc(sizeof(char));
+															strcpy(ssql->sstr.create_table.attributes[valueleng].name,get_id); 
+															ssql->sstr.create_table.attributes[valueleng].type=(yyvsp[(2) - (2)].number);  
+															ssql->sstr.create_table.attributes[valueleng].length=4;
 															valueleng++;
 														    }
     break;
@@ -1741,10 +1741,10 @@ yyreduce:
         valueT[valueleng++] = *(yyvsp[(6) - (9)].value1);
 
         ssql->flag=SCF_INSERT;//"insert";
-        ssql->sstr.ins.relName=(yyvsp[(3) - (9)].string);
-        ssql->sstr.ins.nValues=valueleng;
+        ssql->sstr.insertion.relation_name = (yyvsp[(3) - (9)].string);
+        ssql->sstr.insertion.value_num = valueleng;
         for(i=0;i<valueleng;i++){
-        ssql->sstr.ins.values[i] = valueT[i];
+        ssql->sstr.insertion.values[i] = valueT[i];
       }
 
       //临时变量清零
@@ -1765,7 +1765,7 @@ yyreduce:
     {	
 					(yyval.value1) = (Value*)malloc(sizeof(Value));
 					(yyval.value1)->data=(int*)malloc((sizeof(int)));
-					(yyval.value1)->type =ints; 					                      // "ints";
+					(yyval.value1)->type =INTS; 					                      // "ints";
 					*((int*)((yyval.value1)->data)) = (yyvsp[(1) - (1)].number);
 			}
     break;
@@ -1775,7 +1775,7 @@ yyreduce:
     {								
 					(yyval.value1)=(Value*)malloc(sizeof(Value));
 					(yyval.value1)->data=malloc(MAX_NUM*(sizeof(char)));
-					(yyval.value1)->type =floats; 					                     	//"floats"
+					(yyval.value1)->type =FLOATS; 					                     	//"floats"
 					*((float*)((yyval.value1)->data)) = (yyvsp[(1) - (1)].floats);
 			}
     break;
@@ -1785,7 +1785,7 @@ yyreduce:
     {																		
 					(yyval.value1)=(Value*)malloc(sizeof(Value));				
 					(yyval.value1)->data=malloc(MAX_NUM*(sizeof(char)));		
-    			(yyval.value1)->type = chars;					// "chars";
+    			(yyval.value1)->type = CHARS;					// "chars";
     			(yyvsp[(1) - (1)].string) = substr((yyvsp[(1) - (1)].string),1,strlen((yyvsp[(1) - (1)].string))-2); // TODO snprintf
     			sprintf((char*)((yyval.value1)->data), "%s", (yyvsp[(1) - (1)].string)); 			
     	}
@@ -1796,11 +1796,11 @@ yyreduce:
     {
 	
 	ssql->flag=SCF_DELETE;//"delete";
-	ssql->sstr.del.relName=(yyvsp[(3) - (5)].string);
+	ssql->sstr.deletion.relation_name = (yyvsp[(3) - (5)].string);
 	for(i=0;i<whereleng;i++){
-	ssql->sstr.del.conditions[i]=wherecondi[i];
+	ssql->sstr.deletion.conditions[i]=wherecondi[i];
 	}
-	ssql->sstr.del.nConditions=whereleng;
+	ssql->sstr.deletion.condition_num = whereleng;
 	whereleng=0;	
     }
     break;
@@ -1810,13 +1810,13 @@ yyreduce:
     {
 	
 											ssql->flag=SCF_UPDATE;//"update";
-											ssql->sstr.upd.relName=(yyvsp[(2) - (8)].string);
-											ssql->sstr.upd.value=*(yyvsp[(6) - (8)].value1);
-											ssql->sstr.upd.attrName=(yyvsp[(4) - (8)].string);
+											ssql->sstr.update.relation_name = (yyvsp[(2) - (8)].string);
+											ssql->sstr.update.value = *(yyvsp[(6) - (8)].value1);
+											ssql->sstr.update.attribute_name = (yyvsp[(4) - (8)].string);
 											for(i=0;i<whereleng;i++){
-											  ssql->sstr.upd.conditions[i]=wherecondi[i];
+											  ssql->sstr.update.conditions[i]=wherecondi[i];
 											}
-											ssql->sstr.upd.nConditions=whereleng;
+											ssql->sstr.update.condition_num =whereleng;
 											whereleng=0;
 										    }
     break;
@@ -1825,16 +1825,16 @@ yyreduce:
 #line 344 "yacc_sql.y"
     {
       
-            ssql->sstr.sel.relations[fromleng++]=(yyvsp[(4) - (7)].string);
+            ssql->sstr.selection.relations[fromleng++]=(yyvsp[(4) - (7)].string);
 
             for(i=0;i<whereleng;i++){
-              ssql->sstr.sel.conditions[i]=wherecondi[i];
+              ssql->sstr.selection.conditions[i]=wherecondi[i];
             }
 
             ssql->flag=SCF_SELECT;//"select";
-            ssql->sstr.sel.nSelAttrs=selectleng;
-            ssql->sstr.sel.nRelations=fromleng;
-            ssql->sstr.sel.nConditions=whereleng;
+            ssql->sstr.selection.attr_num = selectleng;
+            ssql->sstr.selection.relation_num = fromleng;
+            ssql->sstr.selection.condition_num =whereleng;
 
             //临时变量清零
             whereleng=0;
@@ -1846,47 +1846,47 @@ yyreduce:
   case 50:
 #line 365 "yacc_sql.y"
     {  // TODO 处理这里的内存泄露问题
-         ssql->sstr.sel.selAttrs[selectleng].attrName="*";
-         ssql->sstr.sel.selAttrs[selectleng++].relName=NULL;
+         ssql->sstr.selection.attributes[selectleng].attribute_name ="*";
+         ssql->sstr.selection.attributes[selectleng++].relation_name =NULL;
        }
     break;
 
   case 51:
 #line 369 "yacc_sql.y"
     {
-        ssql->sstr.sel.selAttrs[selectleng].attrName=(yyvsp[(1) - (2)].string);
-        ssql->sstr.sel.selAttrs[selectleng++].relName=NULL;
+        ssql->sstr.selection.attributes[selectleng].attribute_name=(yyvsp[(1) - (2)].string);
+        ssql->sstr.selection.attributes[selectleng++].relation_name=NULL;
       }
     break;
 
   case 52:
 #line 373 "yacc_sql.y"
     {
-        ssql->sstr.sel.selAttrs[selectleng].attrName=(yyvsp[(3) - (4)].string);
-        ssql->sstr.sel.selAttrs[selectleng++].relName=(yyvsp[(1) - (4)].string);
+        ssql->sstr.selection.attributes[selectleng].attribute_name=(yyvsp[(3) - (4)].string);
+        ssql->sstr.selection.attributes[selectleng++].relation_name=(yyvsp[(1) - (4)].string);
       }
     break;
 
   case 54:
 #line 380 "yacc_sql.y"
     {
-     	  ssql->sstr.sel.selAttrs[selectleng].relName = NULL;
-        ssql->sstr.sel.selAttrs[selectleng++].attrName=(yyvsp[(2) - (3)].string);
+     	  ssql->sstr.selection.attributes[selectleng].relation_name = NULL;
+        ssql->sstr.selection.attributes[selectleng++].attribute_name=(yyvsp[(2) - (3)].string);
       }
     break;
 
   case 55:
 #line 384 "yacc_sql.y"
     {
-        ssql->sstr.sel.selAttrs[selectleng].attrName=(yyvsp[(4) - (5)].string);
-        ssql->sstr.sel.selAttrs[selectleng++].relName=(yyvsp[(2) - (5)].string);
+        ssql->sstr.selection.attributes[selectleng].attribute_name=(yyvsp[(4) - (5)].string);
+        ssql->sstr.selection.attributes[selectleng++].relation_name=(yyvsp[(2) - (5)].string);
   	  }
     break;
 
   case 57:
 #line 392 "yacc_sql.y"
     {	
-				ssql->sstr.sel.relations[fromleng++]=(yyvsp[(2) - (3)].string);
+				ssql->sstr.selection.relations[fromleng++]=(yyvsp[(2) - (3)].string);
 		  }
     break;
 
@@ -1908,14 +1908,14 @@ yyreduce:
 #line 409 "yacc_sql.y"
     {
 									(yyval.condition1) = ( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->bLhsIsAttr = 1;
-									(yyval.condition1)->lhsAttr.relName = NULL;
-									(yyval.condition1)->lhsAttr.attrName = (yyvsp[(1) - (3)].string);
-									(yyval.condition1)->op = compOpT;
-									(yyval.condition1)->bRhsIsAttr = 0;
-									(yyval.condition1)->rhsAttr.relName = NULL;
-									(yyval.condition1)->rhsAttr.attrName = NULL;
-									(yyval.condition1)->rhsValue = *(yyvsp[(3) - (3)].value1);
+									(yyval.condition1)->left_is_attr = 1;
+									(yyval.condition1)->left_attr.relation_name = NULL;
+									(yyval.condition1)->left_attr.attribute_name= (yyvsp[(1) - (3)].string);
+									(yyval.condition1)->comp = compOpT;
+									(yyval.condition1)->right_is_attr = 0;
+									(yyval.condition1)->right_attr.relation_name = NULL;
+									(yyval.condition1)->right_attr.attribute_name = NULL;
+									(yyval.condition1)->right_value = *(yyvsp[(3) - (3)].value1);
 
 								    }
     break;
@@ -1924,15 +1924,15 @@ yyreduce:
 #line 421 "yacc_sql.y"
     {
 									(yyval.condition1) = ( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->bLhsIsAttr = 0;
-									(yyval.condition1)->lhsAttr.relName=NULL;
-									(yyval.condition1)->lhsAttr.attrName=NULL;
-									(yyval.condition1)->lhsValue = *(yyvsp[(1) - (3)].value1);
-									(yyval.condition1)->op = compOpT;
-									(yyval.condition1)->bRhsIsAttr = 0;
-									(yyval.condition1)->rhsAttr.relName = NULL;
-									(yyval.condition1)->rhsAttr.attrName = NULL;
-									(yyval.condition1)->rhsValue = *(yyvsp[(3) - (3)].value1);
+									(yyval.condition1)->left_is_attr = 0;
+									(yyval.condition1)->left_attr.relation_name=NULL;
+									(yyval.condition1)->left_attr.attribute_name=NULL;
+									(yyval.condition1)->left_value = *(yyvsp[(1) - (3)].value1);
+									(yyval.condition1)->comp = compOpT;
+									(yyval.condition1)->right_is_attr = 0;
+									(yyval.condition1)->right_attr.relation_name = NULL;
+									(yyval.condition1)->right_attr.attribute_name = NULL;
+									(yyval.condition1)->right_value = *(yyvsp[(3) - (3)].value1);
 
 								    }
     break;
@@ -1941,13 +1941,13 @@ yyreduce:
 #line 434 "yacc_sql.y"
     {
 									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->bLhsIsAttr = 1;
-									(yyval.condition1)->lhsAttr.relName=NULL;
-									(yyval.condition1)->lhsAttr.attrName=(yyvsp[(1) - (3)].string);
-									(yyval.condition1)->op=compOpT;
-									(yyval.condition1)->bRhsIsAttr = 1;
-									(yyval.condition1)->rhsAttr.relName=NULL;
-									(yyval.condition1)->rhsAttr.attrName=(yyvsp[(3) - (3)].string);
+									(yyval.condition1)->left_is_attr = 1;
+									(yyval.condition1)->left_attr.relation_name=NULL;
+									(yyval.condition1)->left_attr.attribute_name=(yyvsp[(1) - (3)].string);
+									(yyval.condition1)->comp = compOpT;
+									(yyval.condition1)->right_is_attr = 1;
+									(yyval.condition1)->right_attr.relation_name=NULL;
+									(yyval.condition1)->right_attr.attribute_name=(yyvsp[(3) - (3)].string);
 
 								    }
     break;
@@ -1956,15 +1956,15 @@ yyreduce:
 #line 445 "yacc_sql.y"
     {
 									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->bLhsIsAttr = 0;
-									(yyval.condition1)->lhsAttr.relName=NULL;
-									(yyval.condition1)->lhsAttr.attrName=NULL;
-									(yyval.condition1)->lhsValue = *(yyvsp[(1) - (3)].value1);
-									(yyval.condition1)->op=compOpT;
+									(yyval.condition1)->left_is_attr = 0;
+									(yyval.condition1)->left_attr.relation_name=NULL;
+									(yyval.condition1)->left_attr.attribute_name=NULL;
+									(yyval.condition1)->left_value = *(yyvsp[(1) - (3)].value1);
+									(yyval.condition1)->comp=compOpT;
 									
-									(yyval.condition1)->bRhsIsAttr = 1;
-									(yyval.condition1)->rhsAttr.relName=NULL;
-									(yyval.condition1)->rhsAttr.attrName=(yyvsp[(3) - (3)].string);
+									(yyval.condition1)->right_is_attr = 1;
+									(yyval.condition1)->right_attr.relation_name=NULL;
+									(yyval.condition1)->right_attr.attribute_name=(yyvsp[(3) - (3)].string);
 								
 								    }
     break;
@@ -1973,14 +1973,14 @@ yyreduce:
 #line 458 "yacc_sql.y"
     {
 									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->bLhsIsAttr = 1;
-									(yyval.condition1)->lhsAttr.relName=(yyvsp[(1) - (5)].string);
-									(yyval.condition1)->lhsAttr.attrName=(yyvsp[(3) - (5)].string);
-									(yyval.condition1)->op=compOpT;
-									(yyval.condition1)->bRhsIsAttr = 0;   //属性值
-									(yyval.condition1)->rhsAttr.relName=NULL;
-									(yyval.condition1)->rhsAttr.attrName=NULL;
-									(yyval.condition1)->rhsValue=*(yyvsp[(5) - (5)].value1);			
+									(yyval.condition1)->left_is_attr = 1;
+									(yyval.condition1)->left_attr.relation_name=(yyvsp[(1) - (5)].string);
+									(yyval.condition1)->left_attr.attribute_name=(yyvsp[(3) - (5)].string);
+									(yyval.condition1)->comp=compOpT;
+									(yyval.condition1)->right_is_attr = 0;   //属性值
+									(yyval.condition1)->right_attr.relation_name=NULL;
+									(yyval.condition1)->right_attr.attribute_name=NULL;
+									(yyval.condition1)->right_value =*(yyvsp[(5) - (5)].value1);			
 							
     											}
     break;
@@ -1989,14 +1989,14 @@ yyreduce:
 #line 470 "yacc_sql.y"
     {
 									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->bLhsIsAttr = 0;//属性值
-									(yyval.condition1)->lhsAttr.relName=NULL;
-									(yyval.condition1)->lhsAttr.attrName=NULL;
-									(yyval.condition1)->lhsValue = *(yyvsp[(1) - (5)].value1);
-									(yyval.condition1)->op=compOpT;
-									(yyval.condition1)->bRhsIsAttr = 1;//属性
-									(yyval.condition1)->rhsAttr.relName = (yyvsp[(3) - (5)].string);
-									(yyval.condition1)->rhsAttr.attrName = (yyvsp[(5) - (5)].string);
+									(yyval.condition1)->left_is_attr = 0;//属性值
+									(yyval.condition1)->left_attr.relation_name=NULL;
+									(yyval.condition1)->left_attr.attribute_name=NULL;
+									(yyval.condition1)->left_value = *(yyvsp[(1) - (5)].value1);
+									(yyval.condition1)->comp =compOpT;
+									(yyval.condition1)->right_is_attr = 1;//属性
+									(yyval.condition1)->right_attr.relation_name = (yyvsp[(3) - (5)].string);
+									(yyval.condition1)->right_attr.attribute_name = (yyvsp[(5) - (5)].string);
 									
     						}
     break;
@@ -2005,44 +2005,44 @@ yyreduce:
 #line 482 "yacc_sql.y"
     {
 									(yyval.condition1)=( Condition *)malloc(sizeof( Condition));
-									(yyval.condition1)->bLhsIsAttr = 1;		//属性
-									(yyval.condition1)->lhsAttr.relName=(yyvsp[(1) - (7)].string);
-									(yyval.condition1)->lhsAttr.attrName=(yyvsp[(3) - (7)].string);
-									(yyval.condition1)->op=compOpT;
-									(yyval.condition1)->bRhsIsAttr = 1;		//属性
-									(yyval.condition1)->rhsAttr.relName=(yyvsp[(5) - (7)].string);
-									(yyval.condition1)->rhsAttr.attrName=(yyvsp[(7) - (7)].string);								
+									(yyval.condition1)->left_is_attr = 1;		//属性
+									(yyval.condition1)->left_attr.relation_name=(yyvsp[(1) - (7)].string);
+									(yyval.condition1)->left_attr.attribute_name=(yyvsp[(3) - (7)].string);
+									(yyval.condition1)->comp =compOpT;
+									(yyval.condition1)->right_is_attr = 1;		//属性
+									(yyval.condition1)->right_attr.relation_name=(yyvsp[(5) - (7)].string);
+									(yyval.condition1)->right_attr.attribute_name=(yyvsp[(7) - (7)].string);								
     											}
     break;
 
   case 69:
 #line 495 "yacc_sql.y"
-    { compOpT = EQual; }
+    { compOpT = EQUAL_TO; }
     break;
 
   case 70:
 #line 496 "yacc_sql.y"
-    { compOpT = LEqual; }
+    { compOpT = LESS_THAN; }
     break;
 
   case 71:
 #line 497 "yacc_sql.y"
-    { compOpT = GreatT; }
+    { compOpT = GREAT_THAN; }
     break;
 
   case 72:
 #line 498 "yacc_sql.y"
-    { compOpT = LessT; }
+    { compOpT = LESS_EQUAL; }
     break;
 
   case 73:
 #line 499 "yacc_sql.y"
-    { compOpT = GEqual; }
+    { compOpT = GREAT_EQUAL; }
     break;
 
   case 74:
 #line 500 "yacc_sql.y"
-    { compOpT = NEqual; }
+    { compOpT = NOT_EQUAL; }
     break;
 
 

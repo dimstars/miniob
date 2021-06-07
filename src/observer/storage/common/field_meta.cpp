@@ -36,7 +36,7 @@ const char *ATTR_TYPE_NAME[] = {
 };
 
 const char *attr_type_to_string(AttrType type) {
-  if (type >= undefined && type <= floats) {
+  if (type >= UNDEFINED && type <= FLOATS) {
     return ATTR_TYPE_NAME[type];
   }
   return "unknown";
@@ -48,10 +48,10 @@ AttrType attr_type_from_string(const char *s) {
       return (AttrType)i;
     }
   }
-  return undefined;
+  return UNDEFINED;
 }
 
-FieldMeta::FieldMeta() : attr_type_(AttrType::undefined), attr_offset_(-1), attr_len_(0), visible_(false) {
+FieldMeta::FieldMeta() : attr_type_(AttrType::UNDEFINED), attr_offset_(-1), attr_len_(0), visible_(false) {
 }
 
 RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible) {
@@ -60,7 +60,7 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
     return RC::INVALID_ARGUMENT;
   }
 
-  if (AttrType::undefined == attr_type || attr_offset < 0 || attr_len <= 0) {
+  if (AttrType::UNDEFINED == attr_type || attr_offset < 0 || attr_len <= 0) {
     LOG_WARN("Invalid argument. name=%s, attr_type=%d, attr_offset=%d, attr_len=%d",
       name, attr_type, attr_offset, attr_len);
     return RC::INVALID_ARGUMENT;
@@ -147,7 +147,7 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field) {
   }
 
   AttrType type = attr_type_from_string(type_value.asCString());
-  if (undefined == type) {
+  if (UNDEFINED == type) {
     LOG_ERROR("Got invalid field type. type=%d", type);
     return RC::GENERIC_ERROR;
   }

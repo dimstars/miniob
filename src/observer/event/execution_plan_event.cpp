@@ -27,5 +27,8 @@ ExecutionPlanEvent::~ExecutionPlanEvent() {
     sql_event_->doneImmediate();
     sql_event_ = nullptr;
   }
+
+  delete sqls_;
+  sqls_ = nullptr;
 }
 

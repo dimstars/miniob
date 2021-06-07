@@ -116,7 +116,7 @@ private:
   void start_if_not_started();
 private:
   int32_t  trx_id_ = 0;
-  std::unordered_map<Table *, OperationSet> operations_; // TODO set
+  std::unordered_map<Table *, OperationSet> operations_;
 };
 
 #endif // __OBSERVER_STORAGE_TRX_TRX_H_

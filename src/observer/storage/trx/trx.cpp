@@ -42,7 +42,7 @@ const char *Trx::trx_field_name() {
 }
 
 AttrType Trx::trx_field_type() {
-  return ints;
+  return INTS;
 }
 
 int Trx::trx_field_len() {

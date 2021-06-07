@@ -522,15 +522,15 @@ public:
   FieldUpdater(const FieldMeta &field_meta, const Value &value) : field_meta_(field_meta), string_value_(nullptr){
 
     switch (field_meta.type()) {
-    case ints: {
+    case INTS: {
         int_value_ = *(int *)value.data;
       }
       break;
-    case floats: {
+    case FLOATS: {
         float_value_ = *(float *)value.data;
       }
       break;
-    case chars: {
+    case CHARS: {
         int len = strlen((const char *)value.data);
         string_value_len_ = std::min(len + 1, field_meta.len());
         char *str = new char[string_value_len_];
@@ -553,15 +553,15 @@ public:
     char *dest = data + field_meta_.offset();
 
     switch (field_meta_.type()) {
-    case ints: {
+    case INTS: {
         *(int *) (dest) = int_value_;
       }
       break;
-      case floats: {
+      case FLOATS: {
         *(float *)(dest)= float_value_;
       }
       break;
-      case chars: {
+      case CHARS: {
         memcpy(dest, string_value_, string_value_len_);
       }
       break;

@@ -17,10 +17,10 @@
 // Created by Longda on 2021/4/13.
 //
 
+#include "example_stage.h"
+
 #include <string.h>
 #include <string>
-
-#include "example_stage.h"
 
 #include "common/conf/ini.h"
 #include "common/io/io.h"

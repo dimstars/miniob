@@ -39,8 +39,6 @@ protected:
   void handle_event(StageEvent *event);
   void callback_event(StageEvent *event, CallbackContext *context);
 
-protected:
-private:
 };
 } // namespace common
 #endif //__COMMON_SEDA_EXAMPLE_STAGE_H__

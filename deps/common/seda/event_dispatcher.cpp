@@ -21,29 +21,29 @@
 #include "common/seda/event_dispatcher.h"
 namespace common {
 
-//! Constructor
+// Constructor
 EventDispatcher::EventDispatcher(const char *tag)
-  : Stage(tag), eventStore(), nextStage(NULL) {
+  : Stage(tag), event_store_(), next_stage_(NULL) {
   LOG_TRACE("enter\n");
 
   pthread_mutexattr_t attr;
 
   pthread_mutexattr_init(&attr);
   pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
-  pthread_mutex_init(&eventLock, &attr);
+  pthread_mutex_init(&event_lock_, &attr);
 
   LOG_TRACE("exit\n");
 }
 
-//! Destructor
+// Destructor
 EventDispatcher::~EventDispatcher() {
   LOG_TRACE("enter\n");
-  pthread_mutex_destroy(&eventLock);
+  pthread_mutex_destroy(&event_lock_);
   LOG_TRACE("exit\n");
 }
 
-//! Process an event
 /**
+ * Process an event
  * Check if the event can be dispatched. If not, hash it and store
  * it.  If so, send it on to the next stage.
  */
@@ -54,44 +54,44 @@ void EventDispatcher::handle_event(StageEvent *event) {
   DispatchContext *ctx = NULL;
   status_t stat;
 
-  pthread_mutex_lock(&eventLock);
-  stat = dispatchEvent(event, ctx, hash);
+  pthread_mutex_lock(&event_lock_);
+  stat = dispatch_event(event, ctx, hash);
   if (stat == SEND_EVENT) {
-    nextStage->add_event(event);
+    next_stage_->add_event(event);
   } else if (stat == STORE_EVENT) {
     StoredEvent se(event, ctx);
 
-    eventStore[hash].push_back(se);
+    event_store_[hash].push_back(se);
   } else {
     LOG_ERROR("Dispatch event failure\n");
-    // in this case, dispatchEvent is assumed to have disposed of event
+    // in this case, dispatch_event is assumed to have disposed of event
   }
-  pthread_mutex_unlock(&eventLock);
+  pthread_mutex_unlock(&event_lock_);
 
   LOG_TRACE("exit\n");
 }
 
-//! Initialize stage params and validate outputs
+// Initialize stage params and validate outputs
 bool EventDispatcher::initialize() {
-  bool retVal = true;
+  bool ret_val = true;
 
   if (next_stage_list_.size() != 1) {
-    retVal = false;
+    ret_val = false;
   } else {
-    nextStage = *(next_stage_list_.begin());
+    next_stage_ = *(next_stage_list_.begin());
   }
-  return retVal;
+  return ret_val;
 }
 
-//! Cleanup stage after disconnection
+// Cleanup stage after disconnection
 /**
- * Call done() on any events left over in the eventStore.
+ * Call done() on any events left over in the event_store_.
  */
 void EventDispatcher::cleanup() {
-  pthread_mutex_lock(&eventLock);
+  pthread_mutex_lock(&event_lock_);
 
   // for each hash chain...
-  for (EventHash::iterator i = eventStore.begin(); i != eventStore.end(); i++) {
+  for (EventHash::iterator i = event_store_.begin(); i != event_store_.end(); i++) {
 
     // for each event on the chain
     for (std::list<StoredEvent>::iterator j = i->second.begin();
@@ -100,36 +100,36 @@ void EventDispatcher::cleanup() {
     }
     i->second.clear();
   }
-  eventStore.clear();
+  event_store_.clear();
 
-  pthread_mutex_unlock(&eventLock);
+  pthread_mutex_unlock(&event_lock_);
 }
 
-//! Wake up a stored event
-bool EventDispatcher::wakeupEvent(std::string hashkey) {
+// Wake up a stored event
+bool EventDispatcher::wakeup_event(std::string hashkey) {
   bool sent = false;
   EventHash::iterator i;
 
-  i = eventStore.find(hashkey);
-  if (i != eventStore.end()) {
+  i = event_store_.find(hashkey);
+  if (i != event_store_.end()) {
 
     // find the event and remove it from the current queue
-    StoredEvent targetEv = *(i->second.begin());
+    StoredEvent target_ev = *(i->second.begin());
     i->second.pop_front();
     if (i->second.size() == 0) {
-      eventStore.erase(i);
+      event_store_.erase(i);
     }
 
     // try to dispatch the event again
-    status_t stat = dispatchEvent(targetEv.first, targetEv.second, hashkey);
+    status_t stat = dispatch_event(target_ev.first, target_ev.second, hashkey);
     if (stat == SEND_EVENT) {
-      nextStage->add_event(targetEv.first);
+      next_stage_->add_event(target_ev.first);
       sent = true;
     } else if (stat == STORE_EVENT) {
-      eventStore[hashkey].push_back(targetEv);
+      event_store_[hashkey].push_back(target_ev);
     } else {
       LOG_ERROR("Dispatch event failure\n");
-      // in this case, dispatchEvent is assumed to have disposed of event
+      // in this case, dispatch_event is assumed to have disposed of event
     }
   }
 

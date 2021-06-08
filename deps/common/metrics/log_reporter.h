@@ -30,6 +30,6 @@ public:
   void report(const std::string &tag, Metric *metric);
 };
 
-LogReporter* get_g_log_reporter();
+LogReporter* get_log_reporter();
 } //namespace common
 #endif //__COMMON_METRICS_LOG_REPORTER_H__

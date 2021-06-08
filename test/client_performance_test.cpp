@@ -100,8 +100,8 @@ int main(int argc, char *argv[]) {
     serverHost = argv[1];
   }
 
-  MetricsRegistry &metricRegistry = get_g_metrics_registry();
-  ConsoleReporter *consoleReporter = get_g_console_reporter();
+  MetricsRegistry &metricRegistry = get_metrics_registry();
+  ConsoleReporter *consoleReporter = get_console_reporter();
   metricRegistry.add_reporter(consoleReporter);
 
   Meter  *tpsMeter = new Meter();

@@ -24,7 +24,7 @@
 
 namespace common {
 
-MetricsRegistry& get_g_metrics_registry() {
+MetricsRegistry& get_metrics_registry() {
   static MetricsRegistry instance;
 
   return instance;

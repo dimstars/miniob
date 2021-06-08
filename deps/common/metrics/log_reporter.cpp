@@ -27,7 +27,7 @@
 
 namespace common {
 
-LogReporter* get_g_log_reporter() {
+LogReporter* get_log_reporter() {
   static LogReporter* instance = new LogReporter();
 
   return instance;

@@ -34,15 +34,15 @@ namespace common {
 //keywords of sedaconfig
 
 
-//! A class to configure seda stages
 /**
+ *  A class to configure seda stages
  *  Each application uses an xml file to define the stages that make up the
  *  application, the threadpool that the stages use, and the parameters that
  *  are passed to configure each individual stage.  The SedaConfig class
  *  consumes this xml file, parses it, and instantiates the indicated
- *  configuration.  It also then provides access to individual mStages and
+ *  configuration.  It also then provides access to individual stages_ and
  *  threadpools within the configuration. The parameters passed to each
- *  stage consists of the global attributes defined for all the seda mStages
+ *  stage consists of the global attributes defined for all the seda stages_
  *  in the seda instance as well as the attributes defined for that specific
  *  stage. The attributes defined for each stage will override the global
  *  attributes in case of duplicate attributes
@@ -53,30 +53,30 @@ class SedaConfig {
  public:
   typedef enum { SUCCESS = 0, INITFAIL, PARSEFAIL } status_t;
 
-  static SedaConfig *&getInstance();
+  static SedaConfig *&get_instance();
 
-  //! Destructor
   /**
+   * Destructor
    * @post configuration is deleted
    */
   ~SedaConfig();
 
-  //! Set the file holding the configuration
   /**
+   * Set the file holding the configuration
    * @pre  filename is a null-terminated string, or \c NULL
    * @post config filename is initialized, config string is empty
    */
-  void setCfgFilename(const char *filename);
+  void set_cfg_filename(const char *filename);
 
-  //! Set the string holding the configuration
   /**
-   * @pre  configStr is a null-terminated string, or \c NULL
+   * Set the string holding the configuration
+   * @pre  config_str is a null-terminated string, or \c NULL
    * @post config string is initialized, config filename is empty
    */
-  void setCfgString(const char *configStr);
+  void set_cfg_string(const char *config_str);
 
-  //! Parse config file or string
   /**
+   * Parse config file or string
    * parse the seda config file or string and build an in-memory
    * representation of the config.  Also, update global properties object
    * with global seda properties from the config.
@@ -88,150 +88,147 @@ class SedaConfig {
    */
   status_t parse();
 
-  //! instantiate the parsed configuration
   /**
+   * instantiate the parsed configuration
    * Use the parsed configuration to instantiate the thread pools
-   * and mStages specificed, but do not start it running.
+   * and stages_ specificed, but do not start it running.
    *
    * @pre  configuration has been successfully parsed
-   * @post upon SUCCESS, thread pools and mStages are created,
+   * @post upon SUCCESS, thread pools and stages_ are created,
    *        ready to be started.
    */
-  status_t instantiateCfg();
+  status_t instantiate_cfg();
 
-  //! start the parsed, instantiated configuration
   /**
+   * start the parsed, instantiated configuration
    * @pre   configuration parsed and instantiated
    * @post  if SUCCESS, the SEDA pipleine is now running.
    *
    */
   status_t start();
 
-  //! Complete Initialization of the mThreadPools and mStages
   /**
+   * Complete Initialization of the mThreadPools and stages_
    * Use the parsed config to initialize the required mThreadPools and
-   * mStages, and start them running.  If the config has not yet been
+   * stages_, and start them running.  If the config has not yet been
    * parsed then try to parse it first.  The init function combines
    * parse(), instantiate() and start()
    *
-   * @pre empty mThreadPools and mStages
+   * @pre empty mThreadPools and stages_
    * @post if returns SUCCESS then
-   *          mThreadPools and mStages created/initialized and running
+   *          mThreadPools and stages_ created/initialized and running
    * @post if returns INITFAIL or PARSEFAIL then
    *          mThreadPools and stage list are empty
    */
   status_t init();
 
-  //! Clean-up the threadpool and mStages
   /**
-   * @post all mStages disconnected and deleted, all mThreadPools deleted
+   * Clean-up the threadpool and stages_
+   * @post all stages_ disconnected and deleted, all mThreadPools deleted
    */
   void cleanup();
 
-  //! get the desired stage given a string
   /**
+   * get the desired stage given a string
    *
    * @param[in] stagename   take in the stage name and convert it to a Stage
    * @pre
    * @return a reference to the Stage
    */
-  Stage *getStage(const char *stagename);
+  Stage *get_stage(const char *stagename);
 
-  //! get the desired threadpool a string
   /**
+   * get the desired threadpool a string
    *
    * @param[in] index   take in the index for threadpool
    * @pre
    * @return a reference to the ThreadPool
    */
-  Threadpool &getThreadPool(const int index);
+  Threadpool &get_thread_pool(const int index);
 
-  //! Get a list of all stage names
   /**
-   * @param[in/out] names   names of all mStages
+   * Get a list of all stage names
+   * @param[in/out] names   names of all stages_
    */
-  void getStageNames(std::vector<std::string> &names) const;
+  void get_stage_names(std::vector<std::string> &names) const;
 
-  //! Query the number of queued events at each stage.
   /**
+   * Query the number of queued events at each stage.
    * @param[in/out] stats   number of events enqueued at each
    *   stage.
    */
-  void getStageQueueStatus(std::vector<int> &stats) const;
+  void get_stage_queue_status(std::vector<int> &stats) const;
 
   std::map<std::string, Stage *>::iterator begin();
   std::map<std::string, Stage *>::iterator end();
 
- public:
-
  private:
-
-
-  static SedaConfig *instance;
-
-  // In old logic, SedaConfig will parse seda configure file
-  // but here, only one configure file
-  std::string mCfgFile;
-  std::string mCfgStr;
-
-  std::map<std::string, Threadpool *> mThreadPools;
-  std::map<std::string, Stage *> mStages;
-  std::vector<std::string> mStageNames;
-
-  //! Constructor
+  // Constructor
   SedaConfig();
 
-  //! instantiate the mThreadPools and mStages
   /**
-   * Instantiate the mThreadPools and mStages defined in the configuration
+   * instantiate the mThreadPools and stages_
+   * Instantiate the mThreadPools and stages_ defined in the configuration
    *
    * @pre  cfg_ptr is not NULL
-   * @post returns SUCCESS ==> all mThreadPools and mStages are created
-   *       returns INITFAIL ==> mThreadPools and mStages are deleted
+   * @post returns SUCCESS ==> all mThreadPools and stages_ are created
+   *       returns INITFAIL ==> mThreadPools and stages_ are deleted
    */
   status_t instantiate();
 
-  status_t initThreadPool();
+  status_t init_thread_pool();
 
-  std::string getThreadPool(std::string &stageName);
+  std::string get_thread_pool(std::string &stage_name);
 
-  status_t initStages();
-  status_t genNextStages();
+  status_t init_stages();
+  status_t gen_next_stages();
 
-  //! delete all mThreadPools and mStages
   /**
-   * @pre  all existing mStages are disconnected
-   * @post all mThreadPools and mStages are deleted
+   * delete all mThreadPools and stages_
+   * @pre  all existing stages_ are disconnected
+   * @post all mThreadPools and stages_ are deleted
    */
-  void clearConfig();
+  void clear_config();
 
-  //! init event history setting
   /**
+   * init event history setting
    * Setting max_event_hops, event_history_flag
    */
-  void initEventHistory();
+  void init_event_history();
 
   SedaConfig &operator=(const SedaConfig &cevtout);
+  
+  static SedaConfig *instance_;
+
+  // In old logic, SedaConfig will parse seda configure file
+  // but here, only one configure file
+  std::string cfg_file_;
+  std::string cfg_str_;
+
+  std::map<std::string, Threadpool *> thread_pools_;
+  std::map<std::string, Stage *> stages_;
+  std::vector<std::string> stage_names_;
+
 };
 
 inline std::map<std::string, Stage *>::iterator SedaConfig::begin() {
-  return mStages.begin();
+  return stages_.begin();
 }
 
 inline std::map<std::string, Stage *>::iterator SedaConfig::end() {
-  return mStages.end();
+  return stages_.end();
 }
 
-inline Stage *SedaConfig::getStage(const char *stagename) {
+inline Stage *SedaConfig::get_stage(const char *stagename) {
   if (stagename) {
     std::string sname(stagename);
-    return mStages[stagename];
+    return stages_[stagename];
   }
   return NULL;
 }
 
-//! Global seda config object
-SedaConfig *&theSedaConfig();
+// Global seda config object
+SedaConfig *&get_seda_config();
 
 bool &get_event_history_flag();
 u32_t &get_max_event_hops();

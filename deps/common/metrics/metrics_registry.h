@@ -53,6 +53,6 @@ protected:
 
 };
 
-MetricsRegistry& get_g_metrics_registry();
+MetricsRegistry& get_metrics_registry();
 }//namespace common
 #endif //__COMMON_METRICS_METRICS_REGISTRY_H__

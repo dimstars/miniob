@@ -19,8 +19,8 @@
 
 
 #include "init.h"
-#include "ini_setting.h"
 
+#include "ini_setting.h"
 #include "common/conf/ini.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
@@ -192,35 +192,35 @@ int init(ProcessParam *process_param) {
   theSwVersion();
 
   // Read Configuration files
-  rc = get_g_properties()->load(process_param->get_conf());
+  rc = get_properties()->load(process_param->get_conf());
   if (rc) {
     std::cerr << "Failed to load configuration files" << std::endl;
     return rc;
   }
 
   // Init tracer
-  rc = init_log(process_param, *get_g_properties());
+  rc = init_log(process_param, *get_properties());
   if (rc) {
     std::cerr << "Failed to init Log" << std::endl;
     return rc;
   }
 
   std::string conf_data;
-  get_g_properties()->to_string(conf_data);
+  get_properties()->to_string(conf_data);
   LOG_INFO("Output configuration \n%s", conf_data.c_str());
 
   // seda is used for backend async event handler
   // the latency of seda is slow, it isn't used for critical latency
   // environment.
   prepare_init_seda();
-  rc = initSeda(process_param);
+  rc = init_seda(process_param);
   if (rc) {
     LOG_ERROR("Failed to init seda configuration!");
     return rc;
   }
 
-  LogReporter *log_reporter = get_g_log_reporter();
-  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
+  LogReporter *log_reporter = get_log_reporter();
+  MetricsRegistry &metricsRegistry = get_metrics_registry();
 
   metricsRegistry.add_reporter(log_reporter);
 
@@ -240,9 +240,9 @@ int init(ProcessParam *process_param) {
 
 void cleanup_util() {
 
-  if (nullptr != get_g_properties()) {
-    delete get_g_properties();
-    get_g_properties() = nullptr;
+  if (nullptr != get_properties()) {
+    delete get_properties();
+    get_properties() = nullptr;
   }
 
   LOG_INFO("Shutdown Cleanly!");

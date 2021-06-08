@@ -44,6 +44,6 @@ private:
   RandomGenerator random_;
 };
 
-Sampler *&get_g_sampler();
+Sampler *&get_sampler();
 } //namespace common
 #endif //__COMMON_METRICS_SAMPLER_H__

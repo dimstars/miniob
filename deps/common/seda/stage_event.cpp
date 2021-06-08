@@ -154,14 +154,14 @@ bool StageEvent::has_timed_out() {
 
 // Accessor function which wraps value for max hops an event is allowed
 u32_t &get_max_event_hops() {
-  static u32_t maxEventHops = 0;
-  return maxEventHops;
+  static u32_t max_event_hops = 0;
+  return max_event_hops;
 }
 
 // Accessor function which wraps value for event history flag
 bool &get_event_history_flag() {
-  static bool eventHistoryFlag = false;
-  return eventHistoryFlag;
+  static bool event_history_flag = false;
+  return event_history_flag;
 }
 
 } //namespace common

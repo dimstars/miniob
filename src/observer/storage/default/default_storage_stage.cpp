@@ -73,7 +73,7 @@ Stage *DefaultStorageStage::make_stage(const std::string &tag) {
 bool DefaultStorageStage::set_properties() {
   std::string stageNameStr(stage_name_);
   std::map<std::string, std::string> section = 
-      get_g_properties()->get(stageNameStr);
+      get_properties()->get(stageNameStr);
   
   std::map<std::string, std::string>::iterator iter = section.find(CONF_BASE_DIR);
   if (iter == section.end()) {
@@ -119,7 +119,7 @@ bool DefaultStorageStage::set_properties() {
 bool DefaultStorageStage::initialize() {
   LOG_TRACE("Enter");
 
-  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
+  MetricsRegistry &metricsRegistry = get_metrics_registry();
   queryMetric =  new SimpleTimer();
   metricsRegistry.register_metric(QUERY_METRIC_TAG, queryMetric);
 

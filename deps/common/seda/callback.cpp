@@ -36,12 +36,12 @@ extern bool &get_event_history_flag();
  * Implementation of CompletionCallback class.
  */
 
-//! Constructor
+// Constructor
 CompletionCallback::CompletionCallback(Stage *trgt, CallbackContext *ctx)
   : target_stage_(trgt), context_(ctx), next_cb_(NULL),
     ev_hist_flag_(get_event_history_flag()) {}
 
-//! Destructor
+// Destructor
 CompletionCallback::~CompletionCallback() {
   if (context_) {
     delete context_;
@@ -51,14 +51,14 @@ CompletionCallback::~CompletionCallback() {
   }
 }
 
-//! Push onto a callback stack
+// Push onto a callback stack
 void CompletionCallback::push_callback(CompletionCallback *next) {
   ASSERT((!next_cb_), "%s", "cannot push a callback twice");
 
   next_cb_ = next;
 }
 
-//! Pop off of a callback stack
+// Pop off of a callback stack
 CompletionCallback *CompletionCallback::pop_callback() {
   CompletionCallback *ret_val = next_cb_;
 
@@ -66,7 +66,7 @@ CompletionCallback *CompletionCallback::pop_callback() {
   return ret_val;
 }
 
-//! One event is complete
+// One event is complete
 void CompletionCallback::event_done(StageEvent *ev) {
 
   if (ev_hist_flag_) {
@@ -75,7 +75,7 @@ void CompletionCallback::event_done(StageEvent *ev) {
   target_stage_->callback_event(ev, context_);
 }
 
-//! Reschedule callback on target stage thread
+// Reschedule callback on target stage thread
 void CompletionCallback::event_reschedule(StageEvent *ev) {
   target_stage_->add_event(ev);
 }

@@ -76,7 +76,7 @@ void parse_parameter(int argc, char **argv) {
 
 Server *init_server() {
   std::map<std::string, std::string> net_section =
-      get_g_properties()->get(NET);
+      get_properties()->get(NET);
 
   long listen_addr = INADDR_ANY;
   long max_connection_num = MAX_CONNECTION_NUM_DEFAULT;

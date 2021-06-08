@@ -17,9 +17,10 @@
 // Created by Longda on 2010
 //
 // Include Files
+#include "common/seda/kill_thread.h"
+
 #include <assert.h>
 
-#include "common/seda/kill_thread.h"
 #include "common/seda/thread_pool.h"
 namespace common {
 
@@ -31,7 +32,7 @@ namespace common {
  * @post  Call never returns.  Thread is killed.  Pool is notified.
  */
 void KillThreadStage::handle_event(StageEvent *event) {
-  get_pool()->threadKill();
+  get_pool()->thread_kill();
   event->done();
   this->release_event();
   pthread_exit(0);

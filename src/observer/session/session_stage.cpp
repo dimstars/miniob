@@ -76,7 +76,7 @@ bool SessionStage::initialize() {
   std::list<Stage *>::iterator stgp = next_stage_list_.begin();
   resolve_stage_ = *(stgp++);
 
-  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
+  MetricsRegistry &metricsRegistry = get_metrics_registry();
   sql_metric_ = new SimpleTimer();
   metricsRegistry.register_metric(SQL_METRIC_TAG, sql_metric_);
   LOG_TRACE("Exit");
@@ -87,7 +87,7 @@ bool SessionStage::initialize() {
 void SessionStage::cleanup() {
   LOG_TRACE("Enter");
 
-  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
+  MetricsRegistry &metricsRegistry = get_metrics_registry();
   if (sql_metric_ != nullptr) {
     metricsRegistry.unregister(SQL_METRIC_TAG);
     delete sql_metric_;

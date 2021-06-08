@@ -35,7 +35,7 @@ namespace common {
 class Threadpool;
 class CallbackContext;
 
-//! A Stage in a staged event-driven architecture
+// A Stage in a staged event-driven architecture
 /**
  * The Stage class consists of a queue of events and a link to a
  * Threadpool.  The threads in the pool handle the events on the queue.
@@ -95,20 +95,28 @@ class Stage {
   // public interface operations
 
  public:
-  //! Destructor
+  // Destructor
   /**
    * @pre  stage is not connected
    * @post pending events are deleted and stage is destroyed
    */
   virtual ~Stage();
 
-  //! Return the Threadpool object
+  // parse properties, instantiate a summation stage object
+  /**
+   * @pre class members are uninitialized
+   * @post initializing the class members
+   * @return Stage instantiated object
+   */
+  static Stage *make_stage(const std::string &tag);
+
+  // Return the Threadpool object
   /**
    * @return reference to the Threadpool for this Stage
    */
   Threadpool *get_pool() { return th_pool_; }
 
-  //! Push stage to the list of the next stages
+  // Push stage to the list of the next stages
   /**
    * @param[in] stage pointer
    *
@@ -117,13 +125,13 @@ class Stage {
    */
   void push_stage(Stage *);
 
-  //! Get name of the stage
+  // Get name of the stage
   /**
    * @return return the name of this stage which is the class name
    */
   const char *get_name();
 
-  //! Set threadpool
+  // Set threadpool
   /**
    * @param[in] threadpool pointer
    *
@@ -132,7 +140,7 @@ class Stage {
    */
   void set_pool(Threadpool *);
 
-  //! Connect this stage to pipeline and threadpool
+  // Connect this stage to pipeline and threadpool
   /**
    * Connect the output of this stage to the inputs of the stages in
    * the provided stage list.  Each subclass will validate the provided
@@ -150,7 +158,7 @@ class Stage {
    */
   bool connect();
 
-  //! Disconnect this stage from the pipeline and threadpool
+  // Disconnect this stage from the pipeline and threadpool
   /**
    * Block stage from being scheduled.  Wait for currently processing
    * and queued events to complete, then disconnect from the threadpool.
@@ -164,8 +172,8 @@ class Stage {
    */
   void disconnect();
 
-  //! Add an event to the queue.
-  //! This will trigger thread switch, you can use handle_event without thread switch
+  // Add an event to the queue.
+  // This will trigger thread switch, you can use handle_event without thread switch
   /**
    * @param[in] event Event to add to queue.
    *
@@ -176,26 +184,26 @@ class Stage {
    */
   void add_event(StageEvent *event);
 
-  //! Query length of queue
+  // Query length of queue
   /**
    * @return length of event queue.
    */
   unsigned long qlen() const;
 
-  //! Query whether the queue is empty
+  // Query whether the queue is empty
   /**
    * @return \c true if the queue is empty; \c false otherwise
    */
   bool qempty() const;
 
-  //! Query whether stage is connected
+  // Query whether stage is connected
   /**
    * @return true if stage is connected
    */
   bool is_connected() const { return connected_; }
 
-  //! Perform Stage-specific processing for an event
-  //! Processing one event without swtich thread.
+  // Perform Stage-specific processing for an event
+  // Processing one event without swtich thread.
   /**
    * Handle the event according to requirements of specific stage.  Pure
    * virtual member function.
@@ -206,7 +214,7 @@ class Stage {
    */
   virtual void handle_event(StageEvent *event) = 0;
 
-  //! Perform Stage-specific callback processing for an event
+  // Perform Stage-specific callback processing for an event
   /**
    * Implement callback processing according to the requirements of
    * specific stage.  Pure virtual member function.
@@ -215,7 +223,7 @@ class Stage {
    */
   virtual void callback_event(StageEvent *event, CallbackContext *context) = 0;
 
-  //! Perform Stage-specific callback processing for a timed out event
+  // Perform Stage-specific callback processing for a timed out event
   /**
    * A stage only need to implement this interface if the down-stream
    * stages support event timeout detection.
@@ -225,16 +233,8 @@ class Stage {
     this->callback_event(event, context);
   }
 
-  //! parse properties, instantiate a summation stage object
-  /**
-   * @pre class members are uninitialized
-   * @post initializing the class members
-   * @return Stage instantiated object
-   */
-  static Stage *make_stage(const std::string &tag);
-
  protected:
-  //! Constructor
+  // Constructor
   /**
    * @param[in] tag     The label that identifies this stage.
    *
@@ -244,7 +244,7 @@ class Stage {
    */
   Stage(const char *tag);
 
-  //! Remove an event from the queue.
+  // Remove an event from the queue.
   /**
    * Remove an event from the queue.  Called only by service thread.
    *
@@ -254,7 +254,7 @@ class Stage {
    */
   StageEvent *remove_event();
 
-  //! Release ref on stage from event.
+  // Release ref on stage from event.
   /**
    * Release event reference on stage.  Called only by service thread.
    *
@@ -262,7 +262,7 @@ class Stage {
    */
   void release_event();
 
-  //! Initialize stage params and validate outputs
+  // Initialize stage params and validate outputs
   /**
    * Validate the next_stage_list_ according to the requirements of the
    * specific stage.  Initialize stage specific params.  Pure virtual
@@ -273,7 +273,7 @@ class Stage {
    */
   virtual bool initialize() { return true; }
 
-  //! set properties for this object
+  // set properties for this object
   /**
    * @pre class members are uninitialized
    * @post initializing the class members
@@ -281,7 +281,7 @@ class Stage {
    */
   virtual bool set_properties() { return true; }
 
-  //! Prepare to disconnect the stage.
+  // Prepare to disconnect the stage.
   /**
    *  This function is called to allow a stage to perform
    *  stage-specific actions in preparation for disconnecting it
@@ -290,31 +290,29 @@ class Stage {
    */
   virtual void disconnect_prepare() { return; }
 
-  //! Cleanup stage after disconnection
+  // Cleanup stage after disconnection
   /**
    * After disconnection is completed, cleanup any resources held by the
    * stage and prepare for destruction or re-initialization.
    */
   virtual void cleanup() { return; }
 
-  // implementation state
-
- private:
-  std::deque<StageEvent *> event_list_; //!< event queue
-  mutable pthread_mutex_t list_mutex_;  //!< protects the event queue
-  pthread_cond_t disconnect_cond_;      //!< wait here for disconnect
-  bool connected_;                     //!< is stage connected to pool?
-  unsigned long event_ref_;             //!< # of outstanding events
-  Threadpool *th_pool_;                 //!< Threadpool for this stage
-
- protected:
-  char *stage_name_; //!< name of stage
-
   // pipeline state
+  std::list<Stage *> next_stage_list_; // next stage(s) in the pipeline
 
-  std::list<Stage *> next_stage_list_; //!< next stage(s) in the pipeline
+  // implementation state
+  char *stage_name_; // name of stage
 
   friend class Threadpool;
+
+ private:
+  std::deque<StageEvent *> event_list_; // event queue
+  mutable pthread_mutex_t list_mutex_;  // protects the event queue
+  pthread_cond_t disconnect_cond_;      // wait here for disconnect
+  bool connected_;                     // is stage connected to pool?
+  unsigned long event_ref_;             // # of outstanding events
+  Threadpool *th_pool_;                 // Threadpool for this stage
+
 };
 
 inline void Stage::set_pool(Threadpool *th) {

@@ -28,7 +28,7 @@ class Session;
 typedef struct _ConnectionContext { // TODO refactor -> class
   Session *session;
   int fd;
-  struct event readEvent;
+  struct event read_event;
   pthread_mutex_t mutex;
   char addr[24];
   char buf[SOCKET_BUFFER_SIZE];

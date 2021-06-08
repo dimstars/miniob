@@ -41,18 +41,18 @@ ParseStage::ParseStage(const char *tag) : Stage(tag) {}
 ParseStage::~ParseStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *ParseStage::makeStage(const std::string &tag) {
+Stage *ParseStage::make_stage(const std::string &tag) {
   ParseStage *stage = new (std::nothrow) ParseStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new ParseStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool ParseStage::setProperties() {
+bool ParseStage::set_properties() {
   //  std::string stageNameStr(stageName);
   //  std::map<std::string, std::string> section = theGlobalProperties()->get(
   //    stageNameStr);
@@ -68,8 +68,8 @@ bool ParseStage::setProperties() {
 bool ParseStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
-  optimizeStage = *(stgp++);
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
+  optimize_stage_ = *(stgp++);
 
   LOG_TRACE("Exit");
   return true;
@@ -82,37 +82,37 @@ void ParseStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void ParseStage::handleEvent(StageEvent *event) {
+void ParseStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
-  StageEvent *new_event = handleRequest(event);
+  StageEvent *new_event = handle_request(event);
   if (nullptr == new_event) {
-    event->doneImmediate();
+    event->done_immediate();
     return;
   }
 
   CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
   if (cb == nullptr) {
     LOG_ERROR("Failed to new callback for SQLStageEvent");
-    event->doneImmediate();
+    event->done_immediate();
     return;
   }
-  event->pushCallback(cb);
-  optimizeStage->handleEvent(new_event);
+  event->push_callback(cb);
+  optimize_stage_->handle_event(new_event);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void ParseStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void ParseStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
   SQLStageEvent *sql_event = static_cast<SQLStageEvent *>(event);
-  sql_event->session_event()->doneImmediate();
+  sql_event->session_event()->done_immediate();
   LOG_TRACE("Exit\n");
   return;
 }
 
-StageEvent *ParseStage::handleRequest(StageEvent *event) {
+StageEvent *ParseStage::handle_request(StageEvent *event) {
   SQLStageEvent *sql_event = static_cast<SQLStageEvent *>(event);
   const std::string &sql = sql_event->get_sql();
   

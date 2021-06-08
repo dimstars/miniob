@@ -25,23 +25,23 @@
 class ParseStage : public common::Stage {
 public:
   ~ParseStage();
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
 protected:
   // common function
   ParseStage(const char *tag);
-  bool setProperties();
+  bool set_properties();
 
   bool initialize();
   void cleanup();
-  void handleEvent(common::StageEvent *event);
-  void callbackEvent(common::StageEvent *event,
+  void handle_event(common::StageEvent *event);
+  void callback_event(common::StageEvent *event,
                      common::CallbackContext *context);
 
 protected:
-  common::StageEvent *handleRequest(common::StageEvent *event);
+  common::StageEvent *handle_request(common::StageEvent *event);
 private:
-  Stage *optimizeStage;
+  Stage *optimize_stage_;
 };
 
 #endif //__OBSERVER_SQL_PARSE_STAGE_H__

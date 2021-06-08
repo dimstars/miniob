@@ -100,13 +100,13 @@ int main(int argc, char *argv[]) {
     serverHost = argv[1];
   }
 
-  MetricsRegistry &metricRegistry = theGlobalMetricsRegistry();
-  ConsoleReporter *consoleReporter = theGlobalConsoleReporter();
-  metricRegistry.addReporter(consoleReporter);
+  MetricsRegistry &metricRegistry = get_metrics_registry();
+  ConsoleReporter *consoleReporter = get_console_reporter();
+  metricRegistry.add_reporter(consoleReporter);
 
   Meter  *tpsMeter = new Meter();
 
-  metricRegistry.registerMetric("client.sendtps", tpsMeter);
+  metricRegistry.register_metric("client.sendtps", tpsMeter);
 
   for (int i = 0; i < 8; i++) {
     pthread_t pid;

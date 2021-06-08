@@ -25,17 +25,17 @@
 class ResolveStage : public common::Stage {
 public:
   ~ResolveStage();
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
 protected:
   // common function
   ResolveStage(const char *tag);
-  bool setProperties();
+  bool set_properties();
 
   bool initialize();
   void cleanup();
-  void handleEvent(common::StageEvent *event);
-  void callbackEvent(common::StageEvent *event,
+  void handle_event(common::StageEvent *event);
+  void callback_event(common::StageEvent *event,
                      common::CallbackContext *context);
 
 protected:

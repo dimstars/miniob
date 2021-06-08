@@ -28,21 +28,21 @@ class DefaultHandler;
 class DefaultStorageStage : public common::Stage {
 public:
   ~DefaultStorageStage();
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
 protected:
   // common function
   DefaultStorageStage(const char *tag);
-  bool setProperties();
+  bool set_properties() override;
 
-  bool initialize();
-  void cleanup();
-  void handleEvent(common::StageEvent *event);
-  void callbackEvent(common::StageEvent *event,
-                     common::CallbackContext *context);
+  bool initialize() override;
+  void cleanup() override;
+  void handle_event(common::StageEvent *event) override;
+  void callback_event(common::StageEvent *event,
+                     common::CallbackContext *context) override;
 
 protected:
-  common::SimpleTimer *queryMetric;
+  common::SimpleTimer *query_metric_;
   static const std::string QUERY_METRIC_TAG;
 
 private:

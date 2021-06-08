@@ -50,18 +50,18 @@ ExecuteStage::ExecuteStage(const char *tag) : Stage(tag) {}
 ExecuteStage::~ExecuteStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *ExecuteStage::makeStage(const std::string &tag) {
+Stage *ExecuteStage::make_stage(const std::string &tag) {
   ExecuteStage *stage = new (std::nothrow) ExecuteStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new ExecuteStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool ExecuteStage::setProperties() {
+bool ExecuteStage::set_properties() {
   //  std::string stageNameStr(stageName);
   //  std::map<std::string, std::string> section = theGlobalProperties()->get(
   //    stageNameStr);
@@ -77,9 +77,9 @@ bool ExecuteStage::setProperties() {
 bool ExecuteStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
-  defaultStorageStage = *(stgp++);
-  memStorageStage = *(stgp++);
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
+  default_storage_stage_ = *(stgp++);
+  mem_storage_stage_ = *(stgp++);
 
   LOG_TRACE("Exit");
   return true;
@@ -92,45 +92,45 @@ void ExecuteStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void ExecuteStage::handleEvent(StageEvent *event) {
+void ExecuteStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
-  handleRequest(event);
+  handle_request(event);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void ExecuteStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void ExecuteStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   // TODO, here finish read all data from disk or network, but do nothing here.
   ExecutionPlanEvent *exe_event = static_cast<ExecutionPlanEvent *>(event);
   SQLStageEvent *sql_event = exe_event->sql_event();
-  sql_event->doneImmediate();
+  sql_event->done_immediate();
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void ExecuteStage::handleRequest(common::StageEvent *event) {
+void ExecuteStage::handle_request(common::StageEvent *event) {
   ExecutionPlanEvent *exe_event = static_cast<ExecutionPlanEvent *>(event);
   SessionEvent *session_event = exe_event->sql_event()->session_event();
   Query *sql = exe_event->sqls();
-  const char *current_db = session_event->get_client()->session->current_db().c_str();
+  const char *current_db = session_event->get_client()->session->get_current_db().c_str();
 
   CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
   if (cb == nullptr) {
     LOG_ERROR("Failed to new callback for ExecutionPlanEvent");
-    exe_event->doneImmediate();
+    exe_event->done_immediate();
     return;
   }
-  exe_event->pushCallback(cb);
+  exe_event->push_callback(cb);
 
   switch (sql->flag) {
     case SCF_SELECT: { // select
       do_select(current_db, sql, exe_event->sql_event()->session_event());
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
 
@@ -146,31 +146,31 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
       StorageEvent *storage_event = new (std::nothrow) StorageEvent(exe_event);
       if (storage_event == nullptr) {
         LOG_ERROR("Failed to new StorageEvent");
-        event->doneImmediate();
+        event->done_immediate();
         return;
       }
 
       CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
       if (cb == nullptr) {
         LOG_ERROR("Failed to new callback for SessionEvent");
-        exe_event->doneImmediate();
+        exe_event->done_immediate();
         return;
       }
 
-      exe_event->pushCallback(cb);
-      defaultStorageStage->handleEvent(storage_event);
+      exe_event->push_callback(cb);
+      default_storage_stage_->handle_event(storage_event);
     }
     break;
     case SCF_SYNC: {
       RC rc = DefaultHandler::get_default().sync();
       session_event->set_response(strrc(rc));
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_BEGIN: {
       session_event->get_client()->session->set_trx_multi_operation_mode(true);
       session_event->set_response(strrc(RC::SUCCESS));
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_COMMIT: {
@@ -178,7 +178,7 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
       RC rc = trx->commit();
       session_event->get_client()->session->set_trx_multi_operation_mode(false);
       session_event->set_response(strrc(rc));
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_ROLLBACK: {
@@ -186,23 +186,23 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
       RC rc = trx->rollback();
       session_event->get_client()->session->set_trx_multi_operation_mode(false);
       session_event->set_response(strrc(rc));
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_HELP: {
       // TODO
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_EXIT: {
       // do nothing
       const char *response = "Unsupported\n";
       session_event->set_response(response);
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     default: {
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
       LOG_ERROR("Unsupported command=%d\n", sql->flag);
     }
   }

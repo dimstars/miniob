@@ -120,7 +120,7 @@ void SessionStage::callback_event(StageEvent *event, CallbackContext *context) {
   }
   Server::send(sev->get_client(), response, len);
 
-  sev->done();
+  // sev->done();
   LOG_TRACE("Exit\n");
   return;
 }

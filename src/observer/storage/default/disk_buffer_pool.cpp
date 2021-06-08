@@ -110,8 +110,6 @@ RC DiskBufferPool::open_file(const char *file_name, int *file_id) {
 
   RC tmp;
   file_handle->bopen = true;
-  // TODO
-  // The filename's memory is likely to exist problem
   int file_name_len = strlen(file_name) + 1;
   char *cloned_file_name = new char [file_name_len];
   snprintf(cloned_file_name, file_name_len, "%s", file_name);
@@ -140,7 +138,7 @@ RC DiskBufferPool::open_file(const char *file_name, int *file_id) {
   file_handle->file_sub_header = (BPFileSubHeader *)file_handle->hdr_page->data;
   open_list_[i - 1] = file_handle;
   *file_id = i - 1;
-  LOG_INFO("Successfully open %s.", file_name);
+  LOG_INFO("Successfully open %s. file_id=%d, hdr_frame=%p", file_name, *file_id, file_handle->hdr_frame);
   return RC::SUCCESS;
 }
 
@@ -154,6 +152,7 @@ RC DiskBufferPool::close_file(int file_id) {
   BPFileHandle *file_handle = open_list_[file_id];
   file_handle->hdr_frame->pin_count--;
   if ((tmp = force_all_pages(file_handle)) != RC::SUCCESS) {
+    file_handle->hdr_frame->pin_count++;
     LOG_ERROR("Failed to closeFile %d:%s, due to failed to force all pages.",
               file_id, file_handle->file_name);
     return tmp;
@@ -166,6 +165,7 @@ RC DiskBufferPool::close_file(int file_id) {
   }
   open_list_[file_id] = nullptr;
   delete (file_handle);
+  LOG_INFO("Close file: file_id=%d", file_id);
   return RC::SUCCESS;
 }
 
@@ -447,6 +447,7 @@ RC DiskBufferPool::allocate_block(Frame **buffer) {
     if (!bp_manager_.allocated[i]) {
       bp_manager_.allocated[i] = true;
       *buffer = bp_manager_.frame + i;
+      LOG_INFO("Allocate block frame=%p", bp_manager_.frame + i);
       return RC::SUCCESS;
     }
   }
@@ -497,6 +498,7 @@ RC DiskBufferPool::dispose_block(Frame *buf) {
   buf->dirty = false;
   int pos = buf - bp_manager_.frame;
   bp_manager_.allocated[pos] = false;
+  LOG_INFO("dispost block frame =%p", buf);
   return RC::SUCCESS;
 }
 

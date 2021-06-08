@@ -27,20 +27,18 @@ namespace common {
 class ExampleStage : public Stage {
 public:
   ~ExampleStage();
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
 protected:
   // common function
   ExampleStage(const char *tag);
-  bool setProperties();
+  bool set_properties();
 
   bool initialize();
   void cleanup();
-  void handleEvent(StageEvent *event);
-  void callbackEvent(StageEvent *event, CallbackContext *context);
+  void handle_event(StageEvent *event);
+  void callback_event(StageEvent *event, CallbackContext *context);
 
-protected:
-private:
 };
 } // namespace common
 #endif //__COMMON_SEDA_EXAMPLE_STAGE_H__

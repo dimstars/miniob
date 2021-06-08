@@ -37,8 +37,8 @@ namespace common {
 
 class DispatchContext;
 
-//! A stage which stores and re-orders events
 /**
+ * A stage which stores and re-orders events
  * The EventDispatcher stage is designed to assert control over the order
  * of events that move through the Seda pipeline.  The EventDispatcher stage
  * has a hash table that stores events for later processing.  As each event
@@ -63,28 +63,28 @@ class EventDispatcher : public Stage {
  public:
   typedef enum { SEND_EVENT = 0, STORE_EVENT, FAIL_EVENT } status_t;
 
-  //! Destructor
   /**
+   * Destructor
    * @pre  stage is not connected
    * @post pending events are deleted and stage is destroyed
    */
   virtual ~EventDispatcher();
 
-  //! Process an event
   /**
+   * Process an event
    * Check if the event can be dispatched. If not, hash it and store
    * it.  If so, send it on to the next stage
    *
    * @param[in] event Pointer to event that must be handled.
    * @post  event must not be de-referenced by caller after return
    */
-  void handleEvent(StageEvent *event);
+  void handle_event(StageEvent *event);
 
-  // Note, EventDispatcher is an abstract class and needs no makeStage()
+  // Note, EventDispatcher is an abstract class and needs no make_stage()
 
  protected:
-  //! Constructor
   /**
+   * Constructor
    * @param[in] tag     The label that identifies this stage.
    *
    * @pre  tag is non-null and points to null-terminated string
@@ -93,30 +93,30 @@ class EventDispatcher : public Stage {
    */
   EventDispatcher(const char *tag);
 
-  //! Initialize stage params and validate outputs
   /**
+   * Initialize stage params and validate outputs
    * @pre  Stage not connected
    * @return TRUE if and only if outputs are valid and init succeeded.
    */
   bool initialize();
 
-  //! set properties for this object
-  bool setProperties() { return true; }
+  // set properties for this object
+  bool set_properties() { return true; }
 
-  //! Cleanup stage after disconnection
   /**
+   * Cleanup stage after disconnection
    * After disconnection is completed, cleanup any resources held by the
    * stage and prepare for destruction or re-initialization.
    */
   virtual void cleanup();
 
-  //! Dispatch test
   /**
+   * Dispatch test
    * @param[in] ev  Pointer to event that should be tested
    * @param[in/out]  Pointer to context object
    * @param[out] hash  Hash value for event
    *
-   * @pre eventLock is locked
+   * @pre event_lock_ is locked
    * @post hash is calculated if return val is false
    * @return SEND_EVENT if ok to send the event down the pipeline;
    *                    ctx is NULL
@@ -124,26 +124,26 @@ class EventDispatcher : public Stage {
    *         FAIL_EVENT if failure, and event has been completed;
    *                    ctx is NULL
    */
-  virtual status_t dispatchEvent(StageEvent *ev, DispatchContext *&ctx,
+  virtual status_t dispatch_event(StageEvent *ev, DispatchContext *&ctx,
                                  std::string &hash) = 0;
 
-  //! Wake up a stored event
   /**
-   * @pre eventLock is locked
+   * Wake up a stored event
+   * @pre event_lock_ is locked
    * @return true if an event was found on hash-chain associated with
    *              hashkey and sent to next stage
    *         false no event was found on hash-chain
    */
-  bool wakeupEvent(std::string hashkey);
+  bool wakeup_event(std::string hashkey);
 
   // implementation state
 
   typedef std::pair<StageEvent *, DispatchContext *> StoredEvent;
   typedef std::map<std::string, std::list<StoredEvent>> EventHash;
 
-  EventHash eventStore;      //!< events stored here while waiting
-  pthread_mutex_t eventLock; //!< protects access to eventStore
-  Stage *nextStage;          //!< target for dispatched events
+  EventHash event_store_;      // events stored here while waiting
+  pthread_mutex_t event_lock_; // protects access to event_store_
+  Stage *next_stage_;          // target for dispatched events
 
  protected:
 };

@@ -22,21 +22,21 @@
 
 namespace common {
 Meter::Meter() {
-  struct timeval startTime;
-  gettimeofday(&startTime, NULL);
+  struct timeval start_time;
+  gettimeofday(&start_time, NULL);
 
-  snapshotTick = startTime.tv_sec * 1000000 + startTime.tv_usec;
-  value.store(0l);
+  snapshot_tick_ = start_time.tv_sec * 1000000 + start_time.tv_usec;
+  value_.store(0l);
 }
 
 Meter::~Meter() {
-  if (snapshotValue != NULL) {
-    delete snapshotValue;
-    snapshotValue = NULL;
+  if (snapshot_value_ != NULL) {
+    delete snapshot_value_;
+    snapshot_value_ = NULL;
   }
 }
 
-void Meter::inc(long increase) { value.fetch_add(increase); }
+void Meter::inc(long increase) { value_.fetch_add(increase); }
 void Meter::inc() { inc(1l); }
 
 void Meter::snapshot() {
@@ -45,28 +45,28 @@ void Meter::snapshot() {
   struct timeval now;
   gettimeofday(&now, NULL);
 
-  long nowTick = now.tv_sec * 1000000 + now.tv_usec;
+  long now_tick = now.tv_sec * 1000000 + now.tv_usec;
 
-  double tempValue =
-      ((double)value.exchange(0l)) / ((nowTick - snapshotTick ) / 1000000);
-  snapshotTick = nowTick;
+  double temp_value =
+      ((double)value_.exchange(0l)) / ((now_tick - snapshot_tick_ ) / 1000000);
+  snapshot_tick_ = now_tick;
 
-  if (snapshotValue == NULL) {
-    snapshotValue = new SnapshotBasic<double>();
+  if (snapshot_value_ == NULL) {
+    snapshot_value_ = new SnapshotBasic<double>();
   }
-  ((SnapshotBasic<double> *)snapshotValue)->setValue(tempValue);
+  ((SnapshotBasic<double> *)snapshot_value_)->setValue(temp_value);
 }
 
 SimpleTimer::~SimpleTimer() {
-  if (snapshotValue != NULL) {
-    delete snapshotValue;
-    snapshotValue = NULL;
+  if (snapshot_value_ != NULL) {
+    delete snapshot_value_;
+    snapshot_value_ = NULL;
   }
 }
 
 void SimpleTimer::inc(long increase) {
-  value.fetch_add(increase);
-  times.fetch_add(1);
+  value_.fetch_add(increase);
+  times_.fetch_add(1);
 }
 
 void SimpleTimer::update(long one) { inc(one); }
@@ -77,25 +77,25 @@ void SimpleTimer::snapshot() {
   struct timeval now;
   gettimeofday(&now, NULL);
 
-  long nowTick = now.tv_sec * 1000000 + now.tv_usec;
+  long now_tick = now.tv_sec * 1000000 + now.tv_usec;
 
-  long valueSnapshot = value.exchange(0l);
-  long timesSnapshot = times.exchange(0l);
+  long value_snapshot = value_.exchange(0l);
+  long times_snapshot = times_.exchange(0l);
 
   double tps = 0;
   double mean = 0;
 
-  if (timesSnapshot > 0) {
-    tps = ((double)timesSnapshot )/ ((nowTick - snapshotTick) / 1000000);
-    mean = ((double)valueSnapshot) / timesSnapshot;
+  if (times_snapshot > 0) {
+    tps = ((double)times_snapshot )/ ((now_tick - snapshot_tick_) / 1000000);
+    mean = ((double)value_snapshot) / times_snapshot;
   }
 
-  snapshotTick = nowTick;
+  snapshot_tick_ = now_tick;
 
-  if (snapshotValue == NULL) {
-    snapshotValue = new SimplerTimerSnapshot();
+  if (snapshot_value_ == NULL) {
+    snapshot_value_ = new SimplerTimerSnapshot();
   }
-  ((SimplerTimerSnapshot *)snapshotValue)->setValue(mean, tps);
+  ((SimplerTimerSnapshot *)snapshot_value_)->setValue(mean, tps);
 }
 
 Histogram::Histogram(RandomGenerator &random) : UniformReservoir(random) {}
@@ -113,83 +113,83 @@ void Histogram::snapshot() {
 
 Timer::Timer(RandomGenerator &random)
     : UniformReservoir(random){
-  struct timeval startTime;
-  gettimeofday(&startTime, NULL);
+  struct timeval start_time;
+  gettimeofday(&start_time, NULL);
 
-  snapshotTick = startTime.tv_sec * 1000000 + startTime.tv_usec;
-  value.store(0l);
+  snapshot_tick_ = start_time.tv_sec * 1000000 + start_time.tv_usec;
+  value_.store(0l);
 }
 
 Timer::Timer(RandomGenerator &random, size_t size)
     : UniformReservoir(random, size){
-  struct timeval startTime;
-  gettimeofday(&startTime, NULL);
+  struct timeval start_time;
+  gettimeofday(&start_time, NULL);
 
-  snapshotTick = startTime.tv_sec * 1000000 + startTime.tv_usec;
-  value.store(0l);
+  snapshot_tick_ = start_time.tv_sec * 1000000 + start_time.tv_usec;
+  value_.store(0l);
 }
 
 Timer::~Timer() {
-  if (snapshotValue == NULL) {
-    delete snapshotValue;
-    snapshotValue = NULL;
+  if (snapshot_value_ == NULL) {
+    delete snapshot_value_;
+    snapshot_value_ = NULL;
   }
 }
 
 void Timer::update(double ms) {
   UniformReservoir::update(ms);
-  value.fetch_add(1l);
+  value_.fetch_add(1l);
 }
 
 void Timer::snapshot() {
-  if (snapshotValue == NULL) {
-    snapshotValue = new TimerSnapshot();
+  if (snapshot_value_ == NULL) {
+    snapshot_value_ = new TimerSnapshot();
   }
-  TimerSnapshot *timerSnapshot = (TimerSnapshot *)snapshotValue;
+  TimerSnapshot *timer_snapshot = (TimerSnapshot *)snapshot_value_;
 
   struct timeval now;
   gettimeofday(&now, NULL);
 
-  long nowTick = now.tv_sec * 1000000 + now.tv_usec;
+  long now_tick = now.tv_sec * 1000000 + now.tv_usec;
 
   double tps =
-      ((double)value.exchange(0l) )/ ((nowTick - snapshotTick  ) / 1000000);
-  snapshotTick = nowTick;
+      ((double)value_.exchange(0l) )/ ((now_tick - snapshot_tick_  ) / 1000000);
+  snapshot_tick_ = now_tick;
 
   MUTEX_LOCK(&mutex);
   std::vector<double> output = data;
   MUTEX_UNLOCK(&mutex);
 
-  timerSnapshot->setCollection(output);
-  timerSnapshot->setTps(tps);
+  timer_snapshot->set_collection(output);
+  timer_snapshot->set_tps(tps);
 }
 
-TimerStat::TimerStat(SimpleTimer &otherST)
-    : st(otherST), startTick(0), endTick(0) {
+TimerStat::TimerStat(SimpleTimer &other_st)
+    : st_(other_st), start_tick_(0), end_tick_(0) {
 
   start();
 }
 
 TimerStat::~TimerStat() {
-  if (endTick == 0) {
+  if (end_tick_ == 0) {
     end();
   }
 
-  st.update((endTick - startTick) / 1000);
+  st_.update((end_tick_ - start_tick_) / 1000);
 }
 
 void TimerStat::start() {
   struct timeval now;
   gettimeofday(&now, NULL);
 
-  startTick = now.tv_sec * 1000000 + now.tv_usec;
+  start_tick_ = now.tv_sec * 1000000 + now.tv_usec;
 }
 
 void TimerStat::end() {
   struct timeval now;
   gettimeofday(&now, NULL);
 
-  endTick = now.tv_sec * 1000000 + now.tv_usec;
+  end_tick_ = now.tv_sec * 1000000 + now.tv_usec;
 }
 
 } // namespace common

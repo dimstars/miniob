@@ -18,150 +18,150 @@
 //
 
 // Include Files
+#include "common/seda/stage_event.h"
+
 #include <assert.h>
 #include <stdlib.h>
 
 #include "common/defs.h"
 #include "common/lang/mutex.h"
 #include "common/log/log.h"
-
 #include "common/seda/callback.h"
-#include "common/seda/stage_event.h"
 #include "common/time/timeout_info.h"
 namespace common {
 
-//! Constructor
+// Constructor
 StageEvent::StageEvent()
-  : compCB(NULL), ud(NULL), cbFlag(false), history(NULL), stageHops(0),
-    tmInfo(NULL) {}
+  : comp_cb_(NULL), ud_(NULL), cb_flag_(false), history_(NULL), stage_hops_(0),
+    tm_info_(NULL) {}
 
-//! Destructor
+// Destructor
 StageEvent::~StageEvent() {
   // clear all pending callbacks
-  while (compCB) {
-    CompletionCallback *top = compCB;
-    compCB = compCB->popCallback();
+  while (comp_cb_) {
+    CompletionCallback *top = comp_cb_;
+    comp_cb_ = comp_cb_->pop_callback();
     delete top;
   }
 
-  // delete the history if present
-  if (history) {
-    history->clear();
-    delete history;
+  // delete the history_ if present
+  if (history_) {
+    history_->clear();
+    delete history_;
   }
 
-  if (tmInfo) {
-    tmInfo->detach();
-    tmInfo = NULL;
+  if (tm_info_) {
+    tm_info_->detach();
+    tm_info_ = NULL;
   }
 }
 
-//! Processing for this event is done; callbacks executed
+// Processing for this event is done; callbacks executed
 void StageEvent::done() {
   CompletionCallback *top;
 
-  if (compCB) {
-    top = compCB;
-    markCallback();
-    top->eventReschedule(this);
+  if (comp_cb_) {
+    top = comp_cb_;
+    mark_callback();
+    top->event_reschedule(this);
   } else {
     delete this;
   }
 }
 
-//! Processing for this event is done; callbacks executed immediately
-void StageEvent::doneImmediate() {
+// Processing for this event is done; callbacks executed immediately
+void StageEvent::done_immediate() {
   CompletionCallback *top;
 
-  if (compCB) {
-    top = compCB;
-    clearCallback();
-    compCB = compCB->popCallback();
-    top->eventDone(this);
+  if (comp_cb_) {
+    top = comp_cb_;
+    clear_callback();
+    comp_cb_ = comp_cb_->pop_callback();
+    top->event_done(this);
     delete top;
   } else {
     delete this;
   }
 }
 
-void StageEvent::doneTimeout() {
+void StageEvent::done_timeout() {
   CompletionCallback *top;
 
-  if (compCB) {
-    top = compCB;
-    clearCallback();
-    compCB = compCB->popCallback();
-    top->eventTimeout(this);
+  if (comp_cb_) {
+    top = comp_cb_;
+    clear_callback();
+    comp_cb_ = comp_cb_->pop_callback();
+    top->event_timeout(this);
     delete top;
   } else {
     delete this;
   }
 }
 
-//! Push the completion callback onto the stack
-void StageEvent::pushCallback(CompletionCallback *cb) {
-  cb->pushCallback(compCB);
-  compCB = cb;
+// Push the completion callback onto the stack
+void StageEvent::push_callback(CompletionCallback *cb) {
+  cb->push_callback(comp_cb_);
+  comp_cb_ = cb;
 }
 
-void StageEvent::setUserData(UserData *u) {
-  ud = u;
+void StageEvent::set_user_data(UserData *u) {
+  ud_ = u;
   return;
 }
 
-UserData *StageEvent::getUserData() { return ud; }
+UserData *StageEvent::get_user_data() { return ud_; }
 
-//! Add stage to list of stages which have handled this event
-void StageEvent::saveStage(Stage *stg, HistType type) {
-  if (!history) {
-    history = new std::list<HistEntry>;
+// Add stage to list of stages which have handled this event
+void StageEvent::save_stage(Stage *stg, HistType type) {
+  if (!history_) {
+    history_ = new std::list<HistEntry>;
   }
-  if (history) {
-    history->push_back(std::make_pair(stg, type));
-    stageHops++;
-    ASSERT(stageHops <= theMaxEventHops(), "Event exceeded max hops");
-  }
-}
-
-void StageEvent::setTimeoutInfo(TimeoutInfo *tmi) {
-  // release the previous timeout info
-  if (tmInfo) {
-    tmInfo->detach();
-  }
-
-  tmInfo = tmi;
-  if (tmInfo) {
-    tmInfo->attach();
+  if (history_) {
+    history_->push_back(std::make_pair(stg, type));
+    stage_hops_++;
+    ASSERT(stage_hops_ <= get_max_event_hops(), "Event exceeded max hops");
   }
 }
 
-void StageEvent::setTimeoutInfo(time_t deadline) {
+void StageEvent::set_timeout_info(time_t deadline) {
   TimeoutInfo *tmi = new TimeoutInfo(deadline);
-  setTimeoutInfo(tmi);
+  set_timeout_info(tmi);
 }
 
-void StageEvent::setTimeoutInfo(const StageEvent &ev) {
-  setTimeoutInfo(ev.tmInfo);
+void StageEvent::set_timeout_info(const StageEvent &ev) {
+  set_timeout_info(ev.tm_info_);
 }
 
-bool StageEvent::hasTimedOut() {
-  if (!tmInfo) {
+void StageEvent::set_timeout_info(TimeoutInfo *tmi) {
+  // release the previous timeout info
+  if (tm_info_) {
+    tm_info_->detach();
+  }
+
+  tm_info_ = tmi;
+  if (tm_info_) {
+    tm_info_->attach();
+  }
+}
+
+bool StageEvent::has_timed_out() {
+  if (!tm_info_) {
     return false;
   }
 
-  return tmInfo->hasTimedOut();
+  return tm_info_->has_timed_out();
 }
 
-//! Accessor function which wraps value for max hops an event is allowed
-u32_t &theMaxEventHops() {
-  static u32_t maxEventHops = 0;
-  return maxEventHops;
+// Accessor function which wraps value for max hops an event is allowed
+u32_t &get_max_event_hops() {
+  static u32_t max_event_hops = 0;
+  return max_event_hops;
 }
 
-//! Accessor function which wraps value for event history flag
-bool &theEventHistoryFlag() {
-  static bool eventHistoryFlag = false;
-  return eventHistoryFlag;
+// Accessor function which wraps value for event history flag
+bool &get_event_history_flag() {
+  static bool event_history_flag = false;
+  return event_history_flag;
 }
 
 } //namespace common

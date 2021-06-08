@@ -35,15 +35,15 @@ public:
 
   bool sampling();
 
-  void setRatio(double ratio);
-  double getRatio();
+  void set_ratio(double ratio);
+  double get_ratio();
 
 private:
-  double ratio;
-  int ratioNum;
-  RandomGenerator random;
+  double ratio_;
+  int ratio_num_;
+  RandomGenerator random_;
 };
 
-Sampler *&theGlobalSampler();
+Sampler *&get_sampler();
 } //namespace common
 #endif //__COMMON_METRICS_SAMPLER_H__

@@ -17,10 +17,10 @@
 // Created by Longda on 2021/4/13.
 //
 
+#include "example_stage.h"
+
 #include <string.h>
 #include <string>
-
-#include "example_stage.h"
 
 #include "common/conf/ini.h"
 #include "common/io/io.h"
@@ -30,27 +30,27 @@
 
 using namespace common;
 
-//! Constructor
+// Constructor
 ExampleStage::ExampleStage(const char *tag) : Stage(tag) {}
 
-//! Destructor
+// Destructor
 ExampleStage::~ExampleStage() {}
 
-//! Parse properties, instantiate a stage object
-Stage *ExampleStage::makeStage(const std::string &tag) {
+// Parse properties, instantiate a stage object
+Stage *ExampleStage::make_stage(const std::string &tag) {
   ExampleStage *stage = new ExampleStage(tag.c_str());
   if (stage == NULL) {
     LOG_ERROR("new ExampleStage failed");
     return NULL;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
-//! Set properties for this object set in stage specific properties
-bool ExampleStage::setProperties() {
-  //  std::string stageNameStr(stageName);
-  //  std::map<std::string, std::string> section = theGlobalProperties()->get(
+// Set properties for this object set in stage specific properties
+bool ExampleStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
+  //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
   //  std::map<std::string, std::string>::iterator it;
@@ -60,11 +60,11 @@ bool ExampleStage::setProperties() {
   return true;
 }
 
-//! Initialize stage params and validate outputs
+// Initialize stage params and validate outputs
 bool ExampleStage::initialize() {
   LOG_TRACE("Enter");
 
-  //  std::list<Stage*>::iterator stgp = nextStageList.begin();
+  //  std::list<Stage*>::iterator stgp = next_stage_list_.begin();
   //  mTimerStage = *(stgp++);
   //  mCommStage = *(stgp++);
 
@@ -72,21 +72,21 @@ bool ExampleStage::initialize() {
   return true;
 }
 
-//! Cleanup after disconnection
+// Cleanup after disconnection
 void ExampleStage::cleanup() {
   LOG_TRACE("Enter");
 
   LOG_TRACE("Exit");
 }
 
-void ExampleStage::handleEvent(StageEvent *event) {
+void ExampleStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void ExampleStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void ExampleStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   LOG_TRACE("Exit\n");

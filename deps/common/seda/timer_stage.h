@@ -20,12 +20,11 @@
 #ifndef __COMMON_SEDA_TIMER_STAGE_H__
 #define __COMMON_SEDA_TIMER_STAGE_H__
 
-#include <memory>
 #include <pthread.h>
 #include <sys/time.h>
+#include <memory>
 
 #include "common/log/log.h"
-
 #include "common/seda/callback.h"
 #include "common/seda/stage.h"
 #include "common/seda/stage_event.h"
@@ -51,17 +50,17 @@ class TimerToken {
   TimerToken();
   TimerToken(const struct timeval &t);
   TimerToken(const TimerToken &tt);
-  const struct timeval &getTime() const;
-  u64_t getNonce() const;
+  const struct timeval &get_time() const;
+  u64_t get_nonce() const;
   bool operator<(const TimerToken &other) const;
   TimerToken &operator=(const TimerToken &src);
-  std::string toString() const;
+  std::string to_string() const;
 
-  friend bool timerTokenLessThan(const TimerToken &tt1, const TimerToken &tt2);
+  friend bool timer_token_less_than(const TimerToken &tt1, const TimerToken &tt2);
 
  private:
   void set(const struct timeval &t, u64_t n);
-  static u64_t nextNonce();
+  static u64_t next_nonce();
 
   struct timeval time;
   u64_t nonce;
@@ -145,7 +144,7 @@ class TimerRegisterEvent : public TimerEvent {
    *    A pointer to a token that can be used to cancel the timer
    *    callback that was created by this request.
    */
-  std::unique_ptr<const TimerToken> getCancelToken();
+  std::unique_ptr<const TimerToken> get_cancel_token();
 
   /**
    *  \brief Get the absolute time when the callback is to be triggered.
@@ -153,7 +152,7 @@ class TimerRegisterEvent : public TimerEvent {
    *  \return
    *    The absolute time when the callback is to be triggered.
    */
-  const struct timeval &getTime();
+  const struct timeval &get_time();
 
   /**
    *  \brief Get the callback event to be triggered by the timer.
@@ -161,7 +160,7 @@ class TimerRegisterEvent : public TimerEvent {
    *  \return
    *    The callback event to be invoked after the timer fires.
    */
-  StageEvent *getCallbackEvent();
+  StageEvent *get_callback_event();
 
   /**
    *  \brief Assume responsiblity for management of callback event.
@@ -171,7 +170,7 @@ class TimerRegisterEvent : public TimerEvent {
    *  will then hold the callback event until the appropriate timer
    *  fires.
    */
-  StageEvent *adoptCallbackEvent();
+  StageEvent *adopt_callback_event();
 
   /**
    *  \brief Assign the token that can be used to cancel the timer
@@ -181,12 +180,12 @@ class TimerRegisterEvent : public TimerEvent {
    *    The opaque token that the caller can use to later cancel the
    *    callback event.
    */
-  void setCancelToken(const TimerToken &t);
+  void set_cancel_token(const TimerToken &t);
 
  private:
-  StageEvent *timer_cb;
-  struct timeval timer_when;
-  TimerToken token;
+  StageEvent *timer_cb_;
+  struct timeval timer_when_;
+  TimerToken token_;
 };
 
 /**
@@ -209,7 +208,7 @@ class TimerCancelEvent : public TimerEvent {
    *
    *  \arg cancel_token
    *    A pointer to the opaque token (obtained from \c
-   *    TimerRegisterEvent.getCancelToken()) that identifies the
+   *    TimerRegisterEvent.get_cancel_token()) that identifies the
    *    timer callback to be cancelled.
    */
   TimerCancelEvent(const TimerToken &cancel_token);
@@ -226,7 +225,7 @@ class TimerCancelEvent : public TimerEvent {
    *    \c true if the event was cancelled before it was triggered;
    *    \c false otherwise
    */
-  bool getSuccess();
+  bool get_success();
 
   /**
    *  \brief Set the status reporting whether the event was
@@ -236,16 +235,16 @@ class TimerCancelEvent : public TimerEvent {
    *    \c true if the event was successfully cancelled; \c false
    *    otherwise
    */
-  void setSuccess(bool s);
+  void set_success(bool s);
 
   /**
    *  \brief Get the token corresponding to the event to be cancelled.
    */
-  const TimerToken &getToken();
+  const TimerToken &get_token();
 
  private:
-  TimerToken token;
-  bool cancelled;
+  TimerToken token_;
+  bool cancelled_;
 };
 
 /**
@@ -281,45 +280,45 @@ class TimerCancelEvent : public TimerEvent {
 class TimerStage : public Stage {
  public:
   ~TimerStage();
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
   /**
    *  \brief Return the number of events that have been registered
    *  but not yet triggered or cancelled.
    */
-  u32_t getNumEvents();
+  u32_t get_num_events();
 
  protected:
   TimerStage(const char *tag);
-  bool setProperties();
+  bool set_properties();
   bool initialize();
-  void handleEvent(StageEvent *event);
-  void callbackEvent(StageEvent *event, CallbackContext *context);
-  void disconnectPrepare();
+  void handle_event(StageEvent *event);
+  void callback_event(StageEvent *event, CallbackContext *context);
+  void disconnect_prepare();
 
-  // For ordering the keys in the timer_queue.
-  static bool timerTokenLessThan(const TimerToken &tt1, const TimerToken &tt2);
+  // For ordering the keys in the timer_queue_.
+  static bool timer_token_less_than(const TimerToken &tt1, const TimerToken &tt2);
 
  private:
-  void registerTimer(TimerRegisterEvent &reg_ev);
-  void cancelTimer(TimerCancelEvent &cancel_ev);
-  bool timevalLessThan(const struct timeval &t1, const struct timeval &t2);
-  void triggerTimerCheck();
-  void checkTimer();
+  void register_timer(TimerRegisterEvent &reg_ev);
+  void cancel_timer(TimerCancelEvent &cancel_ev);
+  bool timeval_less_than(const struct timeval &t1, const struct timeval &t2);
+  void trigger_timer_check();
+  void check_timer();
 
-  static void *startTimerThread(void *arg);
+  static void *start_timer_thread(void *arg);
 
   typedef std::map<TimerToken, StageEvent *,
                    bool (*)(const TimerToken &, const TimerToken &)>
     timer_queue_t;
-  timer_queue_t timer_queue;
+  timer_queue_t timer_queue_;
 
-  pthread_mutex_t timer_mutex;
-  pthread_cond_t timer_condv;
+  pthread_mutex_t timer_mutex_;
+  pthread_cond_t timer_condv_;
 
-  bool shutdown;    //! true if stage has received the shutdown signal
-  u32_t num_events; //! the number of timer events currently outstanding
-  pthread_t timer_thread_id; //! thread id of the timer maintenance thread
+  bool shutdown_;    // true if stage has received the shutdown signal
+  u32_t num_events_; // the number of timer events currently outstanding
+  pthread_t timer_thread_id_; // thread id of the timer maintenance thread
 };
 
 } //namespace common

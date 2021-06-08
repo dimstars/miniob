@@ -24,31 +24,31 @@
 
 namespace common {
 
-Sampler *&theGlobalSampler() {
-  static Sampler *gSampler = new Sampler();
+Sampler *&get_sampler() {
+  static Sampler *g_sampler = new Sampler();
 
-  return gSampler;
+  return g_sampler;
 }
 
-Sampler::Sampler():random() {}
+Sampler::Sampler():random_() {}
 
 Sampler::~Sampler() {}
 
 bool Sampler::sampling() {
-  int v = random.next(RANGE_SIZE);
-  if (v <= ratioNum) {
+  int v = random_.next(RANGE_SIZE);
+  if (v <= ratio_num_) {
     return true;
   } else {
     return false;
   }
 }
 
-double Sampler::getRatio() { return ratio; }
+double Sampler::get_ratio() { return ratio_; }
 
-void Sampler::setRatio(double ratio) {
+void Sampler::set_ratio(double ratio) {
   if (0 <= ratio && ratio <= 1) {
-    this->ratio = ratio;
-    ratioNum = ratio * RANGE_SIZE;
+    this->ratio_ = ratio_;
+    ratio_num_ = ratio * RANGE_SIZE;
   } else {
     LOG_WARN("Invalid ratio :%lf", ratio);
   }

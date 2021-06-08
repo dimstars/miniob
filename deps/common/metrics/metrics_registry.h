@@ -34,14 +34,14 @@ public:
   MetricsRegistry() {};
   virtual ~MetricsRegistry(){};
 
-  void registerMetric(const std::string &tag, Metric *metric);
+  void register_metric(const std::string &tag, Metric *metric);
   void unregister(const std::string &tag);
 
   void snapshot();
 
   void report();
 
-  void addReporter(Reporter *reporter) {
+  void add_reporter(Reporter *reporter) {
     reporters.push_back(reporter);
   }
 
@@ -53,6 +53,6 @@ protected:
 
 };
 
-MetricsRegistry& theGlobalMetricsRegistry();
+MetricsRegistry& get_metrics_registry();
 }//namespace common
 #endif //__COMMON_METRICS_METRICS_REGISTRY_H__

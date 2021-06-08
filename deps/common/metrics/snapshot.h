@@ -29,7 +29,7 @@ namespace common {
 class Snapshot {
 public:
   virtual ~Snapshot() {};
-  virtual std::string toString() = 0;
+  virtual std::string to_string() = 0;
 };
 
 template <class T>
@@ -43,7 +43,7 @@ public:
 
   void setValue(T &input) { value = input; }
 
-  std::string toString() {
+  std::string to_string() {
     std::string ret;
     val_to_str(value, ret);
     return ret;
@@ -66,7 +66,7 @@ public:
     this->tps = tps;
   }
 
-  std::string toString() {
+  std::string to_string() {
     std::stringstream oss;
     oss << "mean:" << mean << ",tps:"<<tps;
 

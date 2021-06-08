@@ -27,23 +27,23 @@ namespace common {
 class MetricsStage : public Stage {
 public:
   ~MetricsStage();
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
 protected:
   // common function
   MetricsStage(const char *tag);
-  bool setProperties();
+  bool set_properties();
 
   bool initialize();
   void cleanup();
-  void handleEvent(StageEvent *event);
-  void callbackEvent(StageEvent *event, CallbackContext *context);
+  void handle_event(StageEvent *event);
+  void callback_event(StageEvent *event, CallbackContext *context);
 
 protected:
 private:
-  Stage *timerStage;
-  //report metrics every @metricReportInterval seconds
-  int  metricReportInterval;
+  Stage *timer_stage_;
+  //report metrics every @metric_report_interval_ seconds
+  int  metric_report_interval_;
 };
 } // namespace common
 #endif //__COMMON_SEDA_METRICS_STAGE_H__

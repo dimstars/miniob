@@ -20,10 +20,11 @@
 #if !defined(__COMMON_CONF_INI_H__)
 #define __COMMON_CONF_INI_H__
 
+#include <stdio.h>
+
 #include <iostream>
 #include <map>
 #include <set>
-#include <stdio.h>
 #include <string>
 
 namespace common {
@@ -48,7 +49,7 @@ class Ini {
    * it support load multiple ini configuration files
    * @return, 0 means success, others means failed
    */
-  int load(const std::string &iniFile);
+  int load(const std::string &ini_file);
 
   /**
    * get the map of the section
@@ -60,9 +61,9 @@ class Ini {
   /**
    * get the value of the key in the section,
    * if the key-value doesn't exist,
-   * use the input defaultValue
+   * use the input default_value
    */
-  std::string get(const std::string &key, const std::string &defaultValue,
+  std::string get(const std::string &key, const std::string &default_value,
                   const std::string &section = DEFAULT_SECTION);
 
   /**
@@ -76,7 +77,7 @@ class Ini {
   /**
    * output all configuration to one string
    */
-  void toString(std::string &outputStr);
+  void to_string(std::string &output_str);
 
   static const std::string DEFAULT_SECTION;
 
@@ -98,39 +99,39 @@ class Ini {
 
  protected:
   /**
-   * insert one empty session to mSections
+   * insert one empty session to sections_
    */
-  void insertSession(const std::string &sessionName);
+  void insert_session(const std::string &session_name);
 
   /**
-   * switch session according to the sessionName
+   * switch session according to the session_name
    * if the section doesn't exist, it will create one
    */
   std::map<std::string, std::string> *
-  switchSession(const std::string &sessionName);
+  switch_session(const std::string &session_name);
 
   /**
-   * insert one entry to sessionMap
+   * insert one entry to session_map
    * line's format is "key=value"
    *
    */
-  int insertEntry(std::map<std::string, std::string> *sessionMap,
+  int insert_entry(std::map<std::string, std::string> *session_map,
                   const std::string &line);
 
   typedef std::map<std::string, std::map<std::string, std::string>>
     SessionsMap;
 
  private:
-  static const std::map<std::string, std::string> mEmptyMap;
+  static const std::map<std::string, std::string> empty_map_;
 
-  std::set<std::string> mFileNames;
-  SessionsMap mSections;
+  std::set<std::string> file_names_;
+  SessionsMap sections_;
 };
 
 /**
  * Global configurate propertis
  */
-Ini *&theGlobalProperties();
+Ini *&get_properties();
 //********************************************************************
 
 }// namespace common

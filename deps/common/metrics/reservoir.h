@@ -37,7 +37,7 @@ public:
 
 public:
   virtual size_t size() = 0;
-  virtual int getCount() = 0;
+  virtual int get_count() = 0;
 
   virtual void update(double one) = 0;
 

@@ -36,7 +36,7 @@ public:
   Session(const Session & other);
   void operator =(Session &) = delete;
 
-  const std::string &current_db() const;
+  const std::string &get_current_db() const;
   void set_current_db(const std::string &dbname);
 
   void set_trx_multi_operation_mode(bool multi_operation_mode);

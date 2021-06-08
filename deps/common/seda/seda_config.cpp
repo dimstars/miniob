@@ -163,7 +163,7 @@ void SedaConfig::cleanup() {
     while (iter != end) {
       if (iter->second != NULL) {
         Stage *stg = iter->second;
-        if (stg->isConnected()) {
+        if (stg->is_connected()) {
           stg->disconnect();
         }
       }
@@ -178,7 +178,7 @@ void SedaConfig::cleanup() {
 
 void SedaConfig::initEventHistory() {
   std::map<std::string, std::string> baseSection =
-    theGlobalProperties()->get(SEDA_BASE_NAME);
+    get_g_properties()->get(SEDA_BASE_NAME);
   std::map<std::string, std::string>::iterator it;
   std::string key;
 
@@ -212,7 +212,7 @@ SedaConfig::status_t SedaConfig::initThreadPool() {
   try {
 
     std::map<std::string, std::string> baseSection =
-      theGlobalProperties()->get(SEDA_BASE_NAME);
+      get_g_properties()->get(SEDA_BASE_NAME);
     std::map<std::string, std::string>::iterator it;
     std::string key;
 
@@ -239,7 +239,7 @@ SedaConfig::status_t SedaConfig::initThreadPool() {
 
       // get count number
       key = COUNT;
-      std::string countStr = theGlobalProperties()->get(key, defaultCpuNumStr, threadName);
+      std::string countStr = get_g_properties()->get(key, defaultCpuNumStr, threadName);
 
       int threadCount = 1;
       str_to_val(countStr, threadCount);
@@ -282,7 +282,7 @@ std::string SedaConfig::getThreadPool(std::string &stageName) {
   std::string ret = DEFAULT_THREAD_POOL;
   // Get thread pool
   std::map<std::string, std::string> stageSection =
-      theGlobalProperties()->get(stageName);
+      get_g_properties()->get(stageName);
   std::map<std::string, std::string>::iterator itt;
   std::string threadPoolId = THREAD_POOL_ID;
   itt = stageSection.find(threadPoolId);
@@ -310,7 +310,7 @@ std::string SedaConfig::getThreadPool(std::string &stageName) {
 SedaConfig::status_t SedaConfig::initStages() {
   try {
     std::map<std::string, std::string> baseSection =
-      theGlobalProperties()->get(SEDA_BASE_NAME);
+      get_g_properties()->get(SEDA_BASE_NAME);
     std::map<std::string, std::string>::iterator it;
     std::string key;
 
@@ -341,7 +341,7 @@ SedaConfig::status_t SedaConfig::initStages() {
         return INITFAIL;
       }
       mStages[stageName] = stage;
-      stage->setPool(t);
+      stage->set_pool(t);
 
       LOG_INFO("Stage %s use threadpool %s.",
                stageName.c_str(), threadName.c_str());
@@ -372,7 +372,7 @@ SedaConfig::status_t SedaConfig::genNextStages() {
       Stage *stage = mStages[stageName];
 
       std::map<std::string, std::string> stageSection =
-        theGlobalProperties()->get(stageName);
+        get_g_properties()->get(stageName);
       std::map<std::string, std::string>::iterator it;
       std::string nextStageId = NEXT_STAGES;
       it = stageSection.find(nextStageId);
@@ -392,7 +392,7 @@ SedaConfig::status_t SedaConfig::genNextStages() {
            nextIt != nextStageNameList.end(); nextIt++) {
         std::string &nextStageName = *nextIt;
         Stage *nextStage = mStages[nextStageName];
-        stage->pushStage(nextStage);
+        stage->push_stage(nextStage);
       }
 
     } // end for stage
@@ -439,9 +439,9 @@ void SedaConfig::clearConfig() {
     if (s_iter->second != NULL) {
 
       Stage *stg = s_iter->second;
-      LOG_INFO("Stage %s deleted.", stg->getName());
-      ASSERT((!stg->isConnected()), "%s%s", "Stage connected in clearConfig ",
-             stg->getName());
+      LOG_INFO("Stage %s deleted.", stg->get_name());
+      ASSERT((!stg->is_connected()), "%s%s", "Stage connected in clearConfig ",
+             stg->get_name());
       delete stg;
       s_iter->second = NULL;
     }

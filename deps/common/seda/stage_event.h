@@ -39,7 +39,7 @@ class TimeoutInfo;
  * a stack of completion callbacks. A callback is added to an event using
  * the pushCallback() method.  The first completion callback on the stack
  * is invoked by calling the done() method of StageEvent.  The Stage code
- * handling an event (either in handleEvent() or callbackEvent()) has
+ * handling an event (either in handle_event() or callback_event()) has
  * certain responsibilities regarding how the event and its associated
  * callbacks are processed. When a stage finishes processing an
  * event it has the following options:
@@ -89,7 +89,7 @@ class StageEvent {
 
   //! Processing for this event is done if the event has timed out
   /**
-   *  \c timeoutEvent() will be called instead of \c callbackEvent()
+   *  \c timeout_event() will be called instead of \c callback_event()
    *  if the event has timed out.
    */
   void doneTimeout();

@@ -46,20 +46,20 @@
 
 using namespace common;
 
-bool *&_getInit() {
+bool *&_get_init() {
   static bool util_init = false;
   static bool *util_init_p = &util_init;
   return util_init_p;
 }
 
-bool getInit() { return *_getInit(); }
+bool get_init() { return *_get_init(); }
 
-void setInit(bool value) {
-  *_getInit() = value;
+void set_init(bool value) {
+  *_get_init() = value;
   return;
 }
 
-void sigHandler(int sig) {
+void sig_handler(int sig) {
   // TODO Signal handler will be add in the next step.
   //  Add action to shutdown
 
@@ -68,66 +68,66 @@ void sigHandler(int sig) {
   return;
 }
 
-int initLog(ProcessParam *pProcessCfg, Ini &gProperties) {
-  const std::string &procName = pProcessCfg->get_process_name();
+int init_log(ProcessParam *process_cfg, Ini &properties) {
+  const std::string &proc_name = process_cfg->get_process_name();
   try {
     // we had better alloc one lock to do so, but simplify the logic
     if (g_log) {
       return 0;
     }
 
-    const std::string logSectionName = "LOG";
-    std::map<std::string, std::string> logSection =
-        gProperties.get(logSectionName);
+    const std::string log_section_name = "LOG";
+    std::map<std::string, std::string> log_section =
+        properties.get(log_section_name);
 
-    std::string logFileName;
+    std::string log_file_name;
 
     // get log file name
     std::string key = "LOG_FILE_NAME";
-    std::map<std::string, std::string>::iterator it = logSection.find(key);
-    if (it == logSection.end()) {
-      logFileName = procName + ".log";
-      std::cout << "Not set log file name, use default " << logFileName
+    std::map<std::string, std::string>::iterator it = log_section.find(key);
+    if (it == log_section.end()) {
+      log_file_name = proc_name + ".log";
+      std::cout << "Not set log file name, use default " << log_file_name
                 << std::endl;
     } else {
-      logFileName = it->second;
+      log_file_name = it->second;
     }
 
-    logFileName = getAboslutPath(logFileName.c_str());
+    log_file_name = getAboslutPath(log_file_name.c_str());
 
-    LOG_LEVEL logLevel = LOG_LEVEL_INFO;
+    LOG_LEVEL log_level = LOG_LEVEL_INFO;
     key = ("LOG_FILE_LEVEL");
-    it = logSection.find(key);
-    if (it != logSection.end()) {
-      int log = (int)logLevel;
+    it = log_section.find(key);
+    if (it != log_section.end()) {
+      int log = (int)log_level;
       str_to_val(it->second, log);
-      logLevel = (LOG_LEVEL)log;
+      log_level = (LOG_LEVEL)log;
     }
 
-    LOG_LEVEL consoleLevel = LOG_LEVEL_INFO;
+    LOG_LEVEL console_level = LOG_LEVEL_INFO;
     key = ("LOG_CONSOLE_LEVEL");
-    it = logSection.find(key);
-    if (it != logSection.end()) {
-      int log = (int)consoleLevel;
+    it = log_section.find(key);
+    if (it != log_section.end()) {
+      int log = (int)console_level;
       str_to_val(it->second, log);
-      consoleLevel = (LOG_LEVEL)log;
+      console_level = (LOG_LEVEL)log;
     }
 
-    LoggerFactory::init_default(logFileName, logLevel, consoleLevel);
+    LoggerFactory::init_default(log_file_name, log_level, console_level);
 
     key = ("DefaultLogModules");
-    it = logSection.find(key);
-    if (it != logSection.end()) {
+    it = log_section.find(key);
+    if (it != log_section.end()) {
       g_log->set_default_module(it->second);
     }
 
-    if (pProcessCfg->is_demon()) {
-      sysLogRedirect(logFileName.c_str(), logFileName.c_str());
+    if (process_cfg->is_demon()) {
+      sys_log_redirect(log_file_name.c_str(), log_file_name.c_str());
     }
 
     return 0;
   } catch (std::exception &e) {
-    std::cerr << "Failed to init log for " << procName << SYS_OUTPUT_FILE_POS
+    std::cerr << "Failed to init log for " << proc_name << SYS_OUTPUT_FILE_POS
               << SYS_OUTPUT_ERROR << std::endl;
     return errno;
   }
@@ -135,7 +135,7 @@ int initLog(ProcessParam *pProcessCfg, Ini &gProperties) {
   return 0;
 }
 
-void cleanupLog() {
+void cleanup_log() {
 
   if (g_log) {
     delete g_log;
@@ -144,40 +144,40 @@ void cleanupLog() {
   return;
 }
 
-int prepareInitSeda() {
-  static StageFactory sessionStageFactory("SessionStage",
-                                          &SessionStage::makeStage);
-  static StageFactory resolveStageFactory("ResolveStage",
-                                          &ResolveStage::makeStage);
-  static StageFactory queryCacheStageFactory("QueryCacheStage",
-                                             &QueryCacheStage::makeStage);
-  static StageFactory parseStageFactory("ParseStage", &ParseStage::makeStage);
-  static StageFactory planCacheFactory("PlanCacheStage",
-                                       &PlanCacheStage::makeStage);
-  static StageFactory optimizeFactory("OptimizeStage",
-                                      &OptimizeStage::makeStage);
-  static StageFactory executeFactory("ExecuteStage", &ExecuteStage::makeStage);
-  static StageFactory defaultStorageFactory("DefaultStorageStage",
-                                            &DefaultStorageStage::makeStage);
-  static StageFactory memStorageFactory("MemStorageStage",
-                                        &MemStorageStage::makeStage);
+int prepare_init_seda() {
+  static StageFactory session_stage_factory("SessionStage",
+                                          &SessionStage::make_stage);
+  static StageFactory resolve_stage_factory("ResolveStage",
+                                          &ResolveStage::make_stage);
+  static StageFactory query_cache_stage_factory("QueryCacheStage",
+                                             &QueryCacheStage::make_stage);
+  static StageFactory parse_stage_factory("ParseStage", &ParseStage::make_stage);
+  static StageFactory plan_cache_factory("PlanCacheStage",
+                                       &PlanCacheStage::make_stage);
+  static StageFactory optimize_factory("OptimizeStage",
+                                      &OptimizeStage::make_stage);
+  static StageFactory execute_factory("ExecuteStage", &ExecuteStage::make_stage);
+  static StageFactory default_storage_factory("DefaultStorageStage",
+                                            &DefaultStorageStage::make_stage);
+  static StageFactory mem_storage_factory("MemStorageStage",
+                                        &MemStorageStage::make_stage);
   return 0;
 }
 
-int init(ProcessParam *processParam) {
+int init(ProcessParam *process_param) {
 
-  if (getInit()) {
+  if (get_init()) {
 
     return 0;
   }
 
-  setInit(true);
+  set_init(true);
 
   // Run as daemon if daemonization requested
   int rc = STATUS_SUCCESS;
-  if (processParam->is_demon()) {
-    rc = daemonizeService(processParam->get_std_out().c_str(),
-                          processParam->get_std_err().c_str());
+  if (process_param->is_demon()) {
+    rc = daemonize_service(process_param->get_std_out().c_str(),
+                          process_param->get_std_err().c_str());
     if (rc != 0) {
       std::cerr << "Shutdown due to failed to daemon current process!"
                 << std::endl;
@@ -185,47 +185,47 @@ int init(ProcessParam *processParam) {
     }
   }
 
-  writePidFile(processParam->get_process_name().c_str());
+  writePidFile(process_param->get_process_name().c_str());
 
   // Initialize global variables before enter multi-thread mode
   // to avoid race condition
   theSwVersion();
 
   // Read Configuration files
-  rc = theGlobalProperties()->load(processParam->get_conf());
+  rc = get_g_properties()->load(process_param->get_conf());
   if (rc) {
     std::cerr << "Failed to load configuration files" << std::endl;
     return rc;
   }
 
   // Init tracer
-  rc = initLog(processParam, *theGlobalProperties());
+  rc = init_log(process_param, *get_g_properties());
   if (rc) {
     std::cerr << "Failed to init Log" << std::endl;
     return rc;
   }
 
-  std::string confData;
-  theGlobalProperties()->toString(confData);
-  LOG_INFO("Output configuration \n%s", confData.c_str());
+  std::string conf_data;
+  get_g_properties()->to_string(conf_data);
+  LOG_INFO("Output configuration \n%s", conf_data.c_str());
 
   // seda is used for backend async event handler
   // the latency of seda is slow, it isn't used for critical latency
   // environment.
-  prepareInitSeda();
-  rc = initSeda(processParam);
+  prepare_init_seda();
+  rc = initSeda(process_param);
   if (rc) {
     LOG_ERROR("Failed to init seda configuration!");
     return rc;
   }
 
-  LogReporter *logReporter = theGlobalLogReporter();
-  MetricsRegistry &metricsRegistry = theGlobalMetricsRegistry();
+  LogReporter *log_reporter = get_g_log_reporter();
+  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
 
-  metricsRegistry.addReporter(logReporter);
+  metricsRegistry.add_reporter(log_reporter);
 
   // Block interrupt signals before creating child threads.
-  // setSignalHandler(sigHandler);
+  // setSignalHandler(sig_handler);
   // sigset_t newSigset, oset;
   // blockDefaultSignals(&newSigset, &oset);
   //  wait interrupt signals
@@ -238,19 +238,19 @@ int init(ProcessParam *processParam) {
   return STATUS_SUCCESS;
 }
 
-void cleanupUtil() {
+void cleanup_util() {
 
-  if (nullptr != theGlobalProperties()) {
-    delete theGlobalProperties();
-    theGlobalProperties() = nullptr;
+  if (nullptr != get_g_properties()) {
+    delete get_g_properties();
+    get_g_properties() = nullptr;
   }
 
   LOG_INFO("Shutdown Cleanly!");
 
   // Finalize tracer
-  cleanupLog();
+  cleanup_log();
 
-  setInit(false);
+  set_init(false);
   return;
 }
 

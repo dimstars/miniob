@@ -17,8 +17,10 @@
 // Created by Longda on 2021/4/20.
 //
 
-#include <stdint.h>
 #include "common/metrics/uniform_reservoir.h"
+
+#include <stdint.h>
+
 #include "common/lang/mutex.h"
 #include "common/metrics/histogram_snapshot.h"
 
@@ -49,9 +51,9 @@ UniformReservoir::UniformReservoir(RandomGenerator &random, size_t size)
 }
 
 UniformReservoir::~UniformReservoir() {
-  if (snapshotValue == NULL) {
-    delete snapshotValue;
-    snapshotValue = NULL;
+  if (snapshot_value_ == NULL) {
+    delete snapshot_value_;
+    snapshot_value_ = NULL;
   }
 }
 
@@ -69,7 +71,7 @@ size_t UniformReservoir::size() {
   return size;
 }
 
-int UniformReservoir::getCount() {
+int UniformReservoir::get_count() {
   MUTEX_LOCK(&mutex);
   int ret = counter;
   MUTEX_UNLOCK(&mutex);
@@ -95,10 +97,10 @@ void UniformReservoir::snapshot() {
   std::vector<double> output = data;
   MUTEX_UNLOCK(&mutex);
 
-  if (snapshotValue == NULL) {
-    snapshotValue = new HistogramSnapShot();
+  if (snapshot_value_ == NULL) {
+    snapshot_value_ = new HistogramSnapShot();
   }
-  ((HistogramSnapShot *)snapshotValue)->setCollection(output);
+  ((HistogramSnapShot *)snapshot_value_)->set_collection(output);
 }
 
 void UniformReservoir::reset() {

@@ -24,13 +24,13 @@
 
 namespace common {
 
-MetricsRegistry& theGlobalMetricsRegistry() {
+MetricsRegistry& get_g_metrics_registry() {
   static MetricsRegistry instance;
 
   return instance;
 }
 
-void MetricsRegistry::registerMetric(const std::string &tag, Metric *metric) {
+void MetricsRegistry::register_metric(const std::string &tag, Metric *metric) {
   std::map<std::string, Metric*>::iterator it = metrics.find(tag);
   if (it != metrics.end()) {
     LOG_WARN("%s has been registered!", tag.c_str());

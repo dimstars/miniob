@@ -42,20 +42,20 @@ ParseStage::ParseStage(const char *tag) : Stage(tag) {}
 ParseStage::~ParseStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *ParseStage::makeStage(const std::string &tag) {
+Stage *ParseStage::make_stage(const std::string &tag) {
   ParseStage *stage = new (std::nothrow) ParseStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new ParseStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool ParseStage::setProperties() {
-  //  std::string stageNameStr(stageName);
-  //  std::map<std::string, std::string> section = theGlobalProperties()->get(
+bool ParseStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
+  //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
   //  std::map<std::string, std::string>::iterator it;
@@ -69,7 +69,7 @@ bool ParseStage::setProperties() {
 bool ParseStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
   optimizeStage = *(stgp++);
 
   LOG_TRACE("Exit");
@@ -83,7 +83,7 @@ void ParseStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void ParseStage::handleEvent(StageEvent *event) {
+void ParseStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   // TODO pasrse sql plan
@@ -99,13 +99,13 @@ void ParseStage::handleEvent(StageEvent *event) {
     new_event->doneImmediate();
     return;
   }
-  optimizeStage->handleEvent(new_event);
+  optimizeStage->handle_event(new_event);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void ParseStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void ParseStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
   event->doneImmediate();
   LOG_TRACE("Exit\n");

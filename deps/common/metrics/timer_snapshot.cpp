@@ -17,8 +17,8 @@
 // Created by Longda on 2021/4/20.
 //
 
-#include <sstream>
 #include "common/metrics/timer_snapshot.h"
+#include <sstream>
 
 namespace common {
 
@@ -26,14 +26,14 @@ TimerSnapshot::TimerSnapshot() {}
 
 TimerSnapshot::~TimerSnapshot() {}
 
-double TimerSnapshot::getTps() { return tps; }
+double TimerSnapshot::get_tps() { return tps; }
 
-void TimerSnapshot::setTps(double tps) { this->tps = tps; }
+void TimerSnapshot::set_tps(double tps) { this->tps = tps; }
 
-std::string TimerSnapshot::toString() {
+std::string TimerSnapshot::to_string() {
   std::stringstream oss;
 
-  oss << HistogramSnapShot::toString() << ",tps:" << tps;
+  oss << HistogramSnapShot::to_string() << ",tps:" << tps;
 
   return oss.str();
 }

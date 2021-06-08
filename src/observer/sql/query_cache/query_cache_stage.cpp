@@ -37,20 +37,20 @@ QueryCacheStage::QueryCacheStage(const char *tag) : Stage(tag) {}
 QueryCacheStage::~QueryCacheStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *QueryCacheStage::makeStage(const std::string &tag) {
+Stage *QueryCacheStage::make_stage(const std::string &tag) {
   QueryCacheStage *stage = new (std::nothrow) QueryCacheStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new QueryCacheStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool QueryCacheStage::setProperties() {
-  //  std::string stageNameStr(stageName);
-  //  std::map<std::string, std::string> section = theGlobalProperties()->get(
+bool QueryCacheStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
+  //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
   //  std::map<std::string, std::string>::iterator it;
@@ -64,7 +64,7 @@ bool QueryCacheStage::setProperties() {
 bool QueryCacheStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
   planCacheStage = *(stgp++);
 
   LOG_TRACE("Exit");
@@ -78,7 +78,7 @@ void QueryCacheStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void QueryCacheStage::handleEvent(StageEvent *event) {
+void QueryCacheStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   // Add callback to update query cache
@@ -93,13 +93,13 @@ void QueryCacheStage::handleEvent(StageEvent *event) {
   event->pushCallback(cb);
    */
   // do nothing here, pass the event to the next stage
-  planCacheStage->handleEvent(event);
+  planCacheStage->handle_event(event);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void QueryCacheStage::callbackEvent(StageEvent *event,
+void QueryCacheStage::callback_event(StageEvent *event,
                                     CallbackContext *context) {
   LOG_TRACE("Enter\n");
 

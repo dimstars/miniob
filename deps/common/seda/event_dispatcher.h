@@ -78,9 +78,9 @@ class EventDispatcher : public Stage {
    * @param[in] event Pointer to event that must be handled.
    * @post  event must not be de-referenced by caller after return
    */
-  void handleEvent(StageEvent *event);
+  void handle_event(StageEvent *event);
 
-  // Note, EventDispatcher is an abstract class and needs no makeStage()
+  // Note, EventDispatcher is an abstract class and needs no make_stage()
 
  protected:
   //! Constructor
@@ -101,7 +101,7 @@ class EventDispatcher : public Stage {
   bool initialize();
 
   //! set properties for this object
-  bool setProperties() { return true; }
+  bool set_properties() { return true; }
 
   //! Cleanup stage after disconnection
   /**

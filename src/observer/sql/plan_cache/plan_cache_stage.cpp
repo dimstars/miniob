@@ -37,20 +37,20 @@ PlanCacheStage::PlanCacheStage(const char *tag) : Stage(tag) {}
 PlanCacheStage::~PlanCacheStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *PlanCacheStage::makeStage(const std::string &tag) {
+Stage *PlanCacheStage::make_stage(const std::string &tag) {
   PlanCacheStage *stage = new (std::nothrow) PlanCacheStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new PlanCacheStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool PlanCacheStage::setProperties() {
-  //  std::string stageNameStr(stageName);
-  //  std::map<std::string, std::string> section = theGlobalProperties()->get(
+bool PlanCacheStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
+  //  std::map<std::string, std::string> section = g_properties()->get(
   //    stageNameStr);
   //
   //  std::map<std::string, std::string>::iterator it;
@@ -64,7 +64,7 @@ bool PlanCacheStage::setProperties() {
 bool PlanCacheStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
   executeStage = *(stgp++);
   parseStage = *(stgp++);
 
@@ -79,7 +79,7 @@ void PlanCacheStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void PlanCacheStage::handleEvent(StageEvent *event) {
+void PlanCacheStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   // Add callback to update plan cache
@@ -94,13 +94,13 @@ void PlanCacheStage::handleEvent(StageEvent *event) {
   event->pushCallback(cb);
    */
   // do nothing here, pass the event to the next stage
-  parseStage->handleEvent(event);
+  parseStage->handle_event(event);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void PlanCacheStage::callbackEvent(StageEvent *event,
+void PlanCacheStage::callback_event(StageEvent *event,
                                    CallbackContext *context) {
   LOG_TRACE("Enter\n");
 

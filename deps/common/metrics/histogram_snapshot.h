@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
 #include <string>
 #include <vector>
 
@@ -36,7 +37,7 @@ public:
   virtual ~HistogramSnapShot();
 
 public:
-  void setCollection(const std::vector<double> &collection);
+  void set_collection(const std::vector<double> &collection);
 
   /**
    * Returns the value at the given quantile
@@ -44,7 +45,7 @@ public:
    * @param quantile a given quantile, in {@code [0..1]}
    * @return the value in the distribute
    */
-  double getValue(double quantile);
+  double get_value(double quantile);
 
   /**
    * Returns the size of collection in the snapshot
@@ -54,23 +55,23 @@ public:
   /**
    * Returns 50th_percentile.
    */
-  double getMedian();
+  double get_median();
 
-  double get75th();
-  double get90th();
-  double get95th();
-  double get99th();
-  double get999th();
+  double get_75th();
+  double get_90th();
+  double get_95th();
+  double get_99th();
+  double get_999th();
 
-  double getMax();
-  double getMin();
-  double getMean();
+  double get_max();
+  double get_min();
+  double get_mean();
 
-  const std::vector<double> &getValues();
+  const std::vector<double> &get_values();
 
-  std::string toString();
+  std::string to_string();
 protected:
-  std::vector<double> data;
+  std::vector<double> data_;
 };
 
 } // namespace common

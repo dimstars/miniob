@@ -19,9 +19,10 @@
 #ifndef __COMMON_METRICS_UNIFORM_RESERVOIR_H_
 #define __COMMON_METRICS_UNIFORM_RESERVOIR_H_
 
+#include <pthread.h>
+
 #include <atomic>
 #include <vector>
-#include <pthread.h>
 
 #include "common/metrics/reservoir.h"
 
@@ -43,7 +44,7 @@ public:
 
 public:
   size_t size();  // data buffer size
-  int getCount(); // how many items have been insert?
+  int get_count(); // how many items have been insert?
 
   void update(double one);
   void snapshot();

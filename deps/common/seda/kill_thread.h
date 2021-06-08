@@ -51,7 +51,7 @@ public:
    * @post initializing the class members
    * @return Stage instantiated object
    */
-  static Stage *makeStage(const std::string &tag);
+  static Stage *make_stage(const std::string &tag);
 
 protected:
   //! Constructor
@@ -70,17 +70,17 @@ protected:
    *
    * @post  Call never returns.  Thread is killed.  Pool is notified.
    */
-  void handleEvent(StageEvent *event);
+  void handle_event(StageEvent *event);
 
   //! Handle the callback
   /**
    * Nothing special for callbacks in this stage.
    */
-  void callbackEvent(StageEvent *event, CallbackContext *context) { return; }
+  void callback_event(StageEvent *event, CallbackContext *context) { return; }
 
   //! Initialize stage params
   /**
-   * Ignores nextStageList---there are no outputs for this stage.
+   * Ignores next_stage_list_---there are no outputs for this stage.
    *
    * @pre  Stage not connected
    * @return true
@@ -93,7 +93,7 @@ protected:
    * @post initializing the class members
    * @return Stage instantiated object
    */
-  bool setProperties();
+  bool set_properties();
 
   friend class Threadpool;
 };

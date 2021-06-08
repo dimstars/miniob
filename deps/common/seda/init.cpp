@@ -48,10 +48,10 @@ int initSeda(ProcessParam *pProcessCfg) {
 
   // initialize class factory instances here
   static StageFactory killThreadFactory("KillThreads",
-                                        &KillThreadStage::makeStage);
-  static StageFactory timerFactory("TimerStage", &TimerStage::makeStage);
+                                        &KillThreadStage::make_stage);
+  static StageFactory timerFactory("TimerStage", &TimerStage::make_stage);
   static StageFactory sedaStatsFactory("MetricsStage",
-                                       &MetricsStage::makeStage);
+                                       &MetricsStage::make_stage);
 
   // try to parse the seda configuration files
   SedaConfig *config = SedaConfig::getInstance();

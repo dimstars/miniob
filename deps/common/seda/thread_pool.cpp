@@ -138,7 +138,7 @@ unsigned int Threadpool::killThreads(unsigned int threads) {
   }
 
   // connect the kill thread stage to this pool
-  killer.setPool(this);
+  killer.set_pool(this);
   killer.connect();
 
   // generate an appropriate number of kill thread events...
@@ -196,7 +196,7 @@ unsigned int Threadpool::genKillThreadEvents(unsigned int toKill) {
     if (sevent == NULL) {
       break;
     }
-    killer.addEvent(sevent);
+    killer.add_event(sevent);
   }
   LOG_TRACE("%s%d", "exit", toKill);
   return i;
@@ -264,7 +264,7 @@ void *Threadpool::runThread(void *poolPtr) {
     poolP->runQueue.pop_front();
     MUTEX_UNLOCK(&(poolP->runMutex));
 
-    StageEvent *event = runStage->removeEvent();
+    StageEvent *event = runStage->remove_event();
 
     // need to check if this is a rescheduled callback
     if (event->isCallback()) {
@@ -288,13 +288,13 @@ void *Threadpool::runThread(void *poolPtr) {
       if (event->hasTimedOut()) {
         event->done();
       } else {
-        runStage->handleEvent(event);
+        runStage->handle_event(event);
       }
 #else
-      runStage->handleEvent(event);
+      runStage->handle_event(event);
 #endif
     }
-    runStage->releaseEvent();
+    runStage->release_event();
   }
   LOG_TRACE("exit %p", poolPtr);
   LOG_INFO("Begin to exit, threadid = %llx, threadname = %s", threadid,

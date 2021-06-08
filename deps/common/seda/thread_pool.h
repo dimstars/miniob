@@ -37,7 +37,7 @@ class Stage;
  * head of the scheduling queue for a scheduled stage.  It then removes
  * the scheduled stage from the queue, and selects an event from the
  * Stage's event queue for processing. The thread then processes the event
- * using the Stage's handleEvent() member function before starting the
+ * using the Stage's handle_event() member function before starting the
  * process over.  If the thread finds the scheduling queue empty, it sleeps
  * on a condition waiting for Stages to schedule themselves.
  * <p>

@@ -47,21 +47,21 @@ MetricsStage::MetricsStage(const char *tag) : Stage(tag) {}
 MetricsStage::~MetricsStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *MetricsStage::makeStage(const std::string &tag) {
+Stage *MetricsStage::make_stage(const std::string &tag) {
   MetricsStage *stage = new MetricsStage(tag.c_str());
   if (stage == NULL) {
     LOG_ERROR("new MetricsStage failed");
     return NULL;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool MetricsStage::setProperties() {
-  std::string stageNameStr(stageName);
+bool MetricsStage::set_properties() {
+  std::string stageNameStr(stage_name_);
   std::map<std::string, std::string> section =
-      theGlobalProperties()->get(stageNameStr);
+      get_g_properties()->get(stageNameStr);
 
   metricReportInterval = DateTime::SECONDS_PER_MIN;
 
@@ -78,12 +78,12 @@ bool MetricsStage::setProperties() {
 bool MetricsStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
   timerStage = *(stgp++);
 
   MetricsReportEvent *reportEvent = new MetricsReportEvent();
 
-  addEvent(reportEvent);
+  add_event(reportEvent);
   LOG_TRACE("Exit");
   return true;
 }
@@ -95,7 +95,7 @@ void MetricsStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void MetricsStage::handleEvent(StageEvent *event) {
+void MetricsStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   CompletionCallback *cb = new CompletionCallback(this, NULL);
@@ -120,22 +120,22 @@ void MetricsStage::handleEvent(StageEvent *event) {
   }
 
   event->pushCallback(cb);
-  timerStage->addEvent(tmEvent);
+  timerStage->add_event(tmEvent);
 
   LOG_TRACE("Exit\n");
   return;
 }
 
-void MetricsStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void MetricsStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
-  MetricsRegistry &metricsRegistry = theGlobalMetricsRegistry();
+  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
 
   metricsRegistry.snapshot();
   metricsRegistry.report();
 
   // do it again.
-  addEvent(event);
+  add_event(event);
 
   LOG_TRACE("Exit\n");
   return;

@@ -35,7 +35,7 @@ class CallbackContext;
  * pipeline.  Usually, each event will reference a completion callback,
  * and before an event is deleted, the stage doing the deletion should
  * invoke the "done()" event method.  This method eventually invokes the
- * "callbackEvent()" method in the stage which set the callback, providing
+ * "callback_event()" method in the stage which set the callback, providing
  * a reference to the event as a parameter.
  * <p>
  * The purpose of the callback is to allow a stage to register some

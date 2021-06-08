@@ -50,19 +50,19 @@ ExecuteStage::ExecuteStage(const char *tag) : Stage(tag) {}
 ExecuteStage::~ExecuteStage() {}
 
 //! Parse properties, instantiate a stage object
-Stage *ExecuteStage::makeStage(const std::string &tag) {
+Stage *ExecuteStage::make_stage(const std::string &tag) {
   ExecuteStage *stage = new (std::nothrow) ExecuteStage(tag.c_str());
   if (stage == nullptr) {
     LOG_ERROR("new ExecuteStage failed");
     return nullptr;
   }
-  stage->setProperties();
+  stage->set_properties();
   return stage;
 }
 
 //! Set properties for this object set in stage specific properties
-bool ExecuteStage::setProperties() {
-  //  std::string stageNameStr(stageName);
+bool ExecuteStage::set_properties() {
+  //  std::string stageNameStr(stage_name_);
   //  std::map<std::string, std::string> section = theGlobalProperties()->get(
   //    stageNameStr);
   //
@@ -77,7 +77,7 @@ bool ExecuteStage::setProperties() {
 bool ExecuteStage::initialize() {
   LOG_TRACE("Enter");
 
-  std::list<Stage *>::iterator stgp = nextStageList.begin();
+  std::list<Stage *>::iterator stgp = next_stage_list_.begin();
   defaultStorageStage = *(stgp++);
   memStorageStage = *(stgp++);
 
@@ -92,7 +92,7 @@ void ExecuteStage::cleanup() {
   LOG_TRACE("Exit");
 }
 
-void ExecuteStage::handleEvent(StageEvent *event) {
+void ExecuteStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
 
   handleRequest(event);
@@ -101,7 +101,7 @@ void ExecuteStage::handleEvent(StageEvent *event) {
   return;
 }
 
-void ExecuteStage::callbackEvent(StageEvent *event, CallbackContext *context) {
+void ExecuteStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   // TODO, here finish read all data from disk or network, but do nothing here.
@@ -115,7 +115,7 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
   ExecutionPlanEvent *exe_event = static_cast<ExecutionPlanEvent *>(event);
   SessionEvent *session_event = exe_event->sql_event()->session_event();
   sqlstr *sql = exe_event->sqls();
-  const char *current_db = session_event->get_client()->session->current_db().c_str();
+  const char *current_db = session_event->get_client()->session->get_current_db().c_str();
 
   switch (sql->flag) {
     case SCF_SELECT: { // select
@@ -148,7 +148,7 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
       }
 
       storage_event->pushCallback(cb);
-      defaultStorageStage->handleEvent(storage_event);
+      defaultStorageStage->handle_event(storage_event);
     }
     break;
     case SCF_SYNC: { // TODO move to default storage ?

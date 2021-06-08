@@ -47,7 +47,7 @@ EventDispatcher::~EventDispatcher() {
  * Check if the event can be dispatched. If not, hash it and store
  * it.  If so, send it on to the next stage.
  */
-void EventDispatcher::handleEvent(StageEvent *event) {
+void EventDispatcher::handle_event(StageEvent *event) {
   LOG_TRACE("enter\n");
 
   std::string hash;
@@ -57,7 +57,7 @@ void EventDispatcher::handleEvent(StageEvent *event) {
   pthread_mutex_lock(&eventLock);
   stat = dispatchEvent(event, ctx, hash);
   if (stat == SEND_EVENT) {
-    nextStage->addEvent(event);
+    nextStage->add_event(event);
   } else if (stat == STORE_EVENT) {
     StoredEvent se(event, ctx);
 
@@ -75,10 +75,10 @@ void EventDispatcher::handleEvent(StageEvent *event) {
 bool EventDispatcher::initialize() {
   bool retVal = true;
 
-  if (nextStageList.size() != 1) {
+  if (next_stage_list_.size() != 1) {
     retVal = false;
   } else {
-    nextStage = *(nextStageList.begin());
+    nextStage = *(next_stage_list_.begin());
   }
   return retVal;
 }
@@ -123,7 +123,7 @@ bool EventDispatcher::wakeupEvent(std::string hashkey) {
     // try to dispatch the event again
     status_t stat = dispatchEvent(targetEv.first, targetEv.second, hashkey);
     if (stat == SEND_EVENT) {
-      nextStage->addEvent(targetEv.first);
+      nextStage->add_event(targetEv.first);
       sent = true;
     } else if (stat == STORE_EVENT) {
       eventStore[hashkey].push_back(targetEv);

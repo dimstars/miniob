@@ -26,7 +26,7 @@ SQLStageEvent::SQLStageEvent(SessionEvent *event, std::string &sql) :
 
 SQLStageEvent::~SQLStageEvent() noexcept {
   if (session_event_ != nullptr) {
-    session_event_->doneImmediate();
+    session_event_->done_immediate();
     session_event_ = nullptr;
   }
 }

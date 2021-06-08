@@ -24,7 +24,7 @@ ExecutionPlanEvent::ExecutionPlanEvent(SQLStageEvent *sql_event, sqlstr *sqls) :
 }
 ExecutionPlanEvent::~ExecutionPlanEvent() {
   if (sql_event_) {
-    sql_event_->doneImmediate();
+    sql_event_->done_immediate();
     sql_event_ = nullptr;
   }
 }

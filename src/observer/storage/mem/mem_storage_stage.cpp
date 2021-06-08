@@ -80,7 +80,7 @@ void MemStorageStage::handle_event(StageEvent *event) {
   LOG_TRACE("Enter\n");
   TimerStat timerStat(*queryMetric);
 
-  event->doneImmediate();
+  event->done_immediate();
 
   LOG_TRACE("Exit\n");
   return;

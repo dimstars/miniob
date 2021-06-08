@@ -240,7 +240,7 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
   }
 
   session_event->set_response(response);
-  event->doneImmediate();
+  event->done_immediate();
 
   LOG_TRACE("Exit\n");
 }
@@ -248,7 +248,7 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
 void DefaultStorageStage::callback_event(StageEvent *event,
                                         CallbackContext *context) {
   LOG_TRACE("Enter\n");
-  event->doneImmediate();
+  event->done_immediate();
   LOG_TRACE("Exit\n");
   return;
 }

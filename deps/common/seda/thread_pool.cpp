@@ -27,7 +27,7 @@
 #include "common/seda/thread_pool.h"
 namespace common {
 
-extern bool &theEventHistoryFlag();
+extern bool &get_event_history_flag();
 
 //! Constructor
 /**
@@ -36,7 +36,7 @@ extern bool &theEventHistoryFlag();
  * @post thread pool has <i>threads</i> threads running
  */
 Threadpool::Threadpool(unsigned int threads, const std::string &name)
-  : runQueue(), eventhist(theEventHistoryFlag()), nthreads(0),
+  : runQueue(), eventhist(get_event_history_flag()), nthreads(0),
     threadsToKill(0), nIdles(0), killer("KillThreads"), name(name) {
   LOG_TRACE("Enter, thread number:%d", threads);
   MUTEX_INIT(&runMutex, NULL);
@@ -267,25 +267,25 @@ void *Threadpool::runThread(void *poolPtr) {
     StageEvent *event = runStage->remove_event();
 
     // need to check if this is a rescheduled callback
-    if (event->isCallback()) {
+    if (event->is_callback()) {
 #ifdef ENABLE_STAGE_LEVEL_TIMEOUT
       // check if the event has timed out.
-      if (event->hasTimedOut()) {
-        event->doneTimeout();
+      if (event->has_timed_out()) {
+        event->done_timeout();
       } else {
-        event->doneImmediate();
+        event->done_immediate();
       }
 #else
-      event->doneImmediate();
+      event->done_immediate();
 #endif
     } else {
       if (poolP->eventhist) {
-        event->saveStage(runStage, StageEvent::HANDLE_EV);
+        event->save_stage(runStage, StageEvent::HANDLE_EV);
       }
 
 #ifdef ENABLE_STAGE_LEVEL_TIMEOUT
       // check if the event has timed out
-      if (event->hasTimedOut()) {
+      if (event->has_timed_out()) {
         event->done();
       } else {
         runStage->handle_event(event);

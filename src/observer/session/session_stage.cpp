@@ -132,7 +132,7 @@ void SessionStage::handle_request(StageEvent *event) {
   TimerStat sqlStat(*sql_metric_);
   std::string sql = sev->get_request_buf();
   if (common::is_blank(sql.c_str())) {
-    sev->doneImmediate();
+    sev->done_immediate();
     return;
   }
 
@@ -144,7 +144,7 @@ void SessionStage::handle_request(StageEvent *event) {
     return;
   }
 
-  sev->pushCallback(cb);
+  sev->push_callback(cb);
 
   SQLStageEvent *sql_event = new SQLStageEvent(sev, sql);
   resolve_stage_->handle_event(sql_event);

@@ -192,7 +192,7 @@ void SedaConfig::initEventHistory() {
     }
   }
 
-  theEventHistoryFlag() = evHist;
+  get_event_history_flag() = evHist;
 
   // set max event hops
   u32_t maxEventHops = 100;
@@ -201,7 +201,7 @@ void SedaConfig::initEventHistory() {
   if (it != baseSection.end()) {
     str_to_val(it->second, maxEventHops);
   }
-  theMaxEventHops() = maxEventHops;
+  get_max_event_hops() = maxEventHops;
 
   LOG_INFO("Successfully initEventHistory, EventHistory:%d, MaxEventHops:%u",
            (int) evHist, maxEventHops);

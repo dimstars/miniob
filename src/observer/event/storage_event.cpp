@@ -25,7 +25,7 @@ StorageEvent::StorageEvent(ExecutionPlanEvent *exe_event)
 
 StorageEvent::~StorageEvent() {
   if (exe_event_ != nullptr) {
-    exe_event_->doneImmediate();
+    exe_event_->done_immediate();
     exe_event_ = nullptr;
   }
 }

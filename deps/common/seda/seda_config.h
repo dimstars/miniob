@@ -207,7 +207,7 @@ class SedaConfig {
 
   //! init event history setting
   /**
-   * Setting theMaxEventHops, theEventHistoryFlag
+   * Setting max_event_hops, event_history_flag
    */
   void initEventHistory();
 
@@ -233,8 +233,8 @@ inline Stage *SedaConfig::getStage(const char *stagename) {
 //! Global seda config object
 SedaConfig *&theSedaConfig();
 
-bool &theEventHistoryFlag();
-u32_t &theMaxEventHops();
+bool &get_event_history_flag();
+u32_t &get_max_event_hops();
 
 } //namespace common
 #endif //__COMMON_SEDA_SEDA_CONFIG_H__

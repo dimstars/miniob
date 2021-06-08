@@ -89,14 +89,14 @@ void ParseStage::handle_event(StageEvent *event) {
   // TODO pasrse sql plan
   StageEvent *new_event = handleRequest(event);
   if (nullptr == new_event) {
-    event->doneImmediate();
+    event->done_immediate();
     return;
   }
 
   CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
   if (cb == nullptr) {
     LOG_ERROR("Failed to new callback for SQLStageEvent");
-    new_event->doneImmediate();
+    new_event->done_immediate();
     return;
   }
   optimizeStage->handle_event(new_event);
@@ -107,7 +107,7 @@ void ParseStage::handle_event(StageEvent *event) {
 
 void ParseStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
-  event->doneImmediate();
+  event->done_immediate();
   LOG_TRACE("Exit\n");
   return;
 }

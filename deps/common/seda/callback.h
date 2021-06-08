@@ -55,7 +55,7 @@ class CallbackContext;
  * <p>
  * By default, the callback will run on the thread of the stage that created
  * the callback.  If the stage that is calling done() on the event wants
- * to execute the callback stack in place, it can call the doneImmediate()
+ * to execute the callback stack in place, it can call the done_immediate()
  * interface.  Note that this will execute the *entire* callback stack on
  * the current thread.
  */
@@ -72,30 +72,30 @@ class CompletionCallback {
   virtual ~CompletionCallback();
 
   //! Push onto a callback stack
-  void pushCallback(CompletionCallback *stack);
+  void push_callback(CompletionCallback *stack);
 
   //! Pop off of a callback stack
   /**
    * @returns  remainder of callback stack
    */
-  CompletionCallback *popCallback();
+  CompletionCallback *pop_callback();
 
   //! One event is complete
-  void eventDone(StageEvent *ev);
+  void event_done(StageEvent *ev);
 
   //! Reschedule this event as a callback on the target stage
-  void eventReschedule(StageEvent *ev);
+  void event_reschedule(StageEvent *ev);
 
   //! Complete this event if it has timed out
-  void eventTimeout(StageEvent *ev);
+  void event_timeout(StageEvent *ev);
 
  protected:
   // implementation state
 
-  Stage *targetStage;         //!< stage which is setting this callback
-  CallbackContext *context;   //!< argument to pass when invoking cb
-  CompletionCallback *nextCb; //!< next event in the chain
-  bool evHistFlag;            //!< true if event histories are enabled
+  Stage *target_stage_;         //!< stage which is setting this callback
+  CallbackContext *context_;   //!< argument to pass when invoking cb
+  CompletionCallback *next_cb_; //!< next event in the chain
+  bool ev_hist_flag_;            //!< true if event histories are enabled
 };
 
 //! Context attached to callback
@@ -112,12 +112,12 @@ class CallbackContext {
 
 class CallbackContextEvent : public CallbackContext {
  public:
-  CallbackContextEvent(StageEvent *event = NULL) : ev(event) {}
+  CallbackContextEvent(StageEvent *event = NULL) : ev_(event) {}
   ~CallbackContextEvent() {}
-  StageEvent *GetEvent() { return ev; }
+  StageEvent *get_event() { return ev_; }
 
  private:
-  StageEvent *ev;
+  StageEvent *ev_;
 };
 
 } //namespace common

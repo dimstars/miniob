@@ -119,7 +119,7 @@ void MetricsStage::handle_event(StageEvent *event) {
     return;
   }
 
-  event->pushCallback(cb);
+  event->push_callback(cb);
   timerStage->add_event(tmEvent);
 
   LOG_TRACE("Exit\n");

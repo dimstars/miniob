@@ -143,6 +143,14 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
   TimerStat timerStat(*queryMetric);
 
   StorageEvent *storage_event = static_cast<StorageEvent *>(event);
+  CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
+  if (cb == nullptr) {
+    LOG_ERROR("Failed to new callback for SessionEvent");
+    storage_event->doneImmediate();
+    return;
+  }
+  storage_event->pushCallback(cb);
+
   Query *sql = storage_event->exe_event()->sqls();
 
   SessionEvent *session_event = storage_event->exe_event()->sql_event()->session_event();
@@ -226,7 +234,6 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
         ss << "No such table: " << table_name << std::endl;
       }
       snprintf(response, sizeof(response), "%s", ss.str().c_str());
-      free((char *)(sql->sstr.desc_table.relation_name));
     }
     break;
   default:
@@ -250,7 +257,8 @@ void DefaultStorageStage::handleEvent(StageEvent *event) {
 void DefaultStorageStage::callbackEvent(StageEvent *event,
                                         CallbackContext *context) {
   LOG_TRACE("Enter\n");
-  event->doneImmediate();
+  StorageEvent *storage_event = static_cast<StorageEvent *>(event);
+  storage_event->exe_event()->doneImmediate();
   LOG_TRACE("Exit\n");
   return;
 }

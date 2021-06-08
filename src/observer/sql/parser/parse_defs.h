@@ -174,4 +174,20 @@ typedef struct Query {
   union Queries sstr;
 } Query;
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+void desc_table_init(DescTable *desc_table, const char *relation_name);
+void desc_table_destroy(DescTable *desc_table);
+
+void query_init(Query *query);
+Query *query_create(); // create and init
+void query_reset(Query *query);
+void query_destroy(Query *query); // reset and delete
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
 #endif // __OBSERVER_SQL_PARSER_PARSE_DEFS_H__

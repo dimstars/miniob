@@ -120,7 +120,7 @@ void SessionStage::callbackEvent(StageEvent *event, CallbackContext *context) {
   }
   Server::send(sev->get_client(), response, len);
 
-  sev->done();
+  // sev->done();
   LOG_TRACE("Exit\n");
   return;
 }
@@ -140,7 +140,7 @@ void SessionStage::handleRequest(StageEvent *event) {
   if (cb == nullptr) {
     LOG_ERROR("Failed to new callback for SessionEvent");
 
-    sev->done();
+    sev->doneImmediate();
     return;
   }
 

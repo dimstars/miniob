@@ -21,6 +21,7 @@
 #include "sql/parser/parse.h"
 #include "yacc_sql.tab.h"
 #include "rc.h"
+#include "common/log/log.h"
 
 Selects *getSelects();
 Condition *getCondition();
@@ -98,6 +99,49 @@ Query *getSqlstr() {
   (sq)->sstr = *getSqls();
   return sq;
 }
+
+void desc_table_init(DescTable *desc_table, const char *relation_name) {
+  int len = strlen(relation_name) + 1;
+  char *s = (char *)malloc(len);
+  strcpy(s, relation_name);
+  desc_table->relation_name = s;
+  // desc_table->relation_name = strdup(relation_name);
+}
+
+void desc_table_destroy(DescTable *desc_table) {
+  free((char *)desc_table->relation_name);
+}
+
+void query_init(Query *query) {
+  query->flag = SCF_ERROR;
+  memset(&query->sstr, 0, sizeof(query->sstr));
+}
+
+Query *query_create() {
+  Query *query = (Query *)malloc(sizeof(Query));
+  if (nullptr == query) {
+    LOG_ERROR("Failed to alloc memroy for query. size=%d", sizeof(Query));
+    return nullptr;
+  }
+
+  query_init(query);
+  return query;
+}
+
+void query_reset(Query *query) {
+  switch (query->flag) {
+    case SCF_DESC_TABLE: {
+      desc_table_destroy(&query->sstr.desc_table);
+    }
+    break;
+  }
+}
+
+void query_destroy(Query *query) {
+  query_reset(query);
+  free(query);
+}
+////////////////////////////////////////////////////////////////////////////////
 
 extern "C" int sql_parse(const char *st, Query  *sqls);
 

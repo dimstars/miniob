@@ -1653,7 +1653,7 @@ yyreduce:
 #line 197 "yacc_sql.y"
     {
       CONTEXT->ssql->flag = SCF_DESC_TABLE;
-      CONTEXT->ssql->sstr.desc_table.relation_name = (yyvsp[(2) - (3)].string);
+			desc_table_init(&CONTEXT->ssql->sstr.desc_table, (yyvsp[(2) - (3)].string));
     }
     break;
 

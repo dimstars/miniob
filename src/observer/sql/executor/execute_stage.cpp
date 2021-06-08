@@ -105,7 +105,9 @@ void ExecuteStage::callbackEvent(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   // TODO, here finish read all data from disk or network, but do nothing here.
-  event->doneImmediate();
+  ExecutionPlanEvent *exe_event = static_cast<ExecutionPlanEvent *>(event);
+  SQLStageEvent *sql_event = exe_event->sql_event();
+  sql_event->doneImmediate();
 
   LOG_TRACE("Exit\n");
   return;
@@ -143,15 +145,15 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
       CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
       if (cb == nullptr) {
         LOG_ERROR("Failed to new callback for SessionEvent");
-        storage_event->doneImmediate();
+        exe_event->doneImmediate();
         return;
       }
 
-      storage_event->pushCallback(cb);
+      exe_event->pushCallback(cb);
       defaultStorageStage->handleEvent(storage_event);
     }
     break;
-    case SCF_SYNC: { // TODO move to default storage ?
+    case SCF_SYNC: {
       RC rc = DefaultHandler::get_default().sync();
       session_event->set_response(strrc(rc));
       exe_event->doneImmediate();

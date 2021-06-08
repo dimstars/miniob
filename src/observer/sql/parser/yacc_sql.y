@@ -196,7 +196,7 @@ show_tables:
 desc_table:
     DESC ID SEMICOLON {
       CONTEXT->ssql->flag = SCF_DESC_TABLE;
-      CONTEXT->ssql->sstr.desc_table.relation_name = $2;
+			desc_table_init(&CONTEXT->ssql->sstr.desc_table, $2);
     }
     ;
 

@@ -37,8 +37,8 @@ namespace common {
 
 class DispatchContext;
 
-// A stage which stores and re-orders events
 /**
+ * A stage which stores and re-orders events
  * The EventDispatcher stage is designed to assert control over the order
  * of events that move through the Seda pipeline.  The EventDispatcher stage
  * has a hash table that stores events for later processing.  As each event

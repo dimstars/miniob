@@ -28,8 +28,8 @@ class StageEvent;
 class Stage;
 class CallbackContext;
 
-// A generic CompletionCallback
 /**
+ * A generic CompletionCallback
  * A completion callback object provides a function that should be
  * invoked when an event has made it successfully through the stage
  * pipeline.  Usually, each event will reference a completion callback,
@@ -92,10 +92,10 @@ class CompletionCallback {
  protected:
   // implementation state
 
-  Stage *target_stage_;         //< stage which is setting this callback
-  CallbackContext *context_;   //< argument to pass when invoking cb
-  CompletionCallback *next_cb_; //< next event in the chain
-  bool ev_hist_flag_;            //< true if event histories are enabled
+  Stage *target_stage_;         // stage which is setting this callback
+  CallbackContext *context_;   // argument to pass when invoking cb
+  CompletionCallback *next_cb_; // next event in the chain
+  bool ev_hist_flag_;            // true if event histories are enabled
 };
 
 /**

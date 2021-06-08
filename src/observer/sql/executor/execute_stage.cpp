@@ -119,6 +119,14 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
   Query *sql = exe_event->sqls();
   const char *current_db = session_event->get_client()->session->current_db().c_str();
 
+  CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
+  if (cb == nullptr) {
+    LOG_ERROR("Failed to new callback for ExecutionPlanEvent");
+    exe_event->doneImmediate();
+    return;
+  }
+  exe_event->pushCallback(cb);
+
   switch (sql->flag) {
     case SCF_SELECT: { // select
       do_select(current_db, sql, exe_event->sql_event()->session_event());
@@ -319,7 +327,6 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  // 找出需要的字段，按照原始顺序列出(yacc解析出来的列表都是逆序的)
   for (int i = selects.attr_num - 1; i >= 0; i--) {
     const RelAttr &attr = selects.attributes[i];
     if (nullptr == attr.relation_name || 0 == strcmp(table_name, attr.relation_name)) {
@@ -355,7 +362,6 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
   }
 
   // 找出仅与此表相关的过滤条件, 或者都是值的过滤条件
-  std::set<int> unrecognized_conditions; // TODO 放到上层
   std::vector<DefaultConditionFilter> condition_filters;
   for (int i = 0; i < selects.condition_num; i++) {
     const Condition &condition = selects.conditions[i];

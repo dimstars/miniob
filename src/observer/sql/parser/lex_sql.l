@@ -1,6 +1,9 @@
 %{
 #include<string.h>
 #include<stdio.h>
+
+struct ParserContext;
+
 #include "yacc_sql.tab.h"
 extern int atoi();
 extern double atof();

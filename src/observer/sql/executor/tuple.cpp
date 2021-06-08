@@ -217,7 +217,6 @@ TupleRecordConverter::TupleRecordConverter(Table *table, TupleSet &tuple_set) :
 }
 
 void TupleRecordConverter::add_record(const char *record) {
-  // TODO 这里可以对schema做预处理，比如每个tupleField对应表中的field
   const TupleSchema &schema = tuple_set_.schema();
   Tuple tuple;
   const TableMeta &table_meta = table_->table_meta();

@@ -1,14 +1,14 @@
-/* A Bison parser, made by GNU Bison 2.3.  */
+/* A Bison parser, made by GNU Bison 3.7.  */
 
-/* Skeleton interface for Bison's Yacc-like parsers in C
+/* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004, 2005, 2006
-   Free Software Foundation, Inc.
+   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2020 Free Software Foundation,
+   Inc.
 
-   This program is free software; you can redistribute it and/or modify
+   This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2, or (at your option)
-   any later version.
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -16,9 +16,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 51 Franklin Street, Fifth Floor,
-   Boston, MA 02110-1301, USA.  */
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* As a special exception, you may create a larger work that contains
    part or all of the Bison parser skeleton and distribute that work
@@ -33,111 +31,83 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
-/* Tokens.  */
+/* DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+   especially those whose name start with YY_ or yy_.  They are
+   private implementation details that can be changed or removed.  */
+
+#ifndef YY_YY_YACC_SQL_TAB_H_INCLUDED
+# define YY_YY_YACC_SQL_TAB_H_INCLUDED
+/* Debug traces.  */
+#ifndef YYDEBUG
+# define YYDEBUG 0
+#endif
+#if YYDEBUG
+extern int yydebug;
+#endif
+
+/* Token kinds.  */
 #ifndef YYTOKENTYPE
 # define YYTOKENTYPE
-   /* Put the tokens into the symbol table, so that GDB and other debuggers
-      know about them.  */
-   enum yytokentype {
-     SEMICOLON = 258,
-     CREATE = 259,
-     DROP = 260,
-     TABLE = 261,
-     TABLES = 262,
-     INDEX = 263,
-     SELECT = 264,
-     DESC = 265,
-     SHOW = 266,
-     SYNC = 267,
-     INSERT = 268,
-     DELETE = 269,
-     UPDATE = 270,
-     LBRACE = 271,
-     RBRACE = 272,
-     COMMA = 273,
-     TRX_BEGIN = 274,
-     TRX_COMMIT = 275,
-     TRX_ROLLBACK = 276,
-     INT_T = 277,
-     STRING_T = 278,
-     FLOAT_T = 279,
-     HELP = 280,
-     EXIT = 281,
-     DOT = 282,
-     INTO = 283,
-     VALUES = 284,
-     FROM = 285,
-     WHERE = 286,
-     AND = 287,
-     SET = 288,
-     ON = 289,
-     EQ = 290,
-     LT = 291,
-     GT = 292,
-     LE = 293,
-     GE = 294,
-     NE = 295,
-     NUMBER = 296,
-     FLOAT = 297,
-     ID = 298,
-     SSS = 299,
-     STAR = 300,
-     STRING_V = 301
-   };
+  enum yytokentype
+  {
+    YYEMPTY = -2,
+    YYEOF = 0,                     /* "end of file"  */
+    YYerror = 256,                 /* error  */
+    YYUNDEF = 257,                 /* "invalid token"  */
+    SEMICOLON = 258,               /* SEMICOLON  */
+    CREATE = 259,                  /* CREATE  */
+    DROP = 260,                    /* DROP  */
+    TABLE = 261,                   /* TABLE  */
+    TABLES = 262,                  /* TABLES  */
+    INDEX = 263,                   /* INDEX  */
+    SELECT = 264,                  /* SELECT  */
+    DESC = 265,                    /* DESC  */
+    SHOW = 266,                    /* SHOW  */
+    SYNC = 267,                    /* SYNC  */
+    INSERT = 268,                  /* INSERT  */
+    DELETE = 269,                  /* DELETE  */
+    UPDATE = 270,                  /* UPDATE  */
+    LBRACE = 271,                  /* LBRACE  */
+    RBRACE = 272,                  /* RBRACE  */
+    COMMA = 273,                   /* COMMA  */
+    TRX_BEGIN = 274,               /* TRX_BEGIN  */
+    TRX_COMMIT = 275,              /* TRX_COMMIT  */
+    TRX_ROLLBACK = 276,            /* TRX_ROLLBACK  */
+    INT_T = 277,                   /* INT_T  */
+    STRING_T = 278,                /* STRING_T  */
+    FLOAT_T = 279,                 /* FLOAT_T  */
+    HELP = 280,                    /* HELP  */
+    EXIT = 281,                    /* EXIT  */
+    DOT = 282,                     /* DOT  */
+    INTO = 283,                    /* INTO  */
+    VALUES = 284,                  /* VALUES  */
+    FROM = 285,                    /* FROM  */
+    WHERE = 286,                   /* WHERE  */
+    AND = 287,                     /* AND  */
+    SET = 288,                     /* SET  */
+    ON = 289,                      /* ON  */
+    EQ = 290,                      /* EQ  */
+    LT = 291,                      /* LT  */
+    GT = 292,                      /* GT  */
+    LE = 293,                      /* LE  */
+    GE = 294,                      /* GE  */
+    NE = 295,                      /* NE  */
+    NUMBER = 296,                  /* NUMBER  */
+    FLOAT = 297,                   /* FLOAT  */
+    ID = 298,                      /* ID  */
+    SSS = 299,                     /* SSS  */
+    STAR = 300,                    /* STAR  */
+    STRING_V = 301                 /* STRING_V  */
+  };
+  typedef enum yytokentype yytoken_kind_t;
 #endif
-/* Tokens.  */
-#define SEMICOLON 258
-#define CREATE 259
-#define DROP 260
-#define TABLE 261
-#define TABLES 262
-#define INDEX 263
-#define SELECT 264
-#define DESC 265
-#define SHOW 266
-#define SYNC 267
-#define INSERT 268
-#define DELETE 269
-#define UPDATE 270
-#define LBRACE 271
-#define RBRACE 272
-#define COMMA 273
-#define TRX_BEGIN 274
-#define TRX_COMMIT 275
-#define TRX_ROLLBACK 276
-#define INT_T 277
-#define STRING_T 278
-#define FLOAT_T 279
-#define HELP 280
-#define EXIT 281
-#define DOT 282
-#define INTO 283
-#define VALUES 284
-#define FROM 285
-#define WHERE 286
-#define AND 287
-#define SET 288
-#define ON 289
-#define EQ 290
-#define LT 291
-#define GT 292
-#define LE 293
-#define GE 294
-#define NE 295
-#define NUMBER 296
-#define FLOAT 297
-#define ID 298
-#define SSS 299
-#define STAR 300
-#define STRING_V 301
 
-
-
-
+/* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef union YYSTYPE
-#line 101 "yacc_sql.y"
+union YYSTYPE
 {
+#line 104 "yacc_sql.y"
+
     struct _Attr *attr;
 	  struct _Condition *condition1;
   	struct _Value *value1;
@@ -145,14 +115,17 @@ typedef union YYSTYPE
   //  char *ssss;
     int number;
     float floats;
-}
-/* Line 1529 of yacc.c.  */
-#line 151 "yacc_sql.tab.h"
-	YYSTYPE;
-# define yystype YYSTYPE /* obsolescent; will be withdrawn */
-# define YYSTYPE_IS_DECLARED 1
+
+#line 120 "yacc_sql.tab.h"
+
+};
+typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
+# define YYSTYPE_IS_DECLARED 1
 #endif
 
-extern YYSTYPE yylval;
 
+
+int yyparse (void *scanner);
+
+#endif /* !YY_YY_YACC_SQL_TAB_H_INCLUDED  */

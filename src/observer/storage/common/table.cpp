@@ -253,8 +253,6 @@ const TableMeta &Table::table_meta() const {
 }
 
 RC Table::make_record(int value_num, const Value *values, char * &record_out) {
-  // NOTE: 从Yacc出来的values是逆序的
-
   // 检查字段类型是否一致
   if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
     return RC::SCHEMA_FIELD_MISSING;
@@ -263,7 +261,7 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
   const int normal_field_start_index = table_meta_.sys_field_num();
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &value = values[value_num - i - 1];
+    const Value &value = values[i];
     if (field->type() != value.type) {
       LOG_ERROR("Invalid value type. field name=%s, type=%d, but given=%d",
         field->name(), field->type(), value.type);
@@ -277,7 +275,7 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
 
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &value = values[value_num - i - 1];
+    const Value &value = values[i];
     memcpy(record + field->offset(), value.data, field->len());
   }
 

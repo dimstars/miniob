@@ -178,6 +178,52 @@ typedef struct Query {
 extern "C" {
 #endif // __cplusplus
 
+void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name);
+void relation_attr_destroy(RelAttr *relation_attr);
+
+void value_init_integer(Value *value, int v);
+void value_init_float(Value *value, float v);
+void value_init_string(Value *value, const char *v);
+void value_destroy(Value *value);
+
+void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
+                    int right_is_attr, RelAttr *right_attr, Value *right_value);
+void condition_destroy(Condition *condition);
+
+void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, int length);
+void attr_info_destroy(AttrInfo *attr_info);
+
+void selects_init(Selects *selects, ...);
+void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
+void selects_append_relation(Selects *selects, const char *relation_name);
+void selects_append_conditions(Selects *selects, Condition conditions[], int condition_num);
+void selects_destroy(Selects *selects);
+
+void inserts_init(Inserts *inserts, const char *relation_name, Value values[], int value_num);
+void inserts_destroy(Inserts *inserts);
+
+void deletes_init_relation(Deletes *deletes, const char *relation_name);
+void deletes_set_conditions(Deletes *deletes, Condition conditions[], int condition_num);
+void deletes_destroy(Deletes *deletes);
+
+void updates_init(Updates *updates, const char *relation_name, const char *attribute_name,
+                  Value *value, Condition conditions[], int condition_num);
+void updates_destroy(Updates *updates);
+
+void create_table_append_attribute(CreateTable *create_table, AttrInfo *attr_info);
+void create_table_init_name(CreateTable *create_table, const char *relation_name);
+void create_table_destroy(CreateTable *create_table);
+
+void drop_table_init(DropTable *drop_table, const char *relation_name);
+void drop_table_destroy(DropTable *drop_table);
+
+void create_index_init(CreateIndex *create_index, const char *index_name, 
+                       const char *relation_name, const char *attr_name);
+void create_index_destroy(CreateIndex *create_index);
+
+void drop_index_init(DropIndex *drop_index, const char *index_name);
+void drop_index_destroy(DropIndex *drop_index);
+
 void desc_table_init(DescTable *desc_table, const char *relation_name);
 void desc_table_destroy(DescTable *desc_table);
 

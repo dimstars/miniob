@@ -30,13 +30,13 @@
 
 using namespace common;
 
-//! Constructor
+// Constructor
 ExampleStage::ExampleStage(const char *tag) : Stage(tag) {}
 
-//! Destructor
+// Destructor
 ExampleStage::~ExampleStage() {}
 
-//! Parse properties, instantiate a stage object
+// Parse properties, instantiate a stage object
 Stage *ExampleStage::make_stage(const std::string &tag) {
   ExampleStage *stage = new ExampleStage(tag.c_str());
   if (stage == NULL) {
@@ -47,7 +47,7 @@ Stage *ExampleStage::make_stage(const std::string &tag) {
   return stage;
 }
 
-//! Set properties for this object set in stage specific properties
+// Set properties for this object set in stage specific properties
 bool ExampleStage::set_properties() {
   //  std::string stageNameStr(stage_name_);
   //  std::map<std::string, std::string> section = g_properties()->get(
@@ -60,7 +60,7 @@ bool ExampleStage::set_properties() {
   return true;
 }
 
-//! Initialize stage params and validate outputs
+// Initialize stage params and validate outputs
 bool ExampleStage::initialize() {
   LOG_TRACE("Enter");
 
@@ -72,7 +72,7 @@ bool ExampleStage::initialize() {
   return true;
 }
 
-//! Cleanup after disconnection
+// Cleanup after disconnection
 void ExampleStage::cleanup() {
   LOG_TRACE("Enter");
 

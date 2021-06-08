@@ -29,8 +29,8 @@ namespace common {
 
 extern bool &get_event_history_flag();
 
-// Constructor
 /**
+ * Constructor
  * @param[in] threads The number of threads to create.
  *
  * @post thread pool has <i>threads</i> threads running
@@ -47,8 +47,8 @@ Threadpool::Threadpool(unsigned int threads, const std::string &name)
   LOG_TRACE("exit");
 }
 
-// Destructor
 /**
+ * Destructor
  * Kills all threads and destroys pool.
  *
  * @post all threads are destroyed and pool is destroyed
@@ -66,8 +66,8 @@ Threadpool::~Threadpool() {
   LOG_TRACE("%s", "exit");
 }
 
-// Query number of threads.
 /**
+ * Query number of threads.
  * @return number of threads in the thread pool.
  */
 unsigned int Threadpool::num_threads() {
@@ -77,8 +77,8 @@ unsigned int Threadpool::num_threads() {
   return result;
 }
 
-// Add threads to the pool
 /**
+ * Add threads to the pool
  * @param[in] threads Number of threads to add to the pool.
  *
  * @post  0 <= (# of threads in pool) - (original # of threads in pool)
@@ -111,8 +111,8 @@ unsigned int Threadpool::add_threads(unsigned int threads) {
   return i;
 }
 
-// Kill threads in pool
 /**
+ * Kill threads in pool
  * Blocks until the requested number of threads are killed.  Won't
  * kill more than current number of threads.
  *
@@ -155,8 +155,8 @@ unsigned int Threadpool::kill_threads(unsigned int threads) {
   return i;
 }
 
-// Internal thread kill.
 /**
+ * Internal thread kill.
  * Internal operation called only when a thread kill event is processed.
  * Reduces the count of active threads, and, if this is the last pending
  * kill, signals the waiting kill_threads method.
@@ -174,8 +174,8 @@ void Threadpool::thread_kill() {
   MUTEX_UNLOCK(&thread_mutex_);
 }
 
-// Internal generate kill thread events
 /**
+ * Internal generate kill thread events
  * Internal operation called by kill_threads(). Generates the requested
  * number of kill thread events and schedules them.
  *
@@ -202,8 +202,8 @@ unsigned int Threadpool::gen_kill_thread_events(unsigned int to_kill) {
   return i;
 }
 
-// Schedule stage with some work
 /**
+ * Schedule stage with some work
  * Schedule a stage with some work to be done on the run queue.
  *
  * @param[in] stage Reference to stage to be scheduled.
@@ -231,8 +231,8 @@ void Threadpool::schedule(Stage *stage) {
 // Get name of thread pool
 const std::string &Threadpool::get_name() { return name_; }
 
-// Internal thread control function
 /**
+ * Internal thread control function
  * Function which contains the control loop for each service thread.
  * Should not be called except when a thread is created.
  */

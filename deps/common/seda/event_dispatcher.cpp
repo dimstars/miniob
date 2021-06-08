@@ -83,8 +83,8 @@ bool EventDispatcher::initialize() {
   return ret_val;
 }
 
-// Cleanup stage after disconnection
 /**
+ * Cleanup stage after disconnection
  * Call done() on any events left over in the event_store_.
  */
 void EventDispatcher::cleanup() {

@@ -35,8 +35,8 @@ namespace common {
 
 class Threadpool;
 
-//! A Stage to kill threads in a thread pool
 /**
+ * A Stage to kill threads in a thread pool
  * The KillThreadStage is scheduled on a thread pool whenever threads
  * need to be killed.  Each event handled by the stage results in the
  * death of the thread.
@@ -44,8 +44,8 @@ class Threadpool;
 class KillThreadStage : public Stage {
 
 public:
-  //! parse properties, instantiate a summation stage object
   /**
+   * parse properties, instantiate a summation stage object
    * @pre class members are uninitialized
    * @post initializing the class members
    * @return Stage instantiated object
@@ -53,8 +53,8 @@ public:
   static Stage *make_stage(const std::string &tag);
 
 protected:
-  //! Constructor
   /**
+   * Constructor
    * @param[in] tag     The label that identifies this stage.
    *
    * @pre  tag is non-null and points to null-terminated string
@@ -63,22 +63,22 @@ protected:
    */
   KillThreadStage(const char *tag) : Stage(tag) {}
 
-  //! Notify the pool and kill the thread
   /**
+   * Notify the pool and kill the thread
    * @param[in] event Pointer to event that must be handled.
    *
    * @post  Call never returns.  Thread is killed.  Pool is notified.
    */
   void handle_event(StageEvent *event);
 
-  //! Handle the callback
   /**
+   * Handle the callback
    * Nothing special for callbacks in this stage.
    */
   void callback_event(StageEvent *event, CallbackContext *context) { return; }
 
-  //! Initialize stage params
   /**
+   * Initialize stage params
    * Ignores next_stage_list_---there are no outputs for this stage.
    *
    * @pre  Stage not connected
@@ -86,8 +86,8 @@ protected:
    */
   bool initialize() { return true; }
 
-  //! set properties for this object
   /**
+   * set properties for this object
    * @pre class members are uninitialized
    * @post initializing the class members
    * @return Stage instantiated object

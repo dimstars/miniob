@@ -27,8 +27,8 @@
 namespace common {
 
 
-// A class to construct arbitrary subclass instances
 /**
+ *  A class to construct arbitrary subclass instances
  *
  *  This class provides a general solution to constructing instances
  *  of subclasses from a common generic base.  The template is

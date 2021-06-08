@@ -25,8 +25,8 @@
 namespace common {
 
 
-//! Notify the pool and kill the thread
 /**
+ * Notify the pool and kill the thread
  * @param[in] event Pointer to event that must be handled.
  *
  * @post  Call never returns.  Thread is killed.  Pool is notified.
@@ -38,8 +38,8 @@ void KillThreadStage::handle_event(StageEvent *event) {
   pthread_exit(0);
 }
 
-//! Process properties of the classes
 /**
+ * Process properties of the classes
  * @pre class members are uninitialized
  * @post initializing the class members
  * @return the class object

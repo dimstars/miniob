@@ -86,11 +86,11 @@ void QueryCacheStage::handle_event(StageEvent *event) {
   CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
   if (cb == nullptr) {
     LOG_ERROR("Failed to new callback for SQLStageEvent");
-    event->doneImmediate();
+    event->done_immediate();
     return;
   }
 
-  event->pushCallback(cb);
+  event->push_callback(cb);
    */
   // do nothing here, pass the event to the next stage
   planCacheStage->handle_event(event);
@@ -104,7 +104,7 @@ void QueryCacheStage::callback_event(StageEvent *event,
   LOG_TRACE("Enter\n");
 
   // TODO update data to query cache here
-  // event->doneImmediate();
+  // event->done_immediate();
 
   LOG_TRACE("Exit\n");
   return;

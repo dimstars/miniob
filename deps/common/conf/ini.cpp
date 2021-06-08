@@ -230,9 +230,9 @@ void Ini::to_string(std::string &output_str) {
 }
 
 //! Accessor function which wraps global properties object
-Ini *&get_g_properties() {
-  static Ini *g_properties = new Ini();
-  return g_properties;
+Ini *&get_properties() {
+  static Ini *properties = new Ini();
+  return properties;
 }
 
 } //namespace common

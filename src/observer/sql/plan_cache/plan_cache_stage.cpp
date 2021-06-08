@@ -87,11 +87,11 @@ void PlanCacheStage::handle_event(StageEvent *event) {
   CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
   if (cb == nullptr) {
     LOG_ERROR("Failed to new callback for SQLStageEvent");
-    event->doneImmediate();
+    event->done_immediate();
     return;
   }
 
-  event->pushCallback(cb);
+  event->push_callback(cb);
    */
   // do nothing here, pass the event to the next stage
   parseStage->handle_event(event);
@@ -105,7 +105,7 @@ void PlanCacheStage::callback_event(StageEvent *event,
   LOG_TRACE("Enter\n");
 
   // TODO  update execute plan here
-  // event->doneImmediate();
+  // event->done_immediate();
 
   LOG_TRACE("Exit\n");
   return;

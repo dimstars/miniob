@@ -41,9 +41,9 @@ protected:
 
 protected:
 private:
-  Stage *timerStage;
-  //report metrics every @metricReportInterval seconds
-  int  metricReportInterval;
+  Stage *timer_stage_;
+  //report metrics every @metric_report_interval_ seconds
+  int  metric_report_interval_;
 };
 } // namespace common
 #endif //__COMMON_SEDA_METRICS_STAGE_H__

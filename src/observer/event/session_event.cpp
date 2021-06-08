@@ -18,6 +18,7 @@
 //
 
 #include "session_event.h"
+
 SessionEvent::SessionEvent(ConnectionContext *client) : client(client) {
   responseLen = 0;
 }

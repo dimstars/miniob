@@ -22,9 +22,9 @@
 
 // Basic includes
 #include <assert.h>
+#include <signal.h>
 #include <iostream>
 #include <set>
-#include <signal.h>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -34,14 +34,12 @@
 #include "common/os/process_param.h"
 namespace common {
 
-
-
 /**
  * start the seda process, do this will trigger all threads
  */
-int initSeda(ProcessParam *pProcessCfg);
+int init_seda(ProcessParam *process_cfg);
 
-void cleanupSeda();
+void cleanup_seda();
 
 } //namespace common
 #endif // __COMMON_SEDA_INIT_H__

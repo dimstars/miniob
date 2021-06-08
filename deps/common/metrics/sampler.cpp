@@ -24,7 +24,7 @@
 
 namespace common {
 
-Sampler *&get_g_sampler() {
+Sampler *&get_sampler() {
   static Sampler *g_sampler = new Sampler();
 
   return g_sampler;

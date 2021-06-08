@@ -23,7 +23,6 @@
 #include <list>
 
 #include "common/defs.h"
-
 #include "common/seda/stage.h"
 namespace common {
 

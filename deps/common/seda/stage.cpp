@@ -27,13 +27,12 @@
 #include "common/lang/mutex.h"
 #include "common/lang/string.h"
 #include "common/log/log.h"
-
 #include "common/seda/init.h"
 #include "common/seda/thread_pool.h"
 namespace common {
 
 
-//! Constructor
+// Constructor
 /**
  * @param[in] tag     The label that identifies this stage.
  *
@@ -53,7 +52,7 @@ Stage::Stage(const char *tag)
   LOG_TRACE("%s", "exit");
 }
 
-//! Destructor
+// Destructor
 /**
  * @pre  stage is not connected
  * @post pending events are deleted and stage is destroyed
@@ -75,7 +74,7 @@ Stage::~Stage() {
   LOG_TRACE("%s", "exit");
 }
 
-//! Connect this stage to pipeline and threadpool
+// Connect this stage to pipeline and threadpool
 /**
  * Connect the output of this stage to the inputs of the stages in
  * the provided stage list.  Each subclass will validate the provided
@@ -120,7 +119,7 @@ bool Stage::connect() {
   return success;
 }
 
-//! Disconnect this stage from the pipeline and threadpool
+// Disconnect this stage from the pipeline and threadpool
 /**
  * Block stage from being scheduled.  Wait for currently processing
  * and scheduled events to complete, then disconnect from the threadpool.
@@ -149,7 +148,7 @@ void Stage::disconnect() {
   LOG_TRACE("%s%s", "exit", stage_name_);
 }
 
-//! Add an event to the queue.
+// Add an event to the queue.
 /**
  * @param[in] event Event to add to queue.
  *
@@ -176,7 +175,7 @@ void Stage::add_event(StageEvent *event) {
   }
 }
 
-//! Query length of queue
+// Query length of queue
 /**
  * @return length of event queue.
  */
@@ -189,7 +188,7 @@ unsigned long Stage::qlen() const {
   return res;
 }
 
-//! Query whether the queue is empty
+// Query whether the queue is empty
 /**
  * @return \c true if the queue is empty; \c false otherwise
  */
@@ -202,7 +201,7 @@ bool Stage::qempty() const {
   return empty;
 }
 
-//! Remove an event from the queue.
+// Remove an event from the queue.
 /**
  * Remove an event from the queue.  Called only by service thread.
  *
@@ -222,7 +221,7 @@ StageEvent *Stage::remove_event() {
   return se;
 }
 
-//! Release ref on stage from event.
+// Release ref on stage from event.
 /**
  * Release event reference on stage.  Called only by service thread.
  *

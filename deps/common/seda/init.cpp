@@ -17,22 +17,23 @@
 // Created by Longda on 2010
 //
 
+#include "common/seda/init.h"
+
 #include <errno.h>
 #include <fcntl.h>
-#include <iostream>
-#include <map>
 #include <paths.h>
 #include <pthread.h>
-#include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <iostream>
+#include <map>
+#include <string>
+
 #include "common/io/io.h"
 #include "common/log/log.h"
 #include "common/time/datetime.h"
-
-#include "common/seda/init.h"
 #include "common/seda/kill_thread.h"
 #include "common/seda/seda_config.h"
 #include "common/seda/stage_factory.h"
@@ -42,25 +43,25 @@
 namespace common {
 
 
-int initSeda(ProcessParam *pProcessCfg) {
+int init_seda(ProcessParam *process_cfg) {
   // Initialize the static data structures of threadpool
-  Threadpool::createPoolKey();
+  Threadpool::create_pool_key();
 
   // initialize class factory instances here
-  static StageFactory killThreadFactory("KillThreads",
+  static StageFactory kill_thread_factory("KillThreads",
                                         &KillThreadStage::make_stage);
-  static StageFactory timerFactory("TimerStage", &TimerStage::make_stage);
-  static StageFactory sedaStatsFactory("MetricsStage",
+  static StageFactory timer_factory("TimerStage", &TimerStage::make_stage);
+  static StageFactory seda_stats_factory("MetricsStage",
                                        &MetricsStage::make_stage);
 
   // try to parse the seda configuration files
-  SedaConfig *config = SedaConfig::getInstance();
-  SedaConfig::status_t configStat;
+  SedaConfig *config = SedaConfig::get_instance();
+  SedaConfig::status_t config_stat;
 
-  configStat = config->parse();
-  if (configStat != SedaConfig::SUCCESS) {
+  config_stat = config->parse();
+  if (config_stat != SedaConfig::SUCCESS) {
     LOG_ERROR("Error: unable to parse file %s",
-              pProcessCfg->get_process_name().c_str());
+              process_cfg->get_process_name().c_str());
     return errno;
   }
 
@@ -68,25 +69,25 @@ int initSeda(ProcessParam *pProcessCfg) {
   // at a log we can see if mmon is restarting us because we keep
   // crashing.
   LOG_INFO("(Re)Starting State: Pid: %u Time: %s", (unsigned int)getpid(),
-           DateTime::now().toStringLocal().c_str());
-  LOG_INFO("The process Name is %s", pProcessCfg->get_process_name().c_str());
+           DateTime::now().to_string_local().c_str());
+  LOG_INFO("The process Name is %s", process_cfg->get_process_name().c_str());
 
   // try to initialize the seda configuration
-  configStat = config->init();
-  if (configStat != SedaConfig::SUCCESS) {
+  config_stat = config->init();
+  if (config_stat != SedaConfig::SUCCESS) {
     LOG_ERROR("SedaConfig: unable to initialize seda stages");
     return errno;
   }
 
-  theSedaConfig() = config;
+  get_seda_config() = config;
 
   return 0;
 }
 
-void cleanupSeda() {
-  SedaConfig *sedaConfig = SedaConfig::getInstance();
-  delete sedaConfig;
-  SedaConfig::getInstance() = NULL;
+void cleanup_seda() {
+  SedaConfig *seda_config = SedaConfig::get_instance();
+  delete seda_config;
+  SedaConfig::get_instance() = NULL;
 }
 
 } //namespace common

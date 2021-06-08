@@ -17,9 +17,10 @@
 // Created by Longda on 2021/4/13.
 //
 
+#include "common/seda/metrics_stage.h"
+
 #include <string.h>
 #include <string>
-
 
 #include "common/conf/ini.h"
 #include "common/io/io.h"
@@ -29,24 +30,23 @@
 #include "common/seda/metrics_report_event.h"
 #include "common/seda/timer_stage.h"
 #include "common/time/datetime.h"
-#include "common/seda/metrics_stage.h"
 #include "common/seda/seda_defs.h"
 
 using namespace common;
 
-MetricsRegistry &theGlobalMetricRegistry() {
-  static MetricsRegistry metricsRegistry;
+MetricsRegistry &get_metric_registry() {
+  static MetricsRegistry metrics_registry;
 
-  return metricsRegistry;
+  return metrics_registry;
 }
 
-//! Constructor
+// Constructor
 MetricsStage::MetricsStage(const char *tag) : Stage(tag) {}
 
-//! Destructor
+// Destructor
 MetricsStage::~MetricsStage() {}
 
-//! Parse properties, instantiate a stage object
+// Parse properties, instantiate a stage object
 Stage *MetricsStage::make_stage(const std::string &tag) {
   MetricsStage *stage = new MetricsStage(tag.c_str());
   if (stage == NULL) {
@@ -57,38 +57,38 @@ Stage *MetricsStage::make_stage(const std::string &tag) {
   return stage;
 }
 
-//! Set properties for this object set in stage specific properties
+// Set properties for this object set in stage specific properties
 bool MetricsStage::set_properties() {
-  std::string stageNameStr(stage_name_);
+  std::string stage_name_str(stage_name_);
   std::map<std::string, std::string> section =
-      get_g_properties()->get(stageNameStr);
+      get_properties()->get(stage_name_str);
 
-  metricReportInterval = DateTime::SECONDS_PER_MIN;
+  metric_report_interval_ = DateTime::SECONDS_PER_MIN;
 
   std::string key = METRCS_REPORT_INTERVAL;
   std::map<std::string, std::string>::iterator it = section.find(key);
   if (it != section.end()) {
-    str_to_val(it->second, metricReportInterval);
+    str_to_val(it->second, metric_report_interval_);
   }
 
   return true;
 }
 
-//! Initialize stage params and validate outputs
+// Initialize stage params and validate outputs
 bool MetricsStage::initialize() {
   LOG_TRACE("Enter");
 
   std::list<Stage *>::iterator stgp = next_stage_list_.begin();
-  timerStage = *(stgp++);
+  timer_stage_ = *(stgp++);
 
-  MetricsReportEvent *reportEvent = new MetricsReportEvent();
+  MetricsReportEvent *report_event = new MetricsReportEvent();
 
-  add_event(reportEvent);
+  add_event(report_event);
   LOG_TRACE("Exit");
   return true;
 }
 
-//! Cleanup after disconnection
+// Cleanup after disconnection
 void MetricsStage::cleanup() {
   LOG_TRACE("Enter");
 
@@ -107,9 +107,9 @@ void MetricsStage::handle_event(StageEvent *event) {
     return;
   }
 
-  TimerRegisterEvent *tmEvent =
-      new TimerRegisterEvent(event, metricReportInterval * USEC_PER_SEC);
-  if (tmEvent == NULL) {
+  TimerRegisterEvent *tm_event =
+      new TimerRegisterEvent(event, metric_report_interval_ * USEC_PER_SEC);
+  if (tm_event == NULL) {
     LOG_ERROR("Failed to new TimerRegisterEvent");
 
     delete cb;
@@ -119,8 +119,8 @@ void MetricsStage::handle_event(StageEvent *event) {
     return;
   }
 
-  event->pushCallback(cb);
-  timerStage->add_event(tmEvent);
+  event->push_callback(cb);
+  timer_stage_->add_event(tm_event);
 
   LOG_TRACE("Exit\n");
   return;
@@ -129,10 +129,10 @@ void MetricsStage::handle_event(StageEvent *event) {
 void MetricsStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
-  MetricsRegistry &metricsRegistry = get_g_metrics_registry();
+  MetricsRegistry &metrics_registry = get_metrics_registry();
 
-  metricsRegistry.snapshot();
-  metricsRegistry.report();
+  metrics_registry.snapshot();
+  metrics_registry.report();
 
   // do it again.
   add_event(event);

@@ -105,7 +105,7 @@ void ExecuteStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   // TODO, here finish read all data from disk or network, but do nothing here.
-  event->doneImmediate();
+  event->done_immediate();
 
   LOG_TRACE("Exit\n");
   return;
@@ -120,7 +120,7 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
   switch (sql->flag) {
     case SCF_SELECT: { // select
       do_select(current_db, sql, exe_event->sql_event()->session_event());
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
 
@@ -136,31 +136,31 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
       StorageEvent *storage_event = new (std::nothrow) StorageEvent(exe_event);
       if (storage_event == nullptr) {
         LOG_ERROR("Failed to new StorageEvent");
-        event->doneImmediate();
+        event->done_immediate();
         return;
       }
 
       CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
       if (cb == nullptr) {
         LOG_ERROR("Failed to new callback for SessionEvent");
-        storage_event->doneImmediate();
+        storage_event->done_immediate();
         return;
       }
 
-      storage_event->pushCallback(cb);
+      storage_event->push_callback(cb);
       defaultStorageStage->handle_event(storage_event);
     }
     break;
     case SCF_SYNC: { // TODO move to default storage ?
       RC rc = DefaultHandler::get_default().sync();
       session_event->set_response(strrc(rc));
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_BEGIN: {
       session_event->get_client()->session->set_trx_multi_operation_mode(true);
       session_event->set_response(strrc(RC::SUCCESS));
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_COMMIT: {
@@ -168,7 +168,7 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
       RC rc = trx->commit();
       session_event->get_client()->session->set_trx_multi_operation_mode(false);
       session_event->set_response(strrc(rc));
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_ROLLBACK: {
@@ -176,23 +176,23 @@ void ExecuteStage::handleRequest(common::StageEvent *event) {
       RC rc = trx->rollback();
       session_event->get_client()->session->set_trx_multi_operation_mode(false);
       session_event->set_response(strrc(rc));
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_HELP: {
       // TODO
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     case SCF_EXIT: {
       // do nothing
       const char *response = "Unsupported\n";
       session_event->set_response(response);
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
     }
     break;
     default: {
-      exe_event->doneImmediate();
+      exe_event->done_immediate();
       LOG_ERROR("Unsupported command=%d\n", sql->flag);
     }
   }

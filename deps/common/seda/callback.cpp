@@ -27,7 +27,7 @@
 #include "common/seda/stage_event.h"
 namespace common {
 
-extern bool &theEventHistoryFlag();
+extern bool &get_event_history_flag();
 
 /**
  * @author Longda
@@ -36,56 +36,56 @@ extern bool &theEventHistoryFlag();
  * Implementation of CompletionCallback class.
  */
 
-//! Constructor
+// Constructor
 CompletionCallback::CompletionCallback(Stage *trgt, CallbackContext *ctx)
-  : targetStage(trgt), context(ctx), nextCb(NULL),
-    evHistFlag(theEventHistoryFlag()) {}
+  : target_stage_(trgt), context_(ctx), next_cb_(NULL),
+    ev_hist_flag_(get_event_history_flag()) {}
 
-//! Destructor
+// Destructor
 CompletionCallback::~CompletionCallback() {
-  if (context) {
-    delete context;
+  if (context_) {
+    delete context_;
   }
-  if (nextCb) {
-    delete nextCb;
+  if (next_cb_) {
+    delete next_cb_;
   }
 }
 
-//! Push onto a callback stack
-void CompletionCallback::pushCallback(CompletionCallback *next) {
-  ASSERT((!nextCb), "%s", "cannot push a callback twice");
+// Push onto a callback stack
+void CompletionCallback::push_callback(CompletionCallback *next) {
+  ASSERT((!next_cb_), "%s", "cannot push a callback twice");
 
-  nextCb = next;
+  next_cb_ = next;
 }
 
-//! Pop off of a callback stack
-CompletionCallback *CompletionCallback::popCallback() {
-  CompletionCallback *retVal = nextCb;
+// Pop off of a callback stack
+CompletionCallback *CompletionCallback::pop_callback() {
+  CompletionCallback *ret_val = next_cb_;
 
-  nextCb = NULL;
-  return retVal;
+  next_cb_ = NULL;
+  return ret_val;
 }
 
-//! One event is complete
-void CompletionCallback::eventDone(StageEvent *ev) {
+// One event is complete
+void CompletionCallback::event_done(StageEvent *ev) {
 
-  if (evHistFlag) {
-    ev->saveStage(targetStage, StageEvent::CALLBACK_EV);
+  if (ev_hist_flag_) {
+    ev->save_stage(target_stage_, StageEvent::CALLBACK_EV);
   }
-  targetStage->callback_event(ev, context);
+  target_stage_->callback_event(ev, context_);
 }
 
-//! Reschedule callback on target stage thread
-void CompletionCallback::eventReschedule(StageEvent *ev) {
-  targetStage->add_event(ev);
+// Reschedule callback on target stage thread
+void CompletionCallback::event_reschedule(StageEvent *ev) {
+  target_stage_->add_event(ev);
 }
 
-void CompletionCallback::eventTimeout(StageEvent *ev) {
-  LOG_DEBUG("to call eventTimeout for stage %s", targetStage->get_name());
-  if (evHistFlag) {
-    ev->saveStage(targetStage, StageEvent::TIMEOUT_EV);
+void CompletionCallback::event_timeout(StageEvent *ev) {
+  LOG_DEBUG("to call event_timeout for stage %s", target_stage_->get_name());
+  if (ev_hist_flag_) {
+    ev->save_stage(target_stage_, StageEvent::TIMEOUT_EV);
   }
-  targetStage->timeout_event(ev, context);
+  target_stage_->timeout_event(ev, context_);
 }
 
 } //namespace common

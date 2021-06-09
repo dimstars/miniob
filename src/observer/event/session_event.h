@@ -20,6 +20,7 @@
 #ifndef __OBSERVER_SESSION_SESSIONEVENT_H__
 #define __OBSERVER_SESSION_SESSIONEVENT_H__
 
+#include <string.h>
 #include <string>
 
 #include "common/seda/stage_event.h"

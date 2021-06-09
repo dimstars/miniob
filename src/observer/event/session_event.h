@@ -26,7 +26,6 @@
 #include "common/seda/stage_event.h"
 #include "net/connection_context.h"
 
-// TODO refactor
 class SessionEvent : public common::StageEvent {
 public:
   SessionEvent(ConnectionContext *client);

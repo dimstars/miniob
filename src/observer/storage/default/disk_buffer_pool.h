@@ -27,10 +27,11 @@
 #include <sys/stat.h>
 #include <time.h>
 
+#include <vector>
 
 #include "rc.h"
 
-typedef int PageNum; // 使用Unsigned不能清晰的判断是否invalid page number
+typedef int PageNum;
 
 //
 #define BP_INVALID_PAGE_NUM (-1)
@@ -39,8 +40,6 @@ typedef int PageNum; // 使用Unsigned不能清晰的判断是否invalid page nu
 #define BP_FILE_SUB_HDR_SIZE (sizeof(BPFileSubHeader))
 #define BP_BUFFER_SIZE 50
 #define MAX_OPEN_FILE 50
-
-
 
 typedef struct {
   PageNum page_num;
@@ -64,7 +63,7 @@ typedef struct {
 typedef struct {
   bool open;
   Frame *frame;
-} BPPageHandle; // TODO 没有初始化
+} BPPageHandle;
 
 class BPFileHandle{
 public:
@@ -80,45 +79,44 @@ public:
   Page *hdr_page;
   char *bitmap;
   BPFileSubHeader *file_sub_header;
-
-
 } ;
 
-/**
- * TODO
- * 当前BPManager 太简单， 直接使用全局变量， 把所有的Frame 直接拥有，
- * 当内存量非常大的时候， 这个地方很容易出问题。
- *
- * 更好的做法是， 使用内存池算法， 动态申请
- *
- * 这里可以做为一个考题：
- */
 class BPManager {
 public:
-  BPManager() {
-    for (int i = 0; i < BP_BUFFER_SIZE; i++) {
+  BPManager(int size = BP_BUFFER_SIZE) {
+    this->size = size;
+    frame = new Frame[size];
+    allocated = new bool[size];
+    for (int i = 0; i < size; i++) {
       allocated[i] = false;
       frame[i].pin_count = 0;
     }
   }
 
-  void setReads(int reads) { this->reads = reads; }
+  ~BPManager() {
+    delete frame;
+    delete allocated;
+    size = 0;
+    frame = nullptr;
+    allocated = nullptr;
+  }
 
-  int getReads() { return reads; }
+  Frame *alloc() {
+    return nullptr; // TODO for test
+  }
 
-  void setWrites(int writes) { this->writes = writes; }
-
-  int getWrites() { return writes; }
+  Frame *get(int file_desc, PageNum page_num) {
+    return nullptr; // TODO for test
+  }
 
   Frame *getFrame() { return frame; }
 
   bool *getAllocated() { return allocated; }
 
 public:
-  int reads;
-  int writes;
-  Frame frame[BP_BUFFER_SIZE];
-  bool allocated[BP_BUFFER_SIZE];
+  int size;
+  Frame * frame = nullptr;
+  bool *allocated = nullptr;
 };
 
 // TODO refactor

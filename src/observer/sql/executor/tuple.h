@@ -22,7 +22,7 @@
 
 #include <vector>
 
-#include "handler/handler_defs.h"
+#include "sql/parser/parse.h"
 #include "sql/executor/value.h"
 
 class Table;

@@ -18,7 +18,6 @@
 //
 
 #include "condition_filter.h"
-#include "handler/handler_defs.h"
 #include "record_manager.h"
 #include "common/log/log.h"
 #include "storage/common/table.h"
@@ -34,12 +33,12 @@ DefaultConditionFilter::~DefaultConditionFilter() {
 }
 
 RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType attr_type, CompOp comp_op) {
-  if (attr_type < chars || attr_type > floats) {
+  if (attr_type < CHARS || attr_type > FLOATS) {
     LOG_ERROR("Invalid condition with unsupported attribute type: %d", attr_type);
     return RC::INVALID_ARGUMENT;
   }
 
-  if (comp_op < EQual || comp_op >= NO_OP) {
+  if (comp_op < EQUAL_TO || comp_op >= NO_OP) {
     LOG_ERROR("Invalid condition with unsupported compare operation: %d", comp_op);
     return RC::INVALID_ARGUMENT;
   }
@@ -56,14 +55,14 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
   ConDesc left;
   ConDesc right;
 
-  AttrType type_left = undefined;
-  AttrType type_right = undefined;
+  AttrType type_left = UNDEFINED;
+  AttrType type_right = UNDEFINED;
 
-  if (1 == condition.bLhsIsAttr) {
+  if (1 == condition.left_is_attr) {
     left.is_attr = true;
-    const FieldMeta *field_left = table_meta.field(condition.lhsAttr.attrName);
+    const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name);
     if (nullptr == field_left) {
-      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.lhsAttr.attrName);
+      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.left_attr.attribute_name);
       return RC::SCHEMA_FIELD_MISSING;
     }
     left.attr_length = field_left->len();
@@ -72,15 +71,15 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
     type_left = field_left->type();
   } else {
     left.is_attr = false;
-    left.value = condition.lhsValue.data; // 校验type 或者转换类型
-    type_left = condition.lhsValue.type;
+    left.value = condition.left_value.data; // 校验type 或者转换类型
+    type_left = condition.left_value.type;
   }
 
-  if (1 == condition.bRhsIsAttr) {
+  if (1 == condition.right_is_attr) {
     right.is_attr = true;
-    const FieldMeta *field_right = table_meta.field(condition.lhsAttr.attrName);
+    const FieldMeta *field_right = table_meta.field(condition.right_attr.attribute_name);
     if (nullptr == field_right) {
-      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.lhsAttr.attrName);
+      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.right_attr.attribute_name);
       return RC::SCHEMA_FIELD_MISSING;
     }
     right.attr_length = field_right->len();
@@ -88,8 +87,8 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
     type_right = field_right->type();
   } else {
     right.is_attr = false;
-    right.value = condition.rhsValue.data;
-    type_right = condition.rhsValue.type;
+    right.value = condition.right_value.data;
+    type_right = condition.right_value.type;
   }
 
   // 校验和转换
@@ -101,7 +100,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 
-  return init(left, right, type_left, condition.op);
+  return init(left, right, type_left, condition.comp);
 }
 
 bool DefaultConditionFilter::filter(const Record &rec) const {
@@ -122,12 +121,12 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
 
   int cmp_result = 0;
   switch (attr_type_) {
-    case chars: { // 字符串都是定长的，直接比较
+    case CHARS: { // 字符串都是定长的，直接比较
       // TODO 字符串的格式还不确定，先按照C字符串风格来定
       cmp_result = strcmp(left_value, right_value);
     }
     break;
-    case ints: {
+    case INTS: {
       // TODO 没有考虑大小端问题
       // TODO 对int和float，要考虑字节对齐问题,有些平台下直接转换可能会跪
       int left = *(int*)left_value;
@@ -135,7 +134,7 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
       cmp_result = left - right;
     }
     break;
-    case floats: {
+    case FLOATS: {
       float left = *(float*)left_value;
       float right = *(float*)right_value;
       cmp_result = (int)(left - right);
@@ -148,17 +147,17 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
 
   switch (comp_op_)
   {
-  case EQual:
+  case EQUAL_TO:
     return 0 == cmp_result;
-  case LEqual:
+  case LESS_EQUAL:
     return cmp_result <= 0;
-  case NEqual:
+  case NOT_EQUAL:
     return cmp_result != 0;
-  case LessT:
+  case LESS_THAN:
     return cmp_result < 0;
-  case GEqual:
+  case GREAT_EQUAL:
     return cmp_result >= 0;
-  case GreatT:
+  case GREAT_THAN:
     return cmp_result > 0;
   
   default:

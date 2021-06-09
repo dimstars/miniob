@@ -1,6 +1,9 @@
 %{
 #include<string.h>
 #include<stdio.h>
+
+struct ParserContext;
+
 #include "yacc_sql.tab.h"
 extern int atoi();
 extern double atof();
@@ -17,6 +20,8 @@ char * position = "";
 
 /* Prevent the need for linking with -lfl */
 %option noyywrap
+%option bison-bridge
+%option reentrant
 
 WS      [\ \t\b\f]
 DIGIT   [0-9]+
@@ -31,8 +36,8 @@ QUOTE   [\'\"]
 {WS}                    /* ignore whitespace */;
 \n																						 ;			
 
-[\-]?{DIGIT}+					         { yylval.number=atoi(yytext); position=strdup(yytext); RETURN_TOKEN(NUMBER);}
-[\-]?{DIGIT}+{DOT}{DIGIT}+				 { yylval.floats=(float)(atof(yytext)); position=strdup(yytext); RETURN_TOKEN(FLOAT);}
+[\-]?{DIGIT}+					                  { yylval->number=atoi(yytext); position=strdup(yytext); RETURN_TOKEN(NUMBER);}
+[\-]?{DIGIT}+{DOT}{DIGIT}+				      { yylval->floats=(float)(atof(yytext)); position=strdup(yytext); RETURN_TOKEN(FLOAT);}
 
 ";"                 	 				           RETURN_TOKEN(SEMICOLON);
 {DOT}                 					         RETURN_TOKEN(DOT);
@@ -64,7 +69,7 @@ QUOTE   [\'\"]
 [Ii][Nn][Tt]					                   { position=strdup(yytext);RETURN_TOKEN(INT_T);}
 [Cc][Hh][Aa][Rr]				                 { position=strdup(yytext);RETURN_TOKEN(STRING_T);}
 [Ff][Ll][Oo][Aa][Tt]			               { position=strdup(yytext);RETURN_TOKEN(FLOAT_T);}
-{ID}							                       { yylval.string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(ID);}
+{ID}							                       { yylval->string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(ID);}
 "("								                       { position=strdup(yytext);RETURN_TOKEN(LBRACE);}
 ")"								                       position=strdup(yytext);RETURN_TOKEN(RBRACE);
 
@@ -75,11 +80,11 @@ QUOTE   [\'\"]
 "<"                                      position=strdup(yytext);RETURN_TOKEN(LT);
 ">="                                     position=strdup(yytext);RETURN_TOKEN(GE);
 ">"                                      position=strdup(yytext);RETURN_TOKEN(GT);
-{QUOTE}[\40\42\47a-zA-Z0-9]*{QUOTE}	     {yylval.string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(SSS);}
+{QUOTE}[\40\42\47a-zA-Z0-9]*{QUOTE}	     {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(SSS);}
 
 .						                 { printf("Unknown character [%c]\n",yytext[0]);  return yytext[0];    }
 %%
 
-void scan_string(const char *str) {
-	yy_switch_to_buffer(yy_scan_string(str));
+void scan_string(const char *str, yyscan_t scanner) {
+	yy_switch_to_buffer(yy_scan_string(str, scanner), scanner);
 }

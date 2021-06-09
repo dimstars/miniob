@@ -18,7 +18,6 @@
 //
 #include "storage/common/record_manager.h"
 #include "rc.h"
-#include "handler/handler_defs.h"
 #include "common/log/log.h"
 #include "common/lang/bitmap.h"
 #include "condition_filter.h"
@@ -104,10 +103,11 @@ RC RecordPageHandler::init_empty_page(DiskBufferPool &buffer_pool, int file_id, 
   }
 
   int page_size = sizeof(page_handle_.frame->page.data);
+  int record_phy_size = align8(record_size);
   page_header_->record_num = 0;
-  page_header_->record_capacity = page_record_capacity(page_size, record_size);
+  page_header_->record_capacity = page_record_capacity(page_size, record_phy_size);
   page_header_->record_real_size = record_size;
-  page_header_->record_size = align8(record_size);
+  page_header_->record_size = record_phy_size;
   page_header_->first_record_offset = page_header_size(page_header_->record_capacity);
   bitmap_ = page_handle_.frame->page.data + page_fix_size();
 
@@ -130,7 +130,7 @@ RC RecordPageHandler::deinit() {
 RC RecordPageHandler::insert_record(const char *data, RID *rid) {
 
   if (page_header_->record_num == page_header_->record_capacity) {
-    return RC::RECORD_NOMEM; // TODO 错误码
+    return RC::RECORD_NOMEM;
   }
 
   // 找到空闲位置
@@ -217,7 +217,7 @@ RC RecordPageHandler::get_record(const RID *rid, Record *rec) {
 
   // rec->valid = true;
   rec->rid = *rid;
-  rec->data = data; // TODO 参考table中的调用，返回record后，page可能会释放掉
+  rec->data = data;
   return RC::SUCCESS;
 }
 
@@ -242,7 +242,7 @@ RC RecordPageHandler::get_next_record(Record *rec) {
   rec->rid.slot_num = index;
   // rec->valid = true;
 
-  char *record_data = page_handle_.frame->page.data +  // TODO buffer_pool::get_data
+  char *record_data = page_handle_.frame->page.data +
       page_header_->first_record_offset + (index * page_header_->record_size);
   rec->data = record_data;
   return RC::SUCCESS;
@@ -289,7 +289,6 @@ void RecordFileHandler::close() {
 RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid) {
   RC ret = RC::SUCCESS;
   // 找到没有填满的页面 
-  // TODO 优化空闲页面管理
   int page_count = 0;
   if ((ret = disk_buffer_pool_->get_page_count(file_id_, &page_count)) != RC::SUCCESS) {
     LOG_ERROR("Failed to get page count while inserting record");
@@ -341,10 +340,12 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
     current_page_num = page_handle.frame->page.page_num;
     record_page_handler_.deinit();
     ret = record_page_handler_.init_empty_page(*disk_buffer_pool_, file_id_, current_page_num, record_size);
-    if (ret != RC::SUCCESS) { // TODO 初始化失败，文件就被破坏了
+    if (ret != RC::SUCCESS) {
       LOG_ERROR("Failed to init empty page. ret=%d", ret);
+      disk_buffer_pool_->unpin_page(&page_handle);
       return ret;
     }
+    disk_buffer_pool_->unpin_page(&page_handle);
   }
 
   // 找到空闲位置

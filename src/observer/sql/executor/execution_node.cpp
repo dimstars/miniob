@@ -54,7 +54,7 @@ public:
   TupleConditionFilter()  = default;
 
   RC init(const std::vector<TupleSet> &tuple_set_list, const Condition *condition) {
-    if (condition->op < EQual || condition->op > GreatT) {
+    if (condition->comp < EQUAL_TO || condition->comp > GREAT_THAN) {
       return RC::INVALID_ARGUMENT;
     }
 
@@ -62,13 +62,13 @@ public:
     for (int i = 0; i < tuple_set_size; i++) {
       const TupleSchema &schema = tuple_set_list[i].schema();
       if (index_in_tuple_set_left_ == -1) {
-        index_in_tuple_left_ = schema.index_of_field(condition->lhsAttr.relName, condition->lhsAttr.attrName);
+        index_in_tuple_left_ = schema.index_of_field(condition->left_attr.relation_name, condition->left_attr.attribute_name);
         if (index_in_tuple_left_ >= 0) {
           index_in_tuple_set_left_ = i;
         }
       }
       if (index_in_tuple_set_right_ == -1) {
-        index_in_tuple_right_ = schema.index_of_field(condition->rhsAttr.relName, condition->rhsAttr.attrName);
+        index_in_tuple_right_ = schema.index_of_field(condition->right_attr.relation_name, condition->right_attr.attribute_name);
         if (index_in_tuple_right_ >= 0) {
           index_in_tuple_set_right_ = i;
         }
@@ -77,8 +77,8 @@ public:
 
     if (index_in_tuple_set_left_ == -1 || index_in_tuple_set_right_ == -1) {
       LOG_ERROR("Failed to address condition. left attr=%s.%s, right attr=%s.%s",
-                condition->lhsAttr.relName, condition->lhsAttr.attrName,
-                condition->rhsAttr.relName, condition->rhsAttr.attrName);
+                condition->left_attr.relation_name, condition->left_attr.attribute_name,
+                condition->right_attr.relation_name, condition->right_attr.attribute_name);
       return RC::GENERIC_ERROR;
     }
 
@@ -91,7 +91,7 @@ public:
     }
 
     attr_type_ = left_field.type();
-    comp_op_ = condition->op;
+    comp_op_ = condition->comp;
     return RC::SUCCESS;
   }
 
@@ -102,12 +102,12 @@ public:
     int result = left_value.compare(right_value);
 
     switch (comp_op_) {
-      case EQual: return result == 0;
-      case LEqual: return result <= 0;
-      case NEqual: return result != 0;
-      case LessT: return result < 0;
-      case GEqual: return result >= 0;
-      case GreatT: return result > 0;
+      case EQUAL_TO: return result == 0;
+      case LESS_EQUAL: return result <= 0;
+      case NOT_EQUAL: return result != 0;
+      case LESS_THAN: return result < 0;
+      case GREAT_EQUAL: return result >= 0;
+      case GREAT_THAN: return result > 0;
       default: { // never happen
         LOG_PANIC("Found invalid compare op: %d", comp_op_);
         return false;

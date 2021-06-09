@@ -25,7 +25,7 @@
 #include <unordered_set>
 #include <mutex>
 
-#include "handler/handler_defs.h"
+#include "sql/parser/parse.h"
 #include "storage/common/record_manager.h"
 #include "rc.h"
 
@@ -74,6 +74,10 @@ public:
   }
 };
 
+/**
+ * 这里是一个简单的事务实现，可以支持提交/回滚。但是没有对并发访问做控制
+ * 可以在这个基础上做备份恢复，当然也可以重写
+ */
 class Trx {
 public:
   static int32_t default_trx_id();
@@ -116,7 +120,7 @@ private:
   void start_if_not_started();
 private:
   int32_t  trx_id_ = 0;
-  std::unordered_map<Table *, OperationSet> operations_; // TODO set
+  std::unordered_map<Table *, OperationSet> operations_;
 };
 
 #endif // __OBSERVER_STORAGE_TRX_TRX_H_

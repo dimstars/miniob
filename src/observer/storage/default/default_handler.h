@@ -22,7 +22,6 @@
 #include <string>
 #include <map>
 
-#include "handler/handler_defs.h"
 #include "storage/common/db.h"
 
 class Trx;

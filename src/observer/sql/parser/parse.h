@@ -20,12 +20,10 @@
 #ifndef __OBSERVER_SQL_PARSER_PARSE_H__
 #define __OBSERVER_SQL_PARSER_PARSE_H__
 
-#define MAX_NUM 20
-#include "handler/handler_defs.h"
 #include "rc.h"
-//char *position;
+#include "sql/parser/parse_defs.h"
 
-RC parse(const char *st, sqlstr *sqln);
+RC parse(const char *st, Query *sqln);
 
 #endif //__OBSERVER_SQL_PARSER_PARSE_H__
 

@@ -120,7 +120,7 @@ void SessionStage::callback_event(StageEvent *event, CallbackContext *context) {
   }
   Server::send(sev->get_client(), response, len);
 
-  sev->done();
+  // sev->done();
   LOG_TRACE("Exit\n");
   return;
 }
@@ -140,7 +140,7 @@ void SessionStage::handle_request(StageEvent *event) {
   if (cb == nullptr) {
     LOG_ERROR("Failed to new callback for SessionEvent");
 
-    sev->done();
+    sev->done_immediate();
     return;
   }
 
@@ -148,6 +148,4 @@ void SessionStage::handle_request(StageEvent *event) {
 
   SQLStageEvent *sql_event = new SQLStageEvent(sev, sql);
   resolve_stage_->handle_event(sql_event);
-
-  // TODO it will write data directly
 }

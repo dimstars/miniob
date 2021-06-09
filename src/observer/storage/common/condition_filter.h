@@ -21,7 +21,7 @@
 #define __OBSERVER_STORAGE_COMMON_CONDITION_FILTER_H_
 
 #include "rc.h"
-#include "handler/handler_defs.h"
+#include "sql/parser/parse.h"
 
 struct Record;
 class Table;

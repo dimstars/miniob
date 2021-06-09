@@ -33,16 +33,16 @@ public:
 protected:
   // common function
   DefaultStorageStage(const char *tag);
-  bool set_properties();
+  bool set_properties() override;
 
-  bool initialize();
-  void cleanup();
-  void handle_event(common::StageEvent *event);
+  bool initialize() override;
+  void cleanup() override;
+  void handle_event(common::StageEvent *event) override;
   void callback_event(common::StageEvent *event,
-                     common::CallbackContext *context);
+                     common::CallbackContext *context) override;
 
 protected:
-  common::SimpleTimer *queryMetric;
+  common::SimpleTimer *query_metric_;
   static const std::string QUERY_METRIC_TAG;
 
 private:

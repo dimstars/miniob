@@ -21,7 +21,7 @@
 #define __OBSERVER_SQL_EXECUTE_STAGE_H__
 
 #include "common/seda/stage.h"
-#include "handler/handler_defs.h"
+#include "sql/parser/parse.h"
 #include "rc.h"
 
 class SessionEvent;
@@ -34,20 +34,20 @@ public:
 protected:
   // common function
   ExecuteStage(const char *tag);
-  bool set_properties();
+  bool set_properties() override;
 
-  bool initialize();
-  void cleanup();
-  void handle_event(common::StageEvent *event);
+  bool initialize() override;
+  void cleanup() override;
+  void handle_event(common::StageEvent *event) override;
   void callback_event(common::StageEvent *event,
-                     common::CallbackContext *context);
+                     common::CallbackContext *context) override;
 
-  void handleRequest(common::StageEvent *event);
-  RC do_select(const char *db, sqlstr *sql, SessionEvent *session_event);
+  void handle_request(common::StageEvent *event);
+  RC do_select(const char *db, Query *sql, SessionEvent *session_event);
 protected:
 private:
-  Stage *defaultStorageStage;
-  Stage *memStorageStage;
+  Stage *default_storage_stage_;
+  Stage *mem_storage_stage_;
 };
 
 #endif //__OBSERVER_SQL_EXECUTE_STAGE_H__

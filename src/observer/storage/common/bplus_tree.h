@@ -22,6 +22,7 @@
 #include "bplus_tree.h"
 #include "record_manager.h"
 #include "storage/default/disk_buffer_pool.h"
+#include "sql/parser/parse_defs.h"
 
 struct IndexFileHeader {
   int attr_length;

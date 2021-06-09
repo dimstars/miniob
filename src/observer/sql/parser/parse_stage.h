@@ -39,9 +39,9 @@ protected:
                      common::CallbackContext *context);
 
 protected:
-  common::StageEvent *handleRequest(common::StageEvent *event);
+  common::StageEvent *handle_request(common::StageEvent *event);
 private:
-  Stage *optimizeStage;
+  Stage *optimize_stage_;
 };
 
 #endif //__OBSERVER_SQL_PARSE_STAGE_H__

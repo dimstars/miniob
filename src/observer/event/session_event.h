@@ -43,10 +43,9 @@ public:
   int get_request_buf_len();
 
 private:
-  ConnectionContext *client;
+  ConnectionContext *client_;
 
   std::string response_;
-  int responseLen;
 };
 
 #endif //__OBSERVER_SESSION_SESSIONEVENT_H__

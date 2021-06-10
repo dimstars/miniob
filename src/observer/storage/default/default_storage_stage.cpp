@@ -75,6 +75,7 @@ bool DefaultStorageStage::set_properties() {
   std::map<std::string, std::string> section = 
       get_properties()->get(stageNameStr);
   
+  // 初始化时打开默认的database，没有的话会自动创建
   std::map<std::string, std::string>::iterator iter = section.find(CONF_BASE_DIR);
   if (iter == section.end()) {
     LOG_ERROR("Config cannot be empty: %s", CONF_BASE_DIR);
@@ -169,7 +170,7 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
       const Inserts &inserts = sql->sstr.insertion;
       const char *table_name = inserts.relation_name;
       rc = handler_->insert_record(current_trx, current_db, table_name, inserts.value_num, inserts.values);
-      snprintf(response, sizeof(response), "%s\n", strrc(rc));
+      snprintf(response, sizeof(response), "%s\n", rc == RC::SUCCESS ? "SUCCESS" : "FAILURE");
     }
     break;
   case SCF_UPDATE: {
@@ -179,7 +180,7 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
       int updated_count = 0;
       rc = handler_->update_record(current_trx, current_db, table_name, field_name, &updates.value,
                                    updates.condition_num, updates.conditions, &updated_count);
-      snprintf(response, sizeof(response), "%s. %d record(s) updated\n", strrc(rc), updated_count);
+      snprintf(response, sizeof(response), "%s\n", rc == RC::SUCCESS ? "SUCCESS" : "FAILURE");
     }
     break;
   case SCF_DELETE: {
@@ -187,21 +188,21 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
       const char *table_name = deletes.relation_name;
       int deleted_count = 0;
       rc = handler_->delete_record(current_trx, current_db, table_name, deletes.condition_num, deletes.conditions, &deleted_count);
-      snprintf(response, sizeof(response), "%s. %d record(s) deleted\n", strrc(rc), deleted_count);
+      snprintf(response, sizeof(response), "%s\n", rc == RC::SUCCESS ? "SUCCESS" : "FAILURE");
     }
     break;
   case SCF_CREATE_TABLE: { // create table
       const CreateTable &create_table = sql->sstr.create_table;
       rc = handler_->create_table(current_db, create_table.relation_name, 
               create_table.attribute_count, create_table.attributes);
-      snprintf(response, sizeof(response), "%s\n", strrc(rc));
+      snprintf(response, sizeof(response), "%s\n", rc == RC::SUCCESS ? "SUCCESS" : "FAILURE");
     }
     break;
   case SCF_CREATE_INDEX: {
       const CreateIndex &create_index = sql->sstr.create_index;
       rc = handler_->create_index(current_trx, current_db, create_index.relation_name, 
                                   create_index.index_name, create_index.attribute_name);
-      snprintf(response, sizeof(response), "%s\n", strrc(rc));
+      snprintf(response, sizeof(response), "%s\n", rc == RC::SUCCESS ? "SUCCESS" : "FAILURE");
     }
     break;
 
@@ -219,7 +220,7 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
           for (const auto &table: all_tables) {
             ss << table << std::endl;
           }
-          snprintf(response, sizeof(response), "%s\n", ss.str().c_str()); // TODO
+          snprintf(response, sizeof(response), "%s\n", ss.str().c_str());
         }
       }
     }
@@ -244,7 +245,7 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
   if (rc == RC::SUCCESS && !session->is_trx_multi_operation_mode()) {
     rc = current_trx->commit();
     if (rc != RC::SUCCESS) {
-      LOG_ERROR("Failed to commit trx. rc=%d:%s", rc, strrc(rc));// TODO
+      LOG_ERROR("Failed to commit trx. rc=%d:%s", rc, strrc(rc));
     }
   }
 

@@ -225,17 +225,10 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right) {
     }
   }
 }
+
+// TODO 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
+// 需要补充上这一部分
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
-  // 制作简单的查询树
-  // 目前仅支持 select xxx from table1, tableN where condition1, conditionN
-  // 简化成：
-  // filter (condition1, conditionN)
-  //   join (
-  //       filter (conditionX,
-  //          select xxx from table1),
-  //       filter (conditionY,
-  //        select xxx from tableN)
-  //   )
 
   RC rc = RC::SUCCESS;
   Session *session = session_event->get_client()->session;
@@ -274,6 +267,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
 
   std::stringstream ss;
   if (tuple_sets.size() > 1) {
+    // 本次查询了多张表，需要做join操作
     JoinExeNode join_exe_node;
     rc = create_join_executor(selects, db, tuple_sets, join_exe_node);
     if (rc != RC::SUCCESS) {
@@ -287,17 +281,14 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       end_trx_if_need(session, trx, false);
       return rc;
     }
-    if (tuple_set.is_empty()) { // TODO 优化代码
+    if (tuple_set.is_empty()) {
      ss << "No result\n";
     } else {
       tuple_set.print(ss);
     }
   } else {
-    if (tuple_sets.front().is_empty()) {
-      ss << "No result\n";
-    } else {
-      tuple_sets.front().print(ss);
-    }
+    // 当前只查询一张表，直接返回结果即可
+    tuple_sets.front().print(ss);
   }
 
   session_event->set_response(ss.str());

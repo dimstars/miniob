@@ -190,7 +190,15 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
     }
     break;
     case SCF_HELP: {
-      // TODO
+      const char *response = "show tables;\n"
+          "desc `table name`;\n"
+          "create table `table name` (`column name` `column type`, ...);\n"
+          "create index `index name` on `table` (`column`);\n"
+          "insert into `table` values(`value1`,`value2`);\n"
+          "update `table` set column=value [where `column`=`value`];\n"
+          "delete from `table` [where `column`=`value`];\n"
+          "select [ * | `columns` ] from `table`;\n";
+      session_event->set_response(response);
       exe_event->done_immediate();
     }
     break;

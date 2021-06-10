@@ -317,7 +317,8 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
     }
     if (current_page_num != record_page_handler_.get_page_num()) {
       record_page_handler_.deinit();
-      if ((ret = record_page_handler_.init(*disk_buffer_pool_, file_id_, current_page_num)) != RC::SUCCESS) {
+      ret = record_page_handler_.init(*disk_buffer_pool_, file_id_, current_page_num);
+      if (ret != RC::SUCCESS && ret != RC::BUFFERPOOL_INVALID_PAGE_NUM) {
         LOG_ERROR("Failed to init record page handler. page number is %d. ret=%d:%s", current_page_num, ret, strrc(ret));
         return ret;
       }

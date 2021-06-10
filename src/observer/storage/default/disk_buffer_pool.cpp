@@ -436,6 +436,7 @@ RC DiskBufferPool::flush_block(Frame *frame) {
     return RC::IOERR_WRITE;
   }
   frame->dirty = false;
+  LOG_DEBUG("Flush block. file desc=%d, page num=%d", frame->file_desc, frame->page.page_num);
 
   return RC::SUCCESS;
 }

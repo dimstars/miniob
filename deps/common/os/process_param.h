@@ -61,6 +61,14 @@ class ProcessParam {
     ProcessParam::args = args;
   }
 
+  void set_server_port(int port) {
+    server_port_ = port;
+  }
+
+  int get_server_port() const {
+    return server_port_;
+  }
+
  private:
   std::string std_out_;            // The output file
   std::string std_err_;            // The err output file
@@ -68,6 +76,7 @@ class ProcessParam {
   std::string process_name_;       // The process name
   bool demon;                    // whether demon or not
   std::vector<std::string> args; // arguments
+  int server_port_ = -1;         // server port(if valid, will overwrite the port in the config file)
 };
 
 ProcessParam*& the_process_param();

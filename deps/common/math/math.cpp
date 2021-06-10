@@ -42,7 +42,7 @@ long int lrandom(const long int scope) {
   return ret;
 }
 
-void seedRandom() {
+void seed_random() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   srand(tv.tv_usec);

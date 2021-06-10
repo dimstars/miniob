@@ -220,9 +220,9 @@ int init(ProcessParam *process_param) {
   }
 
   LogReporter *log_reporter = get_log_reporter();
-  MetricsRegistry &metricsRegistry = get_metrics_registry();
+  MetricsRegistry &metrics_registry = get_metrics_registry();
 
-  metricsRegistry.add_reporter(log_reporter);
+  metrics_registry.add_reporter(log_reporter);
 
   // Block interrupt signals before creating child threads.
   // setSignalHandler(sig_handler);
@@ -231,7 +231,7 @@ int init(ProcessParam *process_param) {
   //  wait interrupt signals
   // startWaitForSignals(&newSigset);
 
-  seedRandom();
+  seed_random();
 
   LOG_INFO("Successfully init utility");
 

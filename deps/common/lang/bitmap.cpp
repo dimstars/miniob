@@ -61,7 +61,7 @@ void Bitmap::clear_bit(int index) {
 int Bitmap::next_unsetted_bit(int start) {
   int ret = -1;
   int start_in_byte = start % 8;
-  for (int iter = start / 8, end = size_ / 8; iter < end; iter++) {
+  for (int iter = start / 8, end = size_ / 8; iter <= end; iter++) {
     char byte = bitmap_[iter];
     if (byte != -1) {
       int index_in_byte = find_first_zero(byte, start_in_byte);
@@ -80,10 +80,10 @@ int Bitmap::next_unsetted_bit(int start) {
   return ret;
 }
 
-int Bitmap::next_setted_bit(int start) { // TODO
+int Bitmap::next_setted_bit(int start) {
   int ret = -1;
   int start_in_byte = start % 8;
-  for (int iter = start / 8, end = size_ / 8; iter < end; iter++) {
+  for (int iter = start / 8, end = size_ / 8; iter <= end; iter++) {
     char byte = bitmap_[iter];
     if (byte != 0x00) {
       int index_in_byte = find_first_setted(byte, start_in_byte);

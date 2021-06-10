@@ -431,7 +431,6 @@ RC RecordFileScanner::get_first_record(Record *rec) {
 }
 
 RC RecordFileScanner::get_next_record(Record *rec) {
-  //TODO
   if (nullptr == disk_buffer_pool_) {
     return RC::RECORD_CLOSED;
   }
@@ -452,9 +451,16 @@ RC RecordFileScanner::get_next_record(Record *rec) {
 
     if (current_record.rid.page_num != record_page_handler_.get_page_num()) {
       record_page_handler_.deinit();
-      if ((ret = record_page_handler_.init(*disk_buffer_pool_, file_id_, current_record.rid.page_num)) != RC::SUCCESS) {
+      ret = record_page_handler_.init(*disk_buffer_pool_, file_id_, current_record.rid.page_num);
+      if (ret != RC::SUCCESS && ret != RC::BUFFERPOOL_INVALID_PAGE_NUM) {
         LOG_ERROR("Failed to init record page handler. page num=%d", current_record.rid.page_num);
         return ret;
+      }
+
+      if (RC::BUFFERPOOL_INVALID_PAGE_NUM == ret) {
+        current_record.rid.page_num++;
+        current_record.rid.slot_num = -1;
+        continue;
       }
     }
     

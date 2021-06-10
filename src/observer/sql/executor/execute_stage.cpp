@@ -281,11 +281,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       end_trx_if_need(session, trx, false);
       return rc;
     }
-    if (tuple_set.is_empty()) {
-     ss << "No result\n";
-    } else {
-      tuple_set.print(ss);
-    }
+    tuple_set.print(ss);
   } else {
     // 当前只查询一张表，直接返回结果即可
     tuple_sets.front().print(ss);

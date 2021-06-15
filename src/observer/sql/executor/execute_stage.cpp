@@ -151,14 +151,6 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
         return;
       }
 
-      CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
-      if (cb == nullptr) {
-        LOG_ERROR("Failed to new callback for SessionEvent");
-        exe_event->done_immediate();
-        return;
-      }
-
-      exe_event->push_callback(cb);
       default_storage_stage_->handle_event(storage_event);
     }
     break;

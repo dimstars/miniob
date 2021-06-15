@@ -120,7 +120,7 @@ void Server::recv(int fd, short ev, void *arg) {
 
   TimerStat timer_stat(*read_socket_metric_);
   MUTEX_LOCK(&client->mutex);
-  int len = ::read(client->fd, client->buf, sizeof(client->buf));
+  int len = ::read(client->fd, client->buf, sizeof(client->buf) - 1);
   MUTEX_UNLOCK(&client->mutex);
   timer_stat.end();
   if (len == 0) {
@@ -134,6 +134,7 @@ void Server::recv(int fd, short ev, void *arg) {
     return;
   }
 
+  client->buf[len] = '\0';
   SessionEvent *sev = new SessionEvent(client);
   session_stage_->add_event(sev);
 }

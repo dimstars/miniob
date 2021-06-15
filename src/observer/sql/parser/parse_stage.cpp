@@ -87,6 +87,7 @@ void ParseStage::handle_event(StageEvent *event) {
 
   StageEvent *new_event = handle_request(event);
   if (nullptr == new_event) {
+    callback_event(event, nullptr);
     event->done_immediate();
     return;
   }
@@ -94,6 +95,7 @@ void ParseStage::handle_event(StageEvent *event) {
   CompletionCallback *cb = new (std::nothrow) CompletionCallback(this, nullptr);
   if (cb == nullptr) {
     LOG_ERROR("Failed to new callback for SQLStageEvent");
+    callback_event(event, nullptr);
     event->done_immediate();
     return;
   }

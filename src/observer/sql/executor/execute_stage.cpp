@@ -41,7 +41,6 @@
 using namespace common;
 
 RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node);
-RC create_join_executor(const Selects &selects, const char *db, const std::vector<TupleSet> &tuple_set_list, JoinExeNode &node);
 
 //! Constructor
 ExecuteStage::ExecuteStage(const char *tag) : Stage(tag) {}
@@ -220,7 +219,7 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right) {
 }
 
 // TODO 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
-// 需要补充上这一部分
+// 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
 
   RC rc = RC::SUCCESS;
@@ -261,20 +260,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   std::stringstream ss;
   if (tuple_sets.size() > 1) {
     // 本次查询了多张表，需要做join操作
-    JoinExeNode join_exe_node;
-    rc = create_join_executor(selects, db, tuple_sets, join_exe_node);
-    if (rc != RC::SUCCESS) {
-      end_trx_if_need(session, trx, false);
-      return rc;
-    }
-
-    TupleSet tuple_set;
-    rc = join_exe_node.execute(tuple_set);
-    if (rc != RC::SUCCESS) {
-      end_trx_if_need(session, trx, false);
-      return rc;
-    }
-    tuple_set.print(ss);
+    // TODO
   } else {
     // 当前只查询一张表，直接返回结果即可
     tuple_sets.front().print(ss);
@@ -369,81 +355,4 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
   }
 
   return select_node.init(trx, table, std::move(schema), std::move(condition_filters));
-}
-
-RC create_join_executor(const Selects &selects, const char *db, const std::vector<TupleSet> &tuple_set_list, JoinExeNode &node) {
-  if (selects.relation_num <= 1) {
-    LOG_ERROR("Select only one table do not need join");
-    return RC::GENERIC_ERROR;
-  }
-
-  // 把最终想要展示的schema计算出来
-  TupleSchema schema;
-  TupleSchema schema_tmp;
-  for (int i = selects.attr_num - 1; i >= 0; i--) {
-    const RelAttr & select_attr = selects.attributes[i];
-
-    if (select_attr.relation_name == nullptr || common::is_blank(select_attr.relation_name)) {
-      // 出现了一个不指定表名的属性，那么它的attr name一定是 *
-      if ( 0 != strcmp(select_attr.attribute_name, "*")) {
-        LOG_TRACE("AttrName must be '*' while rel name is blank");
-        return RC::SQL_SYNTAX; // TODO 传递错误
-      }
-
-      // 把所有表的都捞出来
-      for (int j = selects.relation_num - 1; j >= 0; j--) {
-        const char *table_name = selects.relations[j];
-        Table *table = DefaultHandler::get_default().find_table(db, table_name);
-        if (table == nullptr) {
-          LOG_ERROR("Cannot find such table: %s.%s", db, table_name);
-          return RC::SCHEMA_TABLE_NOT_EXIST;
-        }
-
-        schema_tmp.clear();
-        TupleSchema::from_table(table, schema_tmp);
-        schema.append(schema_tmp);
-      }
-    } else {
-      const char *table_name = select_attr.relation_name;
-      Table *table = DefaultHandler::get_default().find_table(db, table_name);
-      if (table == nullptr) {
-        LOG_ERROR("Cannot find such table: %s.%s", db, table_name);
-        return RC::SCHEMA_TABLE_NOT_EXIST;
-      }
-
-      // 表名不是空的
-      if (0 == strcmp(select_attr.attribute_name, "*")) {
-        // 字段名字是*，就把所有的字段捞出来
-
-        schema_tmp.clear();
-        TupleSchema::from_table(table, schema_tmp);
-        schema.append(schema_tmp);
-      } else {
-        const FieldMeta *field_meta = table->table_meta().field(select_attr.attribute_name);
-        if (field_meta == nullptr) {
-          LOG_ERROR("No such field (%s) in table %s.%s", select_attr.attribute_name, db, table_name);
-          return RC::SCHEMA_FIELD_MISSING;
-        }
-        schema.add(field_meta->type(), table_name, field_meta->name());
-      }
-    }
-  }
-
-  // 把所有同时与多个表相关的condition找出来
-  std::vector<const Condition *> condition_filters;
-  for (int i = 0; i < selects.condition_num; i++) {
-    const Condition &condition = selects.conditions[i];
-    if (condition.left_is_attr == 1 && condition.right_is_attr == 1) {
-      // 两边都是属性
-      // 判断是否不同的表
-      if (condition.left_attr.relation_name != nullptr && !common::is_blank(condition.left_attr.relation_name) &&
-          condition.right_attr.relation_name != nullptr && !common::is_blank(condition.right_attr.relation_name) &&
-          0 != strcmp(condition.left_attr.relation_name, condition.right_attr.relation_name)) {
-        // 两个表名都不是空的，并且不同
-        condition_filters.push_back(&condition);
-      }
-    }
-  }
-
-  return node.init(tuple_set_list, std::move(schema), std::move(condition_filters));
 }

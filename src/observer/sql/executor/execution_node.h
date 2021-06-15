@@ -50,22 +50,4 @@ private:
   std::vector<DefaultConditionFilter> condition_filters_;
 };
 
-class CompositeTupleConditionFilter;
-class TupleExtractor;
-
-class JoinExeNode : public ExecutionNode {
-public:
-  JoinExeNode() = default;
-  virtual ~JoinExeNode();
-
-  RC init(const std::vector<TupleSet> &tuple_set_list, TupleSchema &&tuple_schema,
-          std::vector<const Condition *> &&condition_filters);
-  RC execute(TupleSet &tuple_set) override;
-
-private:
-  const std::vector<TupleSet> *tuple_set_list_ = nullptr;
-  TupleSchema tuple_schema_;
-  CompositeTupleConditionFilter * condition_filter_ = nullptr;
-  // TupleExtractor * tuple_extractor_;
-};
 #endif //__OBSERVER_SQL_EXECUTOR_EXECUTION_NODE_H_

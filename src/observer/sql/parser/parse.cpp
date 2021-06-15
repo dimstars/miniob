@@ -436,12 +436,9 @@ void query_destroy(Query *query) {
 extern "C" int sql_parse(const char *st, Query  *sqls);
 
 RC parse(const char *st, Query *sqln) {
-  static std::mutex lock;
-  lock.lock();
   sql_parse(st, sqln);
-  lock.unlock();
 
-  if (sqln->flag == 0)
+  if (sqln->flag == SCF_ERROR)
     return SQL_SYNTAX;
   else
     return SUCCESS;

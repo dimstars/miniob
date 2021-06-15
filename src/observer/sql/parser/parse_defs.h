@@ -135,6 +135,11 @@ typedef struct {
   const char *relation_name;
 } DescTable;
 
+typedef struct {
+  const char *relation_name;
+  const char *file_name;
+} LoadData;
+
 union Queries {
   Selects selection;
   Inserts insertion;
@@ -145,6 +150,7 @@ union Queries {
   CreateIndex create_index;
   DropIndex drop_index;
   DescTable desc_table;
+  LoadData load_data;
   char *errors;
 };
 
@@ -165,6 +171,7 @@ enum SqlCommandFlag {
   SCF_BEGIN,
   SCF_COMMIT,
   SCF_ROLLBACK,
+  SCF_LOAD_DATA,
   SCF_HELP,
   SCF_EXIT
 };
@@ -226,6 +233,9 @@ void drop_index_destroy(DropIndex *drop_index);
 
 void desc_table_init(DescTable *desc_table, const char *relation_name);
 void desc_table_destroy(DescTable *desc_table);
+
+void load_data_init(LoadData *load_data, const char *relation_name, const char *file_name);
+void load_data_destroy(LoadData *load_data);
 
 void query_init(Query *query);
 Query *query_create(); // create and init

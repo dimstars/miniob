@@ -21,6 +21,7 @@
 
 #include "gtest/gtest.h"
 #include "common/lang/bitmap.h"
+#include <sstream>
 
 using namespace common;
 

@@ -237,6 +237,18 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
       snprintf(response, sizeof(response), "%s", ss.str().c_str());
     }
     break;
+
+  case SCF_LOAD_DATA: {
+      /*
+        从文件导入数据，如果做性能测试，需要保持这些代码可以正常工作
+        load data infile `your/file/path` into table `table-name`;
+       */
+      const char *table_name = sql->sstr.load_data.relation_name;
+      const char *file_name = sql->sstr.load_data.file_name;
+      std::string result = load_data(current_db, table_name, file_name);
+      snprintf(response, sizeof(response), "%s", result.c_str());
+    }
+    break;
   default:
       snprintf(response, sizeof(response), "Unsupported sql: %d\n", sql->flag);
       break;
@@ -262,4 +274,150 @@ void DefaultStorageStage::callback_event(StageEvent *event,
   storage_event->exe_event()->done_immediate();
   LOG_TRACE("Exit\n");
   return;
+}
+
+/**
+ * 从文件中导入数据时使用。尝试向表中插入解析后的一行数据。
+ * @param table  要导入的表
+ * @param file_values 从文件中读取到的一行数据，使用分隔符拆分后的几个字段值
+ * @param record_values Table::insert_record使用的参数，为了防止频繁的申请内存
+ * @param errmsg 如果出现错误，通过这个参数返回错误信息
+ * @return 成功返回RC::SUCCESS
+ */
+RC insert_record_from_file(Table *table, std::vector<std::string> &file_values, 
+                std::vector<Value> &record_values, std::stringstream &errmsg) {
+
+  const int field_num = record_values.size();
+  const int sys_field_num = table->table_meta().sys_field_num();
+
+  if (file_values.size() < record_values.size()) {
+    return RC::SCHEMA_FIELD_MISSING;
+  }
+
+  RC rc = RC::SUCCESS;
+
+  std::stringstream deserialize_stream;
+  for (int i = 0; i < field_num && RC::SUCCESS == rc; i++) {
+    const FieldMeta *field = table->table_meta().field(i + sys_field_num);
+    
+    std::string &file_value = file_values[i];
+    common::strip(file_value);
+
+    switch (field->type()) {
+      case INTS: {
+        deserialize_stream.clear(); // 清理stream的状态，防止多次解析出现异常
+        deserialize_stream.str(file_value);
+
+        int int_value;
+        deserialize_stream >> int_value;
+        if (!deserialize_stream || !deserialize_stream.eof()) {
+          errmsg << "need an integer but got '" << file_values[i] 
+                 << "' (field index:" << i << ")";
+
+          rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        } else {
+          value_init_integer(&record_values[i], int_value);
+        }
+      }
+
+      break;
+      case FLOATS: {
+        deserialize_stream.clear();
+        deserialize_stream.str(file_value);
+
+        float float_value;
+        deserialize_stream >> float_value;
+        if (!deserialize_stream || !deserialize_stream.eof()) {
+          errmsg << "need a float number but got '" << file_values[i] 
+              << "'(field index:" << i << ")"; 
+          rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        } else {
+          value_init_float(&record_values[i], float_value);
+        }
+      }
+      break;
+      case CHARS: {
+        value_init_string(&record_values[i], file_value.c_str());
+      }
+      break;
+      default: {
+        errmsg << "Unsupported field type to loading: " << field->type();
+        rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+      break;
+    }
+  }
+
+  if (RC::SUCCESS == rc) {
+    rc = table->insert_record(nullptr, field_num, record_values.data());
+    if (rc != RC::SUCCESS) {
+      errmsg << "insert failed.";
+    }
+  }
+  for (int i = 0; i < field_num; i++) {
+    value_destroy(&record_values[i]);
+  }
+  return rc;
+}
+
+std::string DefaultStorageStage::load_data(const char *db_name, 
+          const char *table_name, const char *file_name) {
+
+  std::stringstream result_string;
+  Table *table = handler_->find_table(db_name, table_name);
+  if (nullptr == table) {
+    result_string << "No such table " << db_name << "." << table_name << std::endl;
+    return result_string.str();
+  }
+
+  std::fstream fs;
+  fs.open(file_name, std::ios_base::in | std::ios_base::binary);
+  if (!fs.is_open()) {
+    result_string << "Failed to open file: " << file_name 
+                  << ". system error=" << strerror(errno) << std::endl;
+    return result_string.str();
+  }
+
+  struct timespec begin_time;
+  clock_gettime(CLOCK_MONOTONIC, &begin_time);
+  const int sys_field_num = table->table_meta().sys_field_num();
+  const int field_num = table->table_meta().field_num() - sys_field_num;
+
+  std::vector<Value> record_values(field_num);
+  std::string line;
+  std::vector<std::string> file_values;
+  const std::string delim("|");
+  int line_num = 0;
+  int insertion_count = 0;
+  RC rc = RC::SUCCESS;
+  while (!fs.eof() && RC::SUCCESS == rc) {
+    std::getline(fs, line);
+    line_num++;
+    if (common::is_blank(line.c_str())) {
+      continue;
+    }
+
+    file_values.clear();
+    common::split_string(line, delim, file_values);
+    std::stringstream errmsg;
+    rc = insert_record_from_file(table, file_values, record_values, errmsg);
+    if (rc != RC::SUCCESS) {
+      result_string << "Line:" << line_num << " insert record failed:" 
+          << errmsg.str() << ". error:" << strrc(rc) << std::endl;
+    } else {
+      insertion_count++;
+    }
+  }
+  fs.close();
+
+  struct timespec end_time;
+  clock_gettime(CLOCK_MONOTONIC, &end_time);
+  long cost_nano = (end_time.tv_sec - begin_time.tv_sec) * 1000000000L 
+                    + (end_time.tv_nsec - begin_time.tv_nsec);
+  if (RC::SUCCESS == rc) {
+    result_string << strrc(rc) << ". total " << line_num << " line(s) handled and " 
+                  << insertion_count << " record(s) loaded, total cost " << cost_nano / 1000000000.0 
+                  << " second(s)" << std::endl;
+  }
+  return result_string.str();
 }

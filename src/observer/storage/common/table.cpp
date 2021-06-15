@@ -80,7 +80,7 @@ RC Table::create(const char *path, const char *name, const char *base_dir, int a
 
   close(fd);
 
-  // 创建文件 // TODO 改成fstream 保持风格一致
+  // 创建文件
   if ((rc = table_meta_.init(name, attribute_count, attributes)) != RC::SUCCESS) {
     LOG_ERROR("Failed to init table meta. ret=%d", rc);
     return rc; // TODO delete table file
@@ -235,13 +235,16 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
   char *record_data;
   RC rc = make_record(value_num, values, record_data);
   if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to create a record. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
 
   Record record;
   record.data = record_data;
   // record.valid = true;
-  return insert_record(trx, &record);
+  rc = insert_record(trx, &record);
+  delete record_data;
+  return rc;
 }
 
 const char *Table::name() const {

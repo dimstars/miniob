@@ -335,6 +335,18 @@ void desc_table_destroy(DescTable *desc_table) {
   desc_table->relation_name = nullptr;
 }
 
+void load_data_init(LoadData *load_data, const char *relation_name, const char *file_name) {
+  load_data->relation_name = strdup(relation_name);
+  load_data->file_name = strdup(file_name);
+}
+
+void load_data_destroy(LoadData *load_data) {
+  free((char *)load_data->relation_name);
+  free((char *)load_data->file_name);
+  load_data->relation_name = nullptr;
+  load_data->file_name = nullptr;
+}
+
 void query_init(Query *query) {
   query->flag = SCF_ERROR;
   memset(&query->sstr, 0, sizeof(query->sstr));
@@ -394,6 +406,11 @@ void query_reset(Query *query) {
 
     case SCF_DESC_TABLE: {
       desc_table_destroy(&query->sstr.desc_table);
+    }
+    break;
+
+    case SCF_LOAD_DATA: {
+      load_data_destroy(&query->sstr.load_data);
     }
     break;
     case SCF_BEGIN:

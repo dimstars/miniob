@@ -94,6 +94,9 @@ ParserContext *get_context(yyscan_t scanner) {
         AND
         SET
         ON
+				LOAD
+				DATA
+				INFILE
         EQ
         LT
         GT
@@ -114,8 +117,9 @@ ParserContext *get_context(yyscan_t scanner) {
 %token <number> NUMBER
 %token <floats> FLOAT 
 %token <string> ID
+%token <string> PATH
 %token <string> SSS
-%token <string>  STAR
+%token <string> STAR
 %token <string> STRING_V
 //非终结符
 
@@ -146,6 +150,7 @@ command:
 	| begin
 	| commit
 	| rollback
+	| load_data
 	| help
 	| exit
     ;
@@ -558,6 +563,13 @@ comOp:
     | NE { CONTEXT->comp = NOT_EQUAL; }
     ;
 
+load_data:
+		LOAD DATA INFILE PATH INTO TABLE ID SEMICOLON
+		{
+		  CONTEXT->ssql->flag = SCF_LOAD_DATA;
+			load_data_init(&CONTEXT->ssql->sstr.load_data, $7, $4);
+		}
+		;
 %%
 //_____________________________________________________________________
 extern void scan_string(const char *str, yyscan_t scanner);

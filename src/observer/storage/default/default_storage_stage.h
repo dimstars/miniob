@@ -41,6 +41,9 @@ protected:
   void callback_event(common::StageEvent *event,
                      common::CallbackContext *context) override;
 
+private:
+  std::string load_data(const char *db_name, const char *table_name, const char *file_name);
+
 protected:
   common::SimpleTimer *query_metric_;
   static const std::string QUERY_METRIC_TAG;

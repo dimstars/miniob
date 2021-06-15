@@ -27,7 +27,7 @@ namespace common {
  *       but it will take a global lock to protect static data structure.
  *       could consider using XrandNN_r() later
  */
-void seedRandom();
+void seed_random();
 
 /**
  * if scope is bigger than RAND_MAX/10, the precision is not good

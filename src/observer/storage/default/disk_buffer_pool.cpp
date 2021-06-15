@@ -436,6 +436,7 @@ RC DiskBufferPool::flush_block(Frame *frame) {
     return RC::IOERR_WRITE;
   }
   frame->dirty = false;
+  LOG_DEBUG("Flush block. file desc=%d, page num=%d", frame->file_desc, frame->page.page_num);
 
   return RC::SUCCESS;
 }
@@ -447,7 +448,7 @@ RC DiskBufferPool::allocate_block(Frame **buffer) {
     if (!bp_manager_.allocated[i]) {
       bp_manager_.allocated[i] = true;
       *buffer = bp_manager_.frame + i;
-      LOG_INFO("Allocate block frame=%p", bp_manager_.frame + i);
+      LOG_DEBUG("Allocate block frame=%p", bp_manager_.frame + i);
       return RC::SUCCESS;
     }
   }
@@ -498,7 +499,7 @@ RC DiskBufferPool::dispose_block(Frame *buf) {
   buf->dirty = false;
   int pos = buf - bp_manager_.frame;
   bp_manager_.allocated[pos] = false;
-  LOG_INFO("dispost block frame =%p", buf);
+  LOG_DEBUG("dispost block frame =%p", buf);
   return RC::SUCCESS;
 }
 

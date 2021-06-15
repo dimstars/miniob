@@ -40,6 +40,8 @@ static Server *g_server = nullptr;
 void usage() {
   // TODO ADD USAGE
   std::cout << "Useage " << std::endl;
+  std::cout << "-p: server port. if not specified, the item in the config file will be used" << std::endl;
+  exit(0);
 }
 
 void parse_parameter(int argc, char **argv) {
@@ -52,8 +54,11 @@ void parse_parameter(int argc, char **argv) {
   // Process args
   int opt;
   extern char *optarg;
-  while ((opt = getopt(argc, argv, "ds:f:o:e:h")) > 0) {
+  while ((opt = getopt(argc, argv, "dp:s:f:o:e:h")) > 0) {
     switch (opt) {
+    case 'p':
+      process_param->set_server_port(atoi(optarg));
+      break;
     case 'f':
       process_param->set_conf(optarg);
       break;
@@ -78,6 +83,8 @@ Server *init_server() {
   std::map<std::string, std::string> net_section =
       get_properties()->get(NET);
 
+  ProcessParam *process_param = the_process_param();
+
   long listen_addr = INADDR_ANY;
   long max_connection_num = MAX_CONNECTION_NUM_DEFAULT;
   int port = PORT_DEFAULT;
@@ -94,10 +101,15 @@ Server *init_server() {
     str_to_val(str, max_connection_num);
   }
 
-  it = net_section.find(PORT);
-  if (it != net_section.end()) {
-    std::string str = it->second;
-    str_to_val(str, port);
+  if (process_param->get_server_port() > 0) {
+    port = process_param->get_server_port();
+    LOG_INFO("Use port config in command line: %d", port);
+  } else {
+    it = net_section.find(PORT);
+    if (it != net_section.end()) {
+      std::string str = it->second;
+      str_to_val(str, port);
+    }
   }
 
   ServerParam server_param;

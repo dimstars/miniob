@@ -27,6 +27,7 @@ WS      [\ \t\b\f]
 DIGIT   [0-9]+
 
 ID      [A-Za-z_]+[A-Za-z0-9_]*
+PATH    [A-Za-z0-9_/\.\-]*
 DOT     \.
 QUOTE   [\'\"]
 %x STR
@@ -69,7 +70,11 @@ QUOTE   [\'\"]
 [Ii][Nn][Tt]					                   { position=strdup(yytext);RETURN_TOKEN(INT_T);}
 [Cc][Hh][Aa][Rr]				                 { position=strdup(yytext);RETURN_TOKEN(STRING_T);}
 [Ff][Ll][Oo][Aa][Tt]			               { position=strdup(yytext);RETURN_TOKEN(FLOAT_T);}
+[Ll][Oo][Aa][Dd]			                   { position=strdup(yytext);RETURN_TOKEN(LOAD);}
+[Dd][Aa][Tt][Aa]	                       { position=strdup(yytext);RETURN_TOKEN(DATA);}
+[Ii][Nn][Ff][Ii][Ll][Ee]                 { position=strdup(yytext);RETURN_TOKEN(INFILE);}
 {ID}							                       { yylval->string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(ID);}
+{PATH}							                     { yylval->string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(PATH);}
 "("								                       { position=strdup(yytext);RETURN_TOKEN(LBRACE);}
 ")"								                       position=strdup(yytext);RETURN_TOKEN(RBRACE);
 

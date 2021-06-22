@@ -120,21 +120,43 @@ void Server::recv(int fd, short ev, void *arg) {
 
   TimerStat timer_stat(*read_socket_metric_);
   MUTEX_LOCK(&client->mutex);
-  int len = ::read(client->fd, client->buf, sizeof(client->buf) - 1);
+  int data_len = 0;
+  int read_len = 0;
+  int data_limit = sizeof(client->buf);
+  int buf_size = data_limit;
+  char buf[buf_size];
+  memset(buf, 0, buf_size);
+  memset(client->buf, 0, data_limit);
+
+  while((read_len = ::read(client->fd, buf, buf_size)) > 0){
+    if(read_len+data_len > data_limit){
+      data_len += read_len;
+      break;
+    }
+
+    for(int i=0;i<read_len;i++){
+      client->buf[data_len] = buf[i];
+      data_len++;
+    }
+  }
   MUTEX_UNLOCK(&client->mutex);
   timer_stat.end();
-  if (len == 0) {
+  if(data_len > data_limit){
+    LOG_WARN("The length of sql exceeds the limitation %d\n", buf_size);
+    close_connection(client);
+    return;
+  }
+  if (read_len == 0) {
     LOG_INFO("The peer has been closed %s\n", client->addr);
     close_connection(client);
     return;
-  } else if (len < 0) {
+  } else if (read_len < 0 && data_len == 0) {
     LOG_ERROR("Failed to read socket of %s, %s\n", client->addr,
               strerror(errno));
     close_connection(client);
     return;
   }
 
-  client->buf[len] = '\0';
   SessionEvent *sev = new SessionEvent(client);
   session_stage_->add_event(sev);
 }
@@ -147,7 +169,6 @@ int Server::send(ConnectionContext *client, const char *buf, int data_len) {
   TimerStat writeStat(*write_socket_metric_);
 
   MUTEX_LOCK(&client->mutex);
-
   int wlen = 0;
   for (int i = 0; i < 3 && wlen < data_len; i++) {
     int len = write(client->fd, buf, data_len - wlen);

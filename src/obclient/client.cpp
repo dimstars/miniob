@@ -100,21 +100,22 @@ int main(int argc, char *argv[]) {
     memset(send_buf, 0, sizeof(send_buf));
 
     int len = 0;
-    bool broken = true;
     while((len = recv(sockfd, send_buf, MAX_MEM_BUFFER_SIZE, 0)) > 0){  
+      bool msg_end = false;
       for (int i = 0; i < len; i++) {
+        if (0 == send_buf[i]) {
+          msg_end = true;
+          break;
+		    }
         printf("%c", send_buf[i]);
       }
-      if (send_buf[len - 1] != '\n') {
-        putchar('\n');
-      }
-      if(send_buf[len]==0){
+      if (msg_end) {
         break;
       }
       memset(send_buf, 0, MAX_MEM_BUFFER_SIZE);
     }
 
-    if (len < 0 && broken) {
+    if (len < 0) {
       fprintf(stderr, "Connection was broken: %s\n", strerror(errno));
       break;
     }

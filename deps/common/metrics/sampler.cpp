@@ -47,7 +47,7 @@ double Sampler::get_ratio() { return ratio_; }
 
 void Sampler::set_ratio(double ratio) {
   if (0 <= ratio && ratio <= 1) {
-    this->ratio_ = ratio_;
+    this->ratio_ = ratio;
     ratio_num_ = ratio * RANGE_SIZE;
   } else {
     LOG_WARN("Invalid ratio :%lf", ratio);

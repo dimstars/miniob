@@ -41,6 +41,7 @@ void usage() {
   // TODO ADD USAGE
   std::cout << "Useage " << std::endl;
   std::cout << "-p: server port. if not specified, the item in the config file will be used" << std::endl;
+  std::cout << "-f: path of config file." << std::endl;
   exit(0);
 }
 

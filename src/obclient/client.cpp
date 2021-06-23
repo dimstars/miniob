@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     server_port = atoi(argv[2]);
   }
 
-  const char *prompt_str = "miniob >";
+  const char *prompt_str = "miniob > ";
 
   int sockfd, send_bytes;
   // char send[MAXLINE];
@@ -97,10 +97,24 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "send error: %d:%s \n", errno, strerror(errno));
       exit(1);
     }
-
     memset(send_buf, 0, sizeof(send_buf));
 
-    int len = recv(sockfd, send_buf, MAX_MEM_BUFFER_SIZE, 0);
+    int len = 0;
+    while((len = recv(sockfd, send_buf, MAX_MEM_BUFFER_SIZE, 0)) > 0){  
+      bool msg_end = false;
+      for (int i = 0; i < len; i++) {
+        if (0 == send_buf[i]) {
+          msg_end = true;
+          break;
+		    }
+        printf("%c", send_buf[i]);
+      }
+      if (msg_end) {
+        break;
+      }
+      memset(send_buf, 0, MAX_MEM_BUFFER_SIZE);
+    }
+
     if (len < 0) {
       fprintf(stderr, "Connection was broken: %s\n", strerror(errno));
       break;
@@ -108,13 +122,6 @@ int main(int argc, char *argv[]) {
     if (0 == len) {
       printf("Connection has been closed\n");
       break;
-    }
-
-    for (int i = 0; i < len; i++) {
-      printf("%c", send_buf[i]);
-    }
-    if (send_buf[len - 1] != '\n') {
-      putchar('\n');
     }
     fputs(prompt_str, stdout);
   }

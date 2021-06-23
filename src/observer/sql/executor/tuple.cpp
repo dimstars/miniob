@@ -235,8 +235,8 @@ void TupleRecordConverter::add_record(const char *record) {
       }
         break;
       case CHARS: {
-        const char *s = record + field_meta->offset();  // TODO 现在当做Cstring来处理
-        tuple.add(s, field_meta->len());
+        const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
+        tuple.add(s, strlen(s));
       }
       break;
       default: {

@@ -118,27 +118,55 @@ void Server::recv(int fd, short ev, void *arg) {
   ConnectionContext *client = (ConnectionContext *)arg;
   //Server::send(sev->getClient(), sev->getRequestBuf(), strlen(sev->getRequestBuf()));
 
+  int data_len = 0;
+  int read_len = 0;
+  int buf_size = sizeof(client->buf);
+  memset(client->buf, 0, buf_size);
+
   TimerStat timer_stat(*read_socket_metric_);
   MUTEX_LOCK(&client->mutex);
-  int len = ::read(client->fd, client->buf, sizeof(client->buf) - 1);
+	// 持续接收消息，直到遇到'\0'。将'\0'遇到的后续数据直接丢弃没有处理，因为目前仅支持一收一发的模式
+  while((read_len = ::read(client->fd, client->buf + data_len, buf_size - data_len)) > 0){
+    bool msg_end = false;
+    if (read_len + data_len <= buf_size) {
+			for(int i = 0; i < read_len; i++) {
+				if (client->buf[data_len + i] == 0) {
+					data_len += i + 1;
+          msg_end = true;
+					break;
+				}
+			}
+    }
+
+    if (msg_end) {
+      break;
+    }
+		data_len += read_len;
+  }
   MUTEX_UNLOCK(&client->mutex);
   timer_stat.end();
-  if (len == 0) {
+
+  if(data_len > buf_size) {
+    LOG_WARN("The length of sql exceeds the limitation %d\n", buf_size);
+    close_connection(client);
+    return;
+  }
+  if (read_len == 0) {
     LOG_INFO("The peer has been closed %s\n", client->addr);
     close_connection(client);
     return;
-  } else if (len < 0) {
+  } else if (read_len < 0) {
     LOG_ERROR("Failed to read socket of %s, %s\n", client->addr,
               strerror(errno));
     close_connection(client);
     return;
   }
 
-  client->buf[len] = '\0';
   SessionEvent *sev = new SessionEvent(client);
   session_stage_->add_event(sev);
 }
 
+// 这个函数仅负责发送数据，至于是否是一个完整的消息，由调用者控制
 int Server::send(ConnectionContext *client, const char *buf, int data_len) {
   if (buf == nullptr || data_len == 0) {
     return 0;
@@ -147,10 +175,9 @@ int Server::send(ConnectionContext *client, const char *buf, int data_len) {
   TimerStat writeStat(*write_socket_metric_);
 
   MUTEX_LOCK(&client->mutex);
-
   int wlen = 0;
   for (int i = 0; i < 3 && wlen < data_len; i++) {
-    int len = write(client->fd, buf, data_len - wlen);
+    int len = write(client->fd, buf + wlen, data_len - wlen);
     if (len < 0) {
       LOG_ERROR("Failed to send data back to client\n");
       MUTEX_UNLOCK(&client->mutex);

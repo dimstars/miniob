@@ -20,6 +20,8 @@
 #ifndef __OBSERVER_SQL_EXECUTOR_VALUE_H_
 #define __OBSERVER_SQL_EXECUTOR_VALUE_H_
 
+#include <string.h>
+
 #include <string>
 #include <ostream>
 

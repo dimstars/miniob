@@ -17,6 +17,8 @@
 // Created by Wangyunlai on 2021/5/12.
 //
 
+#include <algorithm>
+
 #include "storage/common/table_meta.h"
 #include "json/json.h"
 #include "common/log/log.h"

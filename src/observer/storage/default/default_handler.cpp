@@ -25,7 +25,6 @@
 #include "common/os/path.h"
 #include "common/log/log.h"
 #include "common/lang/string.h"
-#include "sql/executor/executor.h"
 #include "storage/common/record_manager.h"
 #include "storage/common/bplus_tree.h"
 #include "storage/common/table.h"

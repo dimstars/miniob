@@ -36,7 +36,7 @@ git submodule add https://github.com/open-source-parsers/jsoncpp.git
 cd jsoncpp
 mkdir build
 cd build
-cmake ..
+cmake -DJSONCPP_WITH_TESTS=OFF -DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF ..
 make
 sudo make install
 ```

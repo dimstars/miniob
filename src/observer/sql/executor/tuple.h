@@ -20,6 +20,7 @@
 #ifndef __OBSERVER_SQL_EXECUTOR_TUPLE_H_
 #define __OBSERVER_SQL_EXECUTOR_TUPLE_H_
 
+#include <memory>
 #include <vector>
 
 #include "sql/parser/parse.h"

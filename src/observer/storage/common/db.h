@@ -20,6 +20,7 @@
 #ifndef __OBSERVER_STORAGE_COMMON_DB_H__
 #define __OBSERVER_STORAGE_COMMON_DB_H__
 
+#include <vector>
 #include <string>
 #include <unordered_map>
 

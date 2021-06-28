@@ -20,7 +20,6 @@
 #include "sql/executor/execution_node.h"
 #include "storage/common/table.h"
 #include "common/log/log.h"
-#include "sql/executor/serial_generator.h"
 
 SelectExeNode::SelectExeNode() : table_(nullptr) {
 }

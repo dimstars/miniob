@@ -55,7 +55,7 @@ typedef struct {
 typedef struct {
   bool dirty;
   unsigned int pin_count;
-  clock_t acc_time;
+  unsigned long acc_time;
   int file_desc;
   Page page;
 } Frame;

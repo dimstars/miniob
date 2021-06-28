@@ -24,6 +24,11 @@
 
 using namespace common;
 
+unsigned long current_time() {
+  struct timespec tp;
+  clock_gettime(CLOCK_MONOTONIC, &tp);
+  return tp.tv_sec * 1000 * 1000 * 1000UL + tp.tv_nsec;
+}
 
 DiskBufferPool* theGlobalDiskBufferPool() {
   static DiskBufferPool *instance = new DiskBufferPool();
@@ -122,7 +127,7 @@ RC DiskBufferPool::open_file(const char *file_name, int *file_id) {
     return tmp;
   }
   file_handle->hdr_frame->dirty = false;
-  file_handle->hdr_frame->acc_time = clock();
+  file_handle->hdr_frame->acc_time = current_time();
   file_handle->hdr_frame->file_desc = fd;
   file_handle->hdr_frame->pin_count = 1;
   if ((tmp = load_page(0, file_handle, file_handle->hdr_frame)) != RC::SUCCESS) {
@@ -194,7 +199,7 @@ RC DiskBufferPool::get_this_page(int file_id, PageNum page_num, BPPageHandle *pa
     if (bp_manager_.frame[i].page.page_num == page_num) {
       page_handle->frame = bp_manager_.frame + i;
       page_handle->frame->pin_count++;
-      page_handle->frame->acc_time = clock();
+      page_handle->frame->acc_time = current_time();
       page_handle->open = true;
       return RC::SUCCESS;
     }
@@ -209,7 +214,7 @@ RC DiskBufferPool::get_this_page(int file_id, PageNum page_num, BPPageHandle *pa
   page_handle->frame->dirty = false;
   page_handle->frame->file_desc = file_handle->file_desc;
   page_handle->frame->pin_count = 1;
-  page_handle->frame->acc_time = clock();
+  page_handle->frame->acc_time = current_time();
   if ((tmp = load_page(page_num, file_handle, page_handle->frame)) !=
       RC::SUCCESS) {
     LOG_ERROR("Failed to load page %s:%d", file_handle->file_name);
@@ -265,7 +270,7 @@ RC DiskBufferPool::allocate_page(int file_id, BPPageHandle *page_handle) {
   page_handle->frame->dirty = false;
   page_handle->frame->file_desc = file_handle->file_desc;
   page_handle->frame->pin_count = 1;
-  page_handle->frame->acc_time = clock();
+  page_handle->frame->acc_time = current_time();
   memset(&(page_handle->frame->page), 0, sizeof(Page));
   page_handle->frame->page.page_num = file_handle->file_sub_header->page_count - 1;
 
@@ -540,7 +545,7 @@ RC DiskBufferPool::check_page_num(PageNum page_num, BPFileHandle *file_handle) {
 
 RC DiskBufferPool::load_page(PageNum page_num, BPFileHandle *file_handle, Frame *frame) {
   s64_t offset = ((s64_t)page_num) * sizeof(Page);
-  if (lseek(file_handle->file_desc, offset, SEEK_SET) == offset - 1) {
+  if (lseek(file_handle->file_desc, offset, SEEK_SET) == - 1) {
     LOG_ERROR("Failed to load page %s:%d, due to failed to lseek:%s.",
               file_handle->file_name, page_num, strerror(errno));
 

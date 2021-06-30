@@ -126,23 +126,40 @@ void Server::recv(int fd, short ev, void *arg) {
   TimerStat timer_stat(*read_socket_metric_);
   MUTEX_LOCK(&client->mutex);
 	// 持续接收消息，直到遇到'\0'。将'\0'遇到的后续数据直接丢弃没有处理，因为目前仅支持一收一发的模式
-  while((read_len = ::read(client->fd, client->buf + data_len, buf_size - data_len)) > 0){
+  while (true) {
+    read_len = ::read(client->fd, client->buf + data_len, buf_size - data_len);
+    if (read_len < 0) {
+      if (errno == EAGAIN) {
+        continue;
+      }
+      break;
+    }
+    if (read_len == 0) {
+      break;
+    }
+
+    if (read_len + data_len > buf_size) {
+      data_len += read_len;
+      break;
+    }
+
+
     bool msg_end = false;
-    if (read_len + data_len <= buf_size) {
-			for(int i = 0; i < read_len; i++) {
-				if (client->buf[data_len + i] == 0) {
-					data_len += i + 1;
-          msg_end = true;
-					break;
-				}
-			}
+    for(int i = 0; i < read_len; i++) {
+      if (client->buf[data_len + i] == 0) {
+        data_len += i + 1;
+        msg_end = true;
+        break;
+      }
     }
 
     if (msg_end) {
       break;
     }
-		data_len += read_len;
+
+    data_len += read_len;
   }
+
   MUTEX_UNLOCK(&client->mutex);
   timer_stat.end();
 
@@ -162,6 +179,7 @@ void Server::recv(int fd, short ev, void *arg) {
     return;
   }
 
+  LOG_INFO("receive command(size=%d): %s", data_len, client->buf);
   SessionEvent *sev = new SessionEvent(client);
   session_stage_->add_event(sev);
 }

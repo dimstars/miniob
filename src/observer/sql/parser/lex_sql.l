@@ -9,7 +9,7 @@ extern int atoi();
 extern double atof();
 char * position = "";
 
-#ifdef YYDEBUG
+#if YYDEBUG > 0
 #define debug_printf  printf
 #else
 #define debug_printf(...)

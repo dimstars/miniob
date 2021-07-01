@@ -88,6 +88,7 @@ private:
   IndexScanner *find_index_for_scan(const DefaultConditionFilter &filter);
 
   RC insert_record(Trx *trx, Record *record);
+  RC update_record(Trx *trx, Record *record);
   RC delete_record(Trx *trx, Record *record);
 
 private:

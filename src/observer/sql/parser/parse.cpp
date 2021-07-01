@@ -337,7 +337,16 @@ void desc_table_destroy(DescTable *desc_table) {
 
 void load_data_init(LoadData *load_data, const char *relation_name, const char *file_name) {
   load_data->relation_name = strdup(relation_name);
-  load_data->file_name = strdup(file_name);
+
+  if (file_name[0] == '\'' || file_name[0] == '\"') {
+    file_name++;
+  }
+  char *dup_file_name = strdup(file_name);
+  int len = strlen(dup_file_name);
+  if (dup_file_name[len - 1] == '\'' || dup_file_name[len - 1] == '\"') {
+    dup_file_name[len - 1] = 0;
+  }
+  load_data->file_name = dup_file_name;
 }
 
 void load_data_destroy(LoadData *load_data) {

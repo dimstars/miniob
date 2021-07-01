@@ -75,7 +75,7 @@ public:
   CompositeConditionFilter() = default;
   virtual ~CompositeConditionFilter();
 
-  RC init(const ConditionFilter *filters, int filter_num);
+  RC init(const ConditionFilter *filters[], int filter_num);
   RC init(Table &table, const Condition *conditions, int condition_num);
   virtual bool filter(const Record &rec) const;
 
@@ -84,15 +84,15 @@ public:
     return filter_num_;
   }
   const ConditionFilter &filter(int index) const {
-    return filters_[index];
+    return *filters_[index];
   }
 
 private:
-  RC init(const ConditionFilter *filters, int filter_num, bool own_memory);
+  RC init(const ConditionFilter *filters[], int filter_num, bool own_memory);
 private:
-  const ConditionFilter *       filters_ = nullptr;
+  const ConditionFilter **      filters_ = nullptr;
   int                           filter_num_ = 0;
-  bool                          memory_owner_ = false;
+  bool                          memory_owner_ = false; // filters_的内存是否由自己来控制
 };
 
 #endif // __OBSERVER_STORAGE_COMMON_CONDITION_FILTER_H_

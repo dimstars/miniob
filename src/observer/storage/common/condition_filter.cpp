@@ -96,6 +96,8 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
 //    // TODO 不能比较的两个字段， 要把信息传给客户端
 //    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
 //  }
+  // NOTE：这里没有实现不同类型的数据比较，比如整数跟浮点数之间的对比
+  // 但是选手们还是要实现。这个功能在预选赛中会出现
   if (type_left != type_right) {
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
@@ -170,18 +172,18 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
 
 CompositeConditionFilter::~CompositeConditionFilter() {
   if (memory_owner_) {
-    delete filters_;
+    delete[] filters_;
     filters_ = nullptr;
   }
 }
 
-RC CompositeConditionFilter::init(const ConditionFilter *filters, int filter_num, bool own_memory) {
+RC CompositeConditionFilter::init(const ConditionFilter *filters[], int filter_num, bool own_memory) {
   filters_ = filters;
   filter_num_ = filter_num;
   memory_owner_ = own_memory;
   return RC::SUCCESS;
 }
-RC CompositeConditionFilter::init(const ConditionFilter *filters, int filter_num) {
+RC CompositeConditionFilter::init(const ConditionFilter *filters[], int filter_num) {
   return init(filters, filter_num, false);
 }
 
@@ -194,21 +196,28 @@ RC CompositeConditionFilter::init(Table &table, const Condition *conditions, int
   }
 
   RC rc = RC::SUCCESS;
-  DefaultConditionFilter *default_condition_filters = new DefaultConditionFilter();
+  ConditionFilter **condition_filters = new ConditionFilter *[condition_num];
   for (int i = 0; i < condition_num; i++) {
-    rc = default_condition_filters[i].init(table, conditions[i]);
+    DefaultConditionFilter *default_condition_filter = new DefaultConditionFilter();
+    rc = default_condition_filter->init(table, conditions[i]);
     if (rc != RC::SUCCESS) {
-      delete default_condition_filters;
-      default_condition_filters = nullptr;
+      delete default_condition_filter;
+      for (int j = i - 1; j >= 0; j--) {
+        delete condition_filters[j];
+        condition_filters[j] = nullptr;
+      }
+      delete[] condition_filters;
+      condition_filters = nullptr;
       return rc;
     }
+    condition_filters[i] = default_condition_filter;
   }
-  return init(default_condition_filters, condition_num, true);
+  return init((const ConditionFilter **)condition_filters, condition_num, true);
 }
 
 bool CompositeConditionFilter::filter(const Record &rec) const {
   for (int i = 0; i < filter_num_; i++) {
-    if (!filters_[i].filter(rec)) {
+    if (!filters_[i]->filter(rec)) {
       return false;
     }
   }

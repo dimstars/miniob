@@ -27,8 +27,8 @@ WS      [\ \t\b\f]
 DIGIT   [0-9]+
 
 ID      [A-Za-z_]+[A-Za-z0-9_]*
-PATH    [A-Za-z0-9_/\.\-]*
 DOT     \.
+PATH    [\'\"][A-Za-z0-9_/\.\-]*[\'\"]
 QUOTE   [\'\"]
 %x STR
 

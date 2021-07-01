@@ -19,6 +19,7 @@
 
 #include <limits.h>
 #include <string.h>
+#include <stdio.h>
 #include <algorithm>
 
 #include "storage/common/table.h"
@@ -110,6 +111,24 @@ RC Table::create(const char *path, const char *name, const char *base_dir, int a
 
   base_dir_ = base_dir;
   return rc;
+}
+
+RC Table::drop() {
+  // 删除元数据文件
+  std::string meta_file = base_dir_ + "/" + std::string(table_meta_.name()) + TABLE_META_SUFFIX;
+  if (remove(meta_file.c_str()) != 0) {
+    LOG_ERROR("Failed to remove meta file. file name = %s, errmsg = %s", meta_file.c_str(), strerror(errno));
+    return RC::IOERR;
+  }
+
+  // 删除数据文件
+  std::string data_file = base_dir_ + "/" + std::string(table_meta_.name()) + TABLE_DATA_SUFFIX;
+  if (remove(data_file.c_str()) != 0) {
+    LOG_ERROR("Failed to remove data file. file name = %s, errmsg = %s", data_file.c_str(), strerror(errno));
+    return RC::IOERR;
+  }
+
+  return RC::SUCCESS;
 }
 
 RC Table::open(const char *meta_file, const char *base_dir) {

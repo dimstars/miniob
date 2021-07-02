@@ -28,7 +28,6 @@ DIGIT   [0-9]+
 
 ID      [A-Za-z_]+[A-Za-z0-9_]*
 DOT     \.
-PATH    [\'\"][A-Za-z0-9_/\.\-]*[\'\"]
 QUOTE   [\'\"]
 %x STR
 
@@ -74,7 +73,6 @@ QUOTE   [\'\"]
 [Dd][Aa][Tt][Aa]	                       { position=strdup(yytext);RETURN_TOKEN(DATA);}
 [Ii][Nn][Ff][Ii][Ll][Ee]                 { position=strdup(yytext);RETURN_TOKEN(INFILE);}
 {ID}							                       { yylval->string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(ID);}
-{PATH}							                     { yylval->string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(PATH);}
 "("								                       { position=strdup(yytext);RETURN_TOKEN(LBRACE);}
 ")"								                       position=strdup(yytext);RETURN_TOKEN(RBRACE);
 
@@ -85,7 +83,7 @@ QUOTE   [\'\"]
 "<"                                      position=strdup(yytext);RETURN_TOKEN(LT);
 ">="                                     position=strdup(yytext);RETURN_TOKEN(GE);
 ">"                                      position=strdup(yytext);RETURN_TOKEN(GT);
-{QUOTE}[\40\42\47a-zA-Z0-9]*{QUOTE}	     {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(SSS);}
+{QUOTE}[\40\42\47A-Za-z0-9_/\.\-]*{QUOTE}	     {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(SSS);}
 
 .						                 { printf("Unknown character [%c]\n",yytext[0]);  return yytext[0];    }
 %%

@@ -564,7 +564,7 @@ comOp:
     ;
 
 load_data:
-		LOAD DATA INFILE PATH INTO TABLE ID SEMICOLON
+		LOAD DATA INFILE SSS INTO TABLE ID SEMICOLON
 		{
 		  CONTEXT->ssql->flag = SCF_LOAD_DATA;
 			load_data_init(&CONTEXT->ssql->sstr.load_data, $7, $4);

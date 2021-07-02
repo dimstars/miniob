@@ -28,6 +28,7 @@ TEST(test_bp_manager, test_bp_manager_simple_lru) {
 
   frame1->file_desc = 0;
   frame1->page.page_num = 1;
+  bp_manager.insert_page(frame1);
 
   ASSERT_EQ(frame1, bp_manager.get(0, 1));
 
@@ -35,6 +36,7 @@ TEST(test_bp_manager, test_bp_manager_simple_lru) {
   ASSERT_NE(frame2, nullptr);
   frame2->file_desc = 0;
   frame2->page.page_num = 2;
+  bp_manager.insert_page(frame2);
 
   ASSERT_EQ(frame1, bp_manager.get(0, 1));
 
@@ -42,22 +44,32 @@ TEST(test_bp_manager, test_bp_manager_simple_lru) {
   ASSERT_NE(frame3, nullptr);
   frame3->file_desc = 0;
   frame3->page.page_num = 3;
+  bp_manager.insert_page(frame3);
 
   frame2 = bp_manager.get(0, 2);
   ASSERT_EQ(frame2, nullptr);
 
   Frame *frame4 = bp_manager.alloc();
-  frame4->file_desc = 0;
+  frame4->file_desc = 2;
   frame4->page.page_num = 4;
-
+  bp_manager.insert_page(frame4);
+  
   frame1 = bp_manager.get(0, 1);
   ASSERT_EQ(frame1, nullptr);
 
   frame3 = bp_manager.get(0, 3);
   ASSERT_NE(frame3, nullptr);
 
-  frame4 = bp_manager.get(0, 4);
+  frame4 = bp_manager.get(2, 4);
   ASSERT_NE(frame4, nullptr);
+
+  bp_manager.dispose_all_pages(0);
+  frame3 = bp_manager.get(0, 3);
+  ASSERT_EQ(frame3, nullptr);
+
+  frame4 = bp_manager.get(2, 4);
+  ASSERT_NE(frame4, nullptr);
+
 }
 
 int main(int argc, char **argv) {

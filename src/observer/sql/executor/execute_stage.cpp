@@ -291,7 +291,6 @@ bool match_table(const Selects &selects, const char *table_name_in_condition, co
 static RC schema_add_field(Table *table, const char *field_name, TupleSchema &schema) {
   const FieldMeta *field_meta = table->table_meta().field(field_name);
   if (nullptr == field_meta) {
-    // TODO 返回客户端
     LOG_WARN("No such field. %s.%s", table->name(), field_name);
     return RC::SCHEMA_FIELD_MISSING;
   }

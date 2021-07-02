@@ -28,19 +28,20 @@
 #include <time.h>
 
 #include <vector>
+#include <unordered_map>
 
 #include "rc.h"
 
 typedef int PageNum;
 
-//
 #define BP_INVALID_PAGE_NUM (-1)
 #define BP_PAGE_SIZE (1 << 12)
 #define BP_PAGE_DATA_SIZE (BP_PAGE_SIZE - sizeof(PageNum))
 #define BP_FILE_SUB_HDR_SIZE (sizeof(BPFileSubHeader))
 #define BP_BUFFER_SIZE 50
 #define MAX_OPEN_FILE 50
-
+class BPManager;
+class DiskBufferPool;
 typedef struct {
   PageNum page_num;
   char data[BP_PAGE_DATA_SIZE];
@@ -81,42 +82,100 @@ public:
   BPFileSubHeader *file_sub_header;
 } ;
 
+typedef struct _LruItem{
+  _LruItem *pre;
+  _LruItem *next;
+  int val;  //bpmanager中frame的位序
+}LruItem;
+
+class LruCache {
+public:
+  LruCache(int size, BPManager *bp);
+
+  ~LruCache();
+
+  RC get(int file_desc, PageNum page_num, LruItem **iter);
+
+  /**
+   * 将指定页刷入磁盘
+   */
+  RC flush(int file_desc, PageNum page_num);
+  
+  /**
+   * 将指定文件的所有页刷入磁盘
+   */
+  RC flush_file(int file_desc);
+
+  /**
+   * 内存中删除指定文件所有页的缓存
+   */
+  RC erase_file(int file_desc);
+
+  /**
+   * frame刷入磁盘
+   */
+  RC flush_block(Frame *frame);
+
+  /**
+   * 内存中删除指定页的缓存
+   */
+  RC erase(int file_desc, PageNum page_num);
+
+  /**
+   * 分配一个frame，frame信息更新后需要调用alloc添加到哈希表和双向链表
+   */
+  RC alloc(LruItem **iter);
+
+  /**
+   * 添加frame到哈希表和双向链表
+   */
+  void insert(int file_desc, PageNum page_num, int frame_pos);
+
+  /**
+   * 释放frame到空闲页链表
+   */
+  void free(int frame_pos);
+
+private:
+  std::unordered_map<int, std::unordered_map<int,LruItem*>> hash_map;//(file_desc,page_number->frame数组位序
+  LruItem *items_;
+  LruItem *head_;
+  LruItem *tail_;
+  LruItem *free_list_;
+  BPManager *bp_manager_;
+};
+
 class BPManager {
 public:
-  BPManager(int size = BP_BUFFER_SIZE) {
-    this->size = size;
-    frame = new Frame[size];
-    allocated = new bool[size];
-    for (int i = 0; i < size; i++) {
-      allocated[i] = false;
-      frame[i].pin_count = 0;
-    }
-  }
+  BPManager(int size = BP_BUFFER_SIZE);
 
-  ~BPManager() {
-    delete frame;
-    delete allocated;
-    size = 0;
-    frame = nullptr;
-    allocated = nullptr;
-  }
+  ~BPManager();
 
-  Frame *alloc() {
-    return nullptr; // TODO for test
-  }
+  RC alloc(Frame **buf);
 
-  Frame *get(int file_desc, PageNum page_num) {
-    return nullptr; // TODO for test
-  }
+  Frame* alloc();
+
+  Frame *get(int file_desc, PageNum page_num);
+
+  void dispose_block(Frame *f);
+
+  void insert_page(Frame *f);
+
+  RC dispose_page(int file_desc, PageNum page_num);
+
+  RC dispose_all_pages(int file_desc);
+
+  RC force_page(int file_desc, PageNum page_num);
+
+  RC force_all_pages(int file_desc);
 
   Frame *getFrame() { return frame; }
-
-  bool *getAllocated() { return allocated; }
 
 public:
   int size;
   Frame * frame = nullptr;
-  bool *allocated = nullptr;
+private:
+  LruCache *lru_cache_;
 };
 
 // TODO refactor
@@ -187,6 +246,8 @@ public:
 
   RC flush_all_pages(int file_id);
 
+  RC dispose_all_pages(int file_id);
+
 protected:
   RC allocate_block(Frame **buf);
   RC dispose_block(Frame *buf);
@@ -206,6 +267,7 @@ protected:
 private:
   BPManager bp_manager_;
   BPFileHandle *open_list_[MAX_OPEN_FILE];
+
 };
 
 DiskBufferPool *theGlobalDiskBufferPool();

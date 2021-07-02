@@ -1547,7 +1547,7 @@ yyreduce:
 #line 330 "yacc_sql.y"
                 {
 			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
-			Value *value = &CONTEXT->values[CONTEXT->value_length - 1];
+			Value *value = &CONTEXT->values[0];
 			updates_init(&CONTEXT->ssql->sstr.update, (yyvsp[-6].string), (yyvsp[-4].string), value, 
 					CONTEXT->conditions, CONTEXT->condition_length);
 			CONTEXT->condition_length = 0;
@@ -1708,7 +1708,7 @@ yyreduce:
 			RelAttr left_attr;
 			relation_attr_init(&left_attr, NULL, (yyvsp[-2].string));
 			RelAttr right_attr;
-			relation_attr_init(&left_attr, NULL, (yyvsp[0].string));
+			relation_attr_init(&right_attr, NULL, (yyvsp[0].string));
 
 			Condition condition;
 			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
@@ -1808,7 +1808,7 @@ yyreduce:
 			RelAttr left_attr;
 			relation_attr_init(&left_attr, (yyvsp[-6].string), (yyvsp[-4].string));
 			RelAttr right_attr;
-			relation_attr_init(&left_attr, (yyvsp[-2].string), (yyvsp[0].string));
+			relation_attr_init(&right_attr, (yyvsp[-2].string), (yyvsp[0].string));
 
 			Condition condition;
 			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);

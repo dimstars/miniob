@@ -24,12 +24,19 @@
 SelectExeNode::SelectExeNode() : table_(nullptr) {
 }
 
+SelectExeNode::~SelectExeNode() {
+  for (DefaultConditionFilter * &filter : condition_filters_) {
+    delete filter;
+  }
+  condition_filters_.clear();
+}
+
 RC
-SelectExeNode::init(Trx *trx, Table *table, TupleSchema &&tuple_schema, std::vector<DefaultConditionFilter> &&condition_filters) {
+SelectExeNode::init(Trx *trx, Table *table, TupleSchema &&tuple_schema, std::vector<DefaultConditionFilter *> &&condition_filters) {
   trx_ = trx;
   table_ = table;
   tuple_schema_ = tuple_schema;
-  condition_filters_ = condition_filters;
+  condition_filters_ = std::move(condition_filters);
   return RC::SUCCESS;
 }
 
@@ -39,7 +46,7 @@ void record_reader(const char *data, void *context) {
 }
 RC SelectExeNode::execute(TupleSet &tuple_set) {
   CompositeConditionFilter condition_filter;
-  condition_filter.init(condition_filters_.data(), condition_filters_.size());
+  condition_filter.init((const ConditionFilter **)condition_filters_.data(), condition_filters_.size());
 
   tuple_set.clear();
   tuple_set.set_schema(tuple_schema_);

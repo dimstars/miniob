@@ -39,6 +39,7 @@ void setSignalHandler(int sig, sighandler_t func) {
 */
 void setSignalHandler(sighandler_t func) {
   setSignalHandler(SIGQUIT, func);
+  setSignalHandler(SIGINT, func);
   setSignalHandler(SIGHUP, func);
   setSignalHandler(SIGTERM, func);
 }

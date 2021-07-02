@@ -329,7 +329,7 @@ update:			/*  update 语句的语法解析树*/
     UPDATE ID SET ID EQ value where SEMICOLON
 		{
 			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
-			Value *value = &CONTEXT->values[CONTEXT->value_length - 1];
+			Value *value = &CONTEXT->values[0];
 			updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
 					CONTEXT->conditions, CONTEXT->condition_length);
 			CONTEXT->condition_length = 0;
@@ -454,7 +454,7 @@ condition:
 			RelAttr left_attr;
 			relation_attr_init(&left_attr, NULL, $1);
 			RelAttr right_attr;
-			relation_attr_init(&left_attr, NULL, $3);
+			relation_attr_init(&right_attr, NULL, $3);
 
 			Condition condition;
 			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
@@ -538,7 +538,7 @@ condition:
 			RelAttr left_attr;
 			relation_attr_init(&left_attr, $1, $3);
 			RelAttr right_attr;
-			relation_attr_init(&left_attr, $5, $7);
+			relation_attr_init(&right_attr, $5, $7);
 
 			Condition condition;
 			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);

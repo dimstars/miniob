@@ -92,6 +92,30 @@ RC execute(char *sql) {
   */
 }
 
+bool match_table(const char *table_name_in_condition, const char *table_name_to_match) {
+  if (table_name_in_condition != nullptr) {
+    return 0 == strcmp(table_name_in_condition, table_name_to_match);
+  }
+  return true;
+}
+
+RC check_condition_table_equal(const char* table_name, int condition_num, const Condition *conditions) {
+  for(int i = 0; i < condition_num; i++) {
+    if ((conditions[i].left_is_attr == 0 && conditions[i].right_is_attr == 0) || // 两边都是值
+        (conditions[i].left_is_attr == 1 && conditions[i].right_is_attr == 0 && match_table(conditions[i].left_attr.relation_name, table_name)) ||  // 左边是属性右边是值
+        (conditions[i].left_is_attr == 0 && conditions[i].right_is_attr == 1 && match_table(conditions[i].right_attr.relation_name, table_name)) ||  // 左边是值，右边是属性名
+        (conditions[i].left_is_attr == 1 && conditions[i].right_is_attr == 1 &&
+            match_table(conditions[i].left_attr.relation_name, table_name) && match_table(conditions[i].right_attr.relation_name, table_name)) // 左右都是属性名，并且表名都符合
+        ) {
+      continue;
+    } else {
+      LOG_WARN("Table and table is not equal");
+      return RC::SCHEMA_TABLE_NOT_EQUAL;
+    }
+  }
+  return RC::SUCCESS;
+}
+
 DefaultHandler::DefaultHandler() {
 }
 
@@ -225,8 +249,13 @@ RC DefaultHandler::delete_record(Trx *trx, const char *dbname, const char *relat
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
+  RC rc = check_condition_table_equal(relation_name, condition_num, conditions);
+  if(rc != RC::SUCCESS) {
+    return rc;
+  }
+
   CompositeConditionFilter condition_filter;
-  RC rc = condition_filter.init(*table, conditions, condition_num);
+  rc = condition_filter.init(*table, conditions, condition_num);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -238,6 +267,26 @@ RC DefaultHandler::update_record(Trx *trx, const char *dbname, const char *relat
   Table *table = find_table(dbname, relation_name);
   if (nullptr == table) {
     return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  const FieldMeta *field_meta = table->table_meta().field(attribute_name);
+  if(nullptr == field_meta) {
+    LOG_WARN("No such field. %s.%s", table->name(), attribute_name);
+    return RC::SCHEMA_FIELD_MISSING;
+  }
+
+  // TODO int<->float
+  if(field_meta->type() != value->type) {
+    LOG_WARN("Field type mismatch.");
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  } else if(field_meta->type() == DATES && !check_date_legality((char*)value->data)) {
+    LOG_WARN("Field value is illeagl. %s.%s", table->name(), attribute_name);
+    return RC::SCHEMA_FIELD_VALUE_ILLEGAL;
+  }
+
+  RC rc = check_condition_table_equal(relation_name, condition_num, conditions);
+  if(rc != RC::SUCCESS) {
+    return rc;
   }
 
   return table->update_record(trx, attribute_name, value, condition_num, conditions, updated_count);

@@ -89,5 +89,27 @@ private:
   std::string value_;
 };
 
+class DateValue : public TupleValue {
+public: 
+  explicit DateValue(unsigned int value) : value_(value) {
+  }
+
+  void to_string(std::ostream &os) const override {
+    unsigned int year = value_ >> 11, month = (value_ & 0x7c0) >> 6, day = value_ & 0x3f;
+    os << year << "-";
+    month < 10 ? os << 0 << month << "-": os << month << "-";
+    day < 10 ? os << 0 << day: os << day;
+  }
+
+  int compare(const TupleValue &other) const override {
+    const DateValue & date_other = (const DateValue &)other;
+    // TODO may not safe
+    unsigned int value_r = date_other.value_;
+    return value_ - value_r;
+  }
+
+private:
+  unsigned int value_;
+};
 
 #endif //__OBSERVER_SQL_EXECUTOR_VALUE_H_

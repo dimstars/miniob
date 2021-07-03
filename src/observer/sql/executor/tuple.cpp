@@ -53,6 +53,10 @@ void Tuple::add(int value) {
   add(new IntValue(value));
 }
 
+void Tuple::add(unsigned int value) {
+  add(new DateValue(value));
+}
+
 void Tuple::add(float value) {
   add(new FloatValue(value));
 }
@@ -237,6 +241,11 @@ void TupleRecordConverter::add_record(const char *record) {
       case CHARS: {
         const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
         tuple.add(s, strlen(s));
+      }
+      break;
+      case DATES: {
+        unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
+        tuple.add(value);
       }
       break;
       default: {

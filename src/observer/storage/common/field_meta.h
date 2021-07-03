@@ -52,7 +52,7 @@ public:
 private:
   std::string  name_;
   AttrType     attr_type_;
-  int          attr_offset_;
+  int          attr_offset_;  // 在一个record中的偏移
   int          attr_len_;
   bool         visible_;
 };

@@ -128,7 +128,10 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
 
   switch (sql->flag) {
     case SCF_SELECT: { // select
-      do_select(current_db, sql, exe_event->sql_event()->session_event());
+      RC rc = do_select(current_db, sql, exe_event->sql_event()->session_event());
+      if (rc != RC::SUCCESS) {
+        session_event->set_response(strrc(rc));
+      }
       exe_event->done_immediate();
     }
     break;
@@ -226,7 +229,8 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   Session *session = session_event->get_client()->session;
   Trx *trx = session->current_trx();
   const Selects &selects = sql->sstr.selection;
-  // 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
+  // 把和某张表关联的condition都拿出来，生成该表最底层的select 执行节点, 一个执行节点包括需要返回的列、条件
+  // 数组是用来存放不同表的select 执行节点
   std::vector<SelectExeNode *> select_nodes;
   for (int i = 0; i < selects.relation_num; i++) {
     const char *table_name = selects.relations[i];
@@ -299,7 +303,7 @@ static RC schema_add_field(Table *table, const char *field_name, TupleSchema &sc
   return RC::SUCCESS;
 }
 
-// 把所有的表和只跟这张表关联的condition都拿出来，生成最底层的select 执行节点
+// 把和某张表关联的condition都拿出来，生成该表最底层的select 执行节点, 一个执行节点包括需要返回的列、条件
 RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node) {
   // 列出跟这张表关联的Attr
   TupleSchema schema;
@@ -315,7 +319,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       if (0 == strcmp("*", attr.attribute_name)) {
         // 列出这张表所有字段
         TupleSchema::from_table(table, schema);
-        break; // TODO 没有校验，给出* 之后，再写字段的错误
+        break; // TODO 没有校验，给出* 之后，再写字段的错误 // *,ID paser直接失败
       } else {
         // 列出这张表相关字段
         RC rc = schema_add_field(table, attr.attribute_name, schema);
@@ -323,6 +327,9 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
           return rc;
         }
       }
+    } else {
+      LOG_WARN("Table [%s] and table [%s] is not equal", table_name, attr.relation_name);
+      return RC::SCHEMA_TABLE_NOT_EQUAL;
     }
   }
 
@@ -330,6 +337,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
   std::vector<DefaultConditionFilter *> condition_filters;
   for (int i = 0; i < selects.condition_num; i++) {
     const Condition &condition = selects.conditions[i];
+    // TODO 这里需要支持多表操作, 如 t1.id == t2.id
     if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
         (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_name)) ||  // 左边是属性右边是值
         (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_name)) ||  // 左边是值，右边是属性名
@@ -339,9 +347,13 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       DefaultConditionFilter *condition_filter = new DefaultConditionFilter();
       RC rc = condition_filter->init(*table, condition);
       if (rc != RC::SUCCESS) {
+        delete condition_filter; // free space
         return rc;
       }
       condition_filters.push_back(condition_filter);
+    } else {
+      LOG_WARN("Table and table is not equal");
+      return RC::SCHEMA_TABLE_NOT_EQUAL;
     }
   }
 

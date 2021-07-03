@@ -28,7 +28,7 @@ class ConditionFilter;
 struct RID 
 {
   PageNum page_num; // record's page number
-  SlotNum slot_num; // record's slot number
+  SlotNum slot_num; // record's slot number // page内record的位置
   // bool    valid;    // true means a valid record
 
   bool operator== (const RID &other) const {

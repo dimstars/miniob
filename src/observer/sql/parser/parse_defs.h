@@ -29,7 +29,7 @@
 //属性结构体
 typedef struct {
   char *relation_name;  // relation name (may be NULL) 表名
-  char *attribute_name; // attribute name              属性名
+  char *attribute_name; // attribute name              属性（列）名
 } RelAttr;
 
 typedef enum {
@@ -47,8 +47,18 @@ typedef enum {
   UNDEFINED,
   CHARS, 
   INTS, 
-  FLOATS 
+  FLOATS,
+  DATES // 0x(yyyyyyyyyyyyyymmmmmdddddd) // 14bit|5bit|6bit // 9999-19-39
 } AttrType;
+
+//聚合运算符
+typedef enum {
+  MAX_A,
+  MIN_A,
+  COUNT_A,
+  AVG_A,
+  NOTHING_A
+} AggOp;
 
 //属性值
 typedef struct _Value {
@@ -70,6 +80,7 @@ typedef struct _Condition {
 
 // struct of select
 typedef struct {
+  AggOp aggregation;               // aggregation operator
   int attr_num;                    // Length of attrs in Select clause
   RelAttr attributes[MAX_NUM];     // attrs in Select clause
   int relation_num;                // Length of relations in Fro clause
@@ -184,6 +195,9 @@ typedef struct Query {
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+unsigned int get_maxDay_of_ym(unsigned int year, unsigned int month);
+int check_date_legality(const char *v);
+int cmp_date(char *left, char *right);
 
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name);
 void relation_attr_destroy(RelAttr *relation_attr);
@@ -191,6 +205,7 @@ void relation_attr_destroy(RelAttr *relation_attr);
 void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
+void value_init_date(Value *value, const char *v);
 void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
@@ -201,6 +216,7 @@ void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, int le
 void attr_info_destroy(AttrInfo *attr_info);
 
 void selects_init(Selects *selects, ...);
+void selects_append_aggregation(Selects *selects, AggOp agg);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], int condition_num);

@@ -92,12 +92,12 @@ bool DefaultStorageStage::set_properties() {
   }
 
   handler_ = &DefaultHandler::get_default();
-  if (RC::SUCCESS != handler_->init(base_dir)) {
+  if (RC::SUCCESS != handler_->init(base_dir)) {  // 逐级创建base和db目录 // base目录 ./miniob // db目录 ./miniob/db
     LOG_ERROR("Failed to init default handler");
     return false;
   }
 
-  RC ret = handler_->create_db(sys_db);
+  RC ret = handler_->create_db(sys_db); // 创建具体db目录 // sysdb目录 ./miniob/db/sys
   if (ret != RC::SUCCESS && ret != RC::SCHEMA_DB_EXIST) {
     LOG_ERROR("Failed to create system db");
     return false;

@@ -42,6 +42,7 @@ public:
   void add(TupleValue *value);
   void add(const std::shared_ptr<TupleValue> &other);
   void add(int value);
+  void add(unsigned int value);
   void add(float value);
   void add(const char *s, int len);
 
@@ -89,6 +90,7 @@ private:
   std::string field_name_;
 };
 
+// 用来存对于某表需要返回哪些列（TupleField，表名.列名）
 class TupleSchema {
 public:
   TupleSchema() = default;

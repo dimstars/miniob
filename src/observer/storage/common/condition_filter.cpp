@@ -32,9 +32,10 @@ DefaultConditionFilter::DefaultConditionFilter() {
 DefaultConditionFilter::~DefaultConditionFilter() {
 }
 
-RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType attr_type, CompOp comp_op) {
-  if (attr_type < CHARS || attr_type > FLOATS) {
-    LOG_ERROR("Invalid condition with unsupported attribute type: %d", attr_type);
+RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op) {
+  // 只需要判断一个，因为不相等的情况一定是int/float
+  if (type_left < CHARS || type_left > DATES) {
+    LOG_ERROR("Invalid condition with unsupported attribute type: %d", type_left);
     return RC::INVALID_ARGUMENT;
   }
 
@@ -45,7 +46,8 @@ RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrT
 
   left_ = left;
   right_ = right;
-  attr_type_ = attr_type;
+  type_left_ = type_left;
+  type_right_ = type_right;
   comp_op_ = comp_op;
   return RC::SUCCESS;
 }
@@ -70,6 +72,11 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
 
     type_left = field_left->type();
   } else {
+    if(condition.left_value.type == DATES && !check_date_legality((char*)condition.left_value.data)) { // 校验date类型
+      // TODO 没有考虑大小端问题
+      LOG_WARN("Field value in condition is illeagl. %s.%s", table.name(), condition.left_attr.attribute_name);
+      return RC::SCHEMA_FIELD_VALUE_ILLEGAL;
+    }
     left.is_attr = false;
     left.value = condition.left_value.data; // 校验type 或者转换类型
     type_left = condition.left_value.type;
@@ -86,6 +93,13 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
     right.attr_offset = field_right->offset();
     type_right = field_right->type();
   } else {
+    if(condition.right_value.type == DATES) { // 校验date类型
+      // TODO 没有考虑大小端问题
+      if(!check_date_legality((char*)condition.right_value.data)) {
+        LOG_WARN("Field value in condition is illeagl. %s.%s", table.name(), condition.right_attr.attribute_name);
+        return RC::SCHEMA_FIELD_VALUE_ILLEGAL;
+      }
+    }
     right.is_attr = false;
     right.value = condition.right_value.data;
     type_right = condition.right_value.type;
@@ -98,11 +112,15 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
 //  }
   // NOTE：这里没有实现不同类型的数据比较，比如整数跟浮点数之间的对比
   // 但是选手们还是要实现。这个功能在预选赛中会出现
-  if (type_left != type_right) {
+  if((type_left == FLOATS && type_right == INTS) || (type_left == INTS && type_right == FLOATS)) {
+    // do nothing
+    // 在filter里进行转换比较
+  } else if(type_left != type_right) {
+    LOG_WARN("Field type mismatch.");
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 
-  return init(left, right, type_left, condition.comp);
+  return init(left, right, type_left, type_right, condition.comp);
 }
 
 bool DefaultConditionFilter::filter(const Record &rec) const {
@@ -122,7 +140,7 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
   }
 
   int cmp_result = 0;
-  switch (attr_type_) {
+  switch (type_left_) {
     case CHARS: { // 字符串都是定长的，直接比较
       // TODO 字符串的格式还不确定，先按照C字符串风格来定
       cmp_result = strcmp(left_value, right_value);
@@ -131,17 +149,32 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
     case INTS: {
       // TODO 没有考虑大小端问题
       // TODO 对int和float，要考虑字节对齐问题,有些平台下直接转换可能会跪
-      int left = *(int*)left_value;
-      int right = *(int*)right_value;
-      cmp_result = left - right;
+      if(type_right_ == INTS) {
+        int left = *(int*)left_value;
+        int right = *(int*)right_value;
+        cmp_result = left - right;
+      } else {
+        int left = *(int*)left_value;
+        float right = *(float*)right_value;
+        cmp_result = (int)(left - right);
+      }
     }
     break;
     case FLOATS: {
-      float left = *(float*)left_value;
-      float right = *(float*)right_value;
-      cmp_result = (int)(left - right);
+      if(type_right_ == FLOATS) {
+        float left = *(float*)left_value;
+        float right = *(float*)right_value;
+        cmp_result = (int)(left - right);
+      } else {
+        float left = *(float*)left_value;
+        int right = *(int*)right_value;
+        cmp_result = (int)(left - right);
+      }
     }
     break;
+    case DATES: {
+      cmp_result = cmp_date(left_value, right_value);
+    }
     default: {
       // TODO
     }

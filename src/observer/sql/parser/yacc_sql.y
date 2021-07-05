@@ -20,6 +20,7 @@ typedef struct ParserContext {
   Value values[MAX_NUM];
   Condition conditions[MAX_NUM];
   CompOp comp;
+  AggOp agg;
 	char id[MAX_NUM];
 } ParserContext;
 
@@ -84,6 +85,7 @@ ParserContext *get_context(yyscan_t scanner) {
         INT_T
         STRING_T
         FLOAT_T
+		DATE_T
         HELP
         EXIT
         DOT //QUOTE
@@ -103,6 +105,10 @@ ParserContext *get_context(yyscan_t scanner) {
         LE
         GE
         NE
+		MAX
+		MIN
+		COUNT
+		AVG
 
 %union {
     struct _Attr *attr;
@@ -121,6 +127,7 @@ ParserContext *get_context(yyscan_t scanner) {
 %token <string> SSS
 %token <string> STAR
 %token <string> STRING_V
+%token <string> DATE
 //非终结符
 
 %type <number> type;
@@ -253,6 +260,7 @@ attr_def:
     |ID_get type
 		{
 			AttrInfo attribute;
+			// TODO 如果支持NULL，需要考虑如何用4字节表示或其他方式
 			attr_info_init(&attribute, CONTEXT->id, $2, 4);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
@@ -269,6 +277,7 @@ type:
 	INT_T { $$=INTS; }
        | STRING_T { $$=CHARS; }
        | FLOAT_T { $$=FLOATS; }
+	   | DATE_T { $$=DATES; }
        ;
 ID_get:
 	ID 
@@ -312,6 +321,10 @@ value:
     |SSS {
 			$1 = substr($1,1,strlen($1)-2);
   		value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
+		}
+	|DATE {
+			$1 = substr($1,1,strlen($1)-2);
+			value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
     ;
     
@@ -359,6 +372,7 @@ select_attr:
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, "*");
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, NOTHING_A);
 		}
     | ID attr_list {
 			RelAttr attr;
@@ -369,6 +383,66 @@ select_attr:
 			RelAttr attr;
 			relation_attr_init(&attr, $1, $3);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		}
+	| MAX LBRACE ID RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, MAX_A);
+		}
+	| MAX LBRACE ID DOT ID RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, $3, $5);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, MAX_A);
+		}
+	| MIN LBRACE ID RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, MIN_A);
+		}
+	| MIN LBRACE ID DOT ID RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, $3, $5);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, MIN_A);
+		}
+	| COUNT LBRACE STAR RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, COUNT_A);
+		}
+	| COUNT LBRACE ID RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, COUNT_A);
+		}
+	| COUNT LBRACE ID DOT ID RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, $3, $5);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, COUNT_A);
+		}
+	| COUNT LBRACE NUMBER RBRACE {  //  TODO optimize count(n)
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, COUNT_A);
+		}
+	| AVG LBRACE ID RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, AVG_A);
+		}
+	| AVG LBRACE ID DOT ID RBRACE {
+			RelAttr attr;
+			relation_attr_init(&attr, $3, $5);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, AVG_A);
 		}
     ;
 attr_list:

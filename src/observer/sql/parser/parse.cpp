@@ -102,6 +102,56 @@ Query *getSqlstr() {
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+unsigned int get_maxDay_of_ym(unsigned int year, unsigned int month) {
+  int res = 0;
+  switch(month) {
+    case 1:
+    case 3:
+    case 5:
+    case 7:
+    case 8:
+    case 10:
+    case 12: {
+      res = 31;
+    }
+      break;
+    case 2: {
+      if((year % 100 == 0 && year % 400 == 0) || (year % 100 != 0 && year % 4 == 0)) res = 29;
+      else res = 28;
+    }
+      break;
+    case 4:
+    case 6:
+    case 9:
+    case 11: {
+      res = 30;
+    }
+      break;
+    default: 
+      break;
+  }
+  return res;
+}
+
+int check_date_legality(const char *v) {
+  // TODO 没有考虑大小端
+  unsigned int data = *(unsigned int*)v;
+  unsigned int year = data >> 11, month = (data & 0x7c0) >> 6, day = data & 0x3f;
+  if(month < 1 || month > 12 || day < 1 || day > get_maxDay_of_ym(year, month) || year > 2038 \
+    || (year == 2038 && month > 2)) {
+      return 0;
+  }
+  return 1;
+}
+
+int cmp_date(char *left, char *right) {
+  // TODO 没有考虑大小端
+  unsigned int data_l = *(unsigned int*)left;
+  unsigned int data_r = *(unsigned int*)right;
+  
+  return data_l - data_r;
+}
+
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name) {
   if (relation_name != nullptr) {
     relation_attr->relation_name = strdup(relation_name);
@@ -131,6 +181,20 @@ void value_init_float(Value *value, float v) {
 void value_init_string(Value *value, const char *v) {
   value->type = CHARS;
   value->data = strdup(v);
+}
+void value_init_date(Value *value, const char *v) {
+  value->type = DATES;
+  const char *delim = "-";
+  char tstr[12];
+  strcpy(tstr, v);
+  char *token = strtok(tstr, delim);
+  unsigned int data = atoi(token) << 11;
+  token = strtok(NULL, delim);
+  data |= atoi(token) << 6;
+  token = strtok(NULL, delim);
+  data |= atoi(token);
+  value->data = malloc(sizeof(data));
+  memcpy(value->data, &data, sizeof(data));
 }
 void value_destroy(Value *value) {
   value->type = UNDEFINED;
@@ -180,6 +244,9 @@ void attr_info_destroy(AttrInfo *attr_info) {
 }
 
 void selects_init(Selects *selects, ...);
+void selects_append_aggregation(Selects *selects, AggOp agg) {
+  selects->aggregation = agg;
+}
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr) {
   selects->attributes[selects->attr_num++] = *rel_attr;
 }

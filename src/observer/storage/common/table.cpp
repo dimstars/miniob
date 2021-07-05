@@ -276,7 +276,7 @@ const TableMeta &Table::table_meta() const {
 }
 
 RC Table::make_record(int value_num, const Value *values, char * &record_out) {
-  // 检查字段类型是否一致
+  // 检查字段类型数量是否一致
   if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
     return RC::SCHEMA_FIELD_MISSING;
   }
@@ -286,9 +286,13 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
     if (field->type() != value.type) {
+      // TODO int<->float
       LOG_ERROR("Invalid value type. field name=%s, type=%d, but given=%d",
         field->name(), field->type(), value.type);
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    } else if(value.type == DATES && !check_date_legality((char*)value.data)) {
+      LOG_ERROR("Illeagl value.");
+      return RC::SCHEMA_FIELD_VALUE_ILLEGAL;
     }
   }
 
@@ -547,7 +551,6 @@ public:
   RC update_record(Record *record) {
     RC rc = RC::SUCCESS;
 
-    const int normal_field_start_index = table_.table_meta_.sys_field_num();
     const FieldMeta *field = table_.table_meta_.field(attribute_name_);
     memcpy(record->data + field->offset(), value_->data, field->len());
 

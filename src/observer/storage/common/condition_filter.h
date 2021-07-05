@@ -20,8 +20,10 @@
 #ifndef __OBSERVER_STORAGE_COMMON_CONDITION_FILTER_H_
 #define __OBSERVER_STORAGE_COMMON_CONDITION_FILTER_H_
 
+#include <string>
 #include "rc.h"
 #include "sql/parser/parse.h"
+#include "sql/executor/tuple.h"
 
 struct Record;
 class Table;
@@ -69,6 +71,43 @@ private:
   AttrType type_left_;
   AttrType type_right_;
   CompOp   comp_op_;
+};
+
+class JoinConditionFilter : public ConditionFilter {
+public:
+  JoinConditionFilter();
+  virtual ~JoinConditionFilter();
+
+  RC init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right,
+          const char * table_left, const char * table_right, const char * field_left, const char * field_right, CompOp comp_op);
+  RC init(Table &table_left, Table &table_right, const Condition &condition);
+
+  virtual bool filter(const Record &rec) const;
+  bool filter(TupleSchema &schema, const Tuple &tuple) const;
+
+public:
+  const ConDesc &left() const {
+    return left_;
+  }
+
+  const ConDesc &right() const {
+    return right_;
+  }
+
+  CompOp comp_op() const {
+    return comp_op_;
+  }
+
+private:
+  ConDesc     left_;
+  ConDesc     right_;
+  AttrType    type_left_;
+  AttrType    type_right_;
+  std::string table_left_;
+  std::string table_right_;
+  std::string field_left_;
+  std::string field_right_;
+  CompOp      comp_op_;
 };
 
 class CompositeConditionFilter : public ConditionFilter {

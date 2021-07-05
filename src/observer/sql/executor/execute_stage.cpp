@@ -222,18 +222,190 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right) {
   }
 }
 
+RC join_tables(std::vector<TupleSet> &tuple_sets, std::vector<JoinConditionFilter *> &join_condition_filters, TupleSet &join_tuple_set) {
+  // 若任意TupleSet为空，那么笛卡尔积为空
+  for (TupleSet &tuple_set: tuple_sets) {
+    if (tuple_set.size() == 0) {
+      return RC::SUCCESS;
+    }
+  }
+
+  // 构建schema
+  std::vector<int> tuple_sizes;
+  TupleSchema schema;
+  int cycles = 1;
+  for (TupleSet &tuple_set: tuple_sets) {
+    cycles *= tuple_set.size();
+    tuple_sizes.push_back(tuple_set.size());
+    schema.append(tuple_set.schema());
+  }
+  join_tuple_set.set_schema(schema);
+
+  // 构建笛卡尔积
+  std::vector<int> tuple_nums(tuple_sets.size(), 0);
+  for (int i = 0; i < cycles; i++) {
+    Tuple tuple;
+    for (int j = 0; j < tuple_sets.size(); j++) {
+      TupleSet &tuple_set = tuple_sets[j];
+      const Tuple &tuple_tmp = tuple_set.get(tuple_nums[j]);
+      for (std::shared_ptr<TupleValue> value: tuple_tmp.values()) {
+        tuple.add(value);
+      }
+    }
+    tuple_nums[tuple_sets.size() - 1] += 1;
+    for (int j = tuple_sets.size() - 1; j > 0; j--) {
+      if (tuple_nums[j] >= tuple_sizes[j]) {
+        tuple_nums[j-1] += 1;
+        tuple_nums[j] = 0;
+      }
+    }
+    // 根据条件进行筛选
+    bool flag = true;
+    for (JoinConditionFilter *filter: join_condition_filters) {
+      if (!filter->filter(schema, tuple)) {
+        flag = false;
+        break;
+      }
+    }
+    if (flag) {
+      join_tuple_set.add(std::move(tuple));
+    }
+    if (tuple_nums[0] >= tuple_sizes[0]) {
+      break;
+    }
+  }
+
+  return RC::SUCCESS;
+}
+
+RC create_join_condition_filter(const char * db, const Selects &selects, std::vector<JoinConditionFilter*> &join_condition_filters) {
+  for (int i = 0; i < selects.condition_num; i++) {
+    const Condition &condition = selects.conditions[i];
+    // 两边都是表名加属性名，是多表之间比较的条件表达式
+    if (condition.left_is_attr == 1 && condition.right_is_attr == 1) {
+      Table * left_table = DefaultHandler::get_default().find_table(db, condition.left_attr.relation_name);
+      Table * right_table = DefaultHandler::get_default().find_table(db, condition.right_attr.relation_name);
+      if (left_table == nullptr || right_table == nullptr) {
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
+      JoinConditionFilter *join_condition_filter = new JoinConditionFilter();
+      RC rc = join_condition_filter->init(*left_table, *right_table, condition);
+      if (rc != RC::SUCCESS) {
+        delete join_condition_filter;
+        return rc;
+      }
+      join_condition_filters.push_back(join_condition_filter);
+    }
+  }
+  return RC::SUCCESS;
+}
+
+RC check_attr_in_table(std::vector<Table *> tables, const RelAttr &attr, AttrType &type) {
+  // 无表名，要么是“*”，要么是单表查询
+  if (attr.relation_name == nullptr) {
+    if (0 == strcmp(attr.attribute_name, "*")) {
+      return RC::SUCCESS;
+    }
+    if (tables.size() > 1) {
+      return RC::SCHEMA_FIELD_NAME_ILLEGAL;
+    }
+    const FieldMeta * field =tables[0]->table_meta().field(attr.attribute_name);
+    if (nullptr == field) {
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+    type = field->type();
+  }
+  // 有表名，表名必须出现在from后面的table列表中
+  else {
+    int exist = false;
+    for (int j = 0; j < tables.size(); j++) {
+      if (0 == strcmp(tables[j]->name(), attr.relation_name)) {
+        const FieldMeta * field = tables[j]->table_meta().field(attr.attribute_name);
+        if (nullptr == field) {
+          // 属性不存在
+          return RC::SCHEMA_FIELD_NOT_EXIST;
+        }
+        type = field->type();
+        exist = true;
+        break;
+      }
+    }
+    if (!exist) {
+      // 表不存在
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+  }
+  return RC::SUCCESS;
+}
+
+// select命令的元数据校验
+RC check_meta_select(const char *db, const Selects &selects) {
+  std::vector<Table *> tables;
+
+  // table校验，检查from后面的table是否在db中
+  for (int i = selects.relation_num - 1; i >= 0; i--) {
+    const char *table_name = selects.relations[i];
+    Table * table = DefaultHandler::get_default().find_table(db, table_name);
+    if (table == nullptr) {
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+    tables.push_back(table);
+  }
+
+  // attr校验，检查select后面的attr是否在from后面的table中
+  for (int i = 0; i < selects.attr_num; i++) {
+    const RelAttr &attr = selects.attributes[i];
+    AttrType type;
+    RC rc = check_attr_in_table(tables, attr, type);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+  }
+
+  // condition校验，检查where后面的condition中的attr是否在from后面的table中
+  for (int i = 0; i < selects.condition_num; i++) {
+    const Condition &condition = selects.conditions[i];
+    AttrType left_type = condition.left_value.type;
+    AttrType right_type = condition.right_value.type;
+    if (condition.left_is_attr) {
+      RC rc = check_attr_in_table(tables, condition.left_attr, left_type);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+    }
+    if (condition.right_is_attr) {
+      RC rc = check_attr_in_table(tables, condition.right_attr, right_type);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+    }
+    if (left_type != right_type && ((left_type != INTS && left_type != FLOATS) || (right_type != INTS && right_type != FLOATS))) {
+      // 条件表达式两边类型不匹配，并且其中一个不是int或float类型，不能转换类型
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+  }
+
+  return RC::SUCCESS;
+}
+
 // TODO 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
 // 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
-
   RC rc = RC::SUCCESS;
   Session *session = session_event->get_client()->session;
   Trx *trx = session->current_trx();
   const Selects &selects = sql->sstr.selection;
+
+  // 元数据校验
+  rc = check_meta_select(db, selects);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
   // 把和某张表关联的condition都拿出来，生成该表最底层的select 执行节点, 一个执行节点包括需要返回的列、条件
   // 数组是用来存放不同表的select 执行节点
   std::vector<SelectExeNode *> select_nodes;
-  for (int i = 0; i < selects.relation_num; i++) {
+  for (int i = selects.relation_num - 1; i >= 0; i--) {
     const char *table_name = selects.relations[i];
     SelectExeNode *select_node = new SelectExeNode;
     rc = create_selection_executor(trx, selects, db, table_name, *select_node);
@@ -272,7 +444,14 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   std::stringstream ss;
   if (tuple_sets.size() > 1) {
     // 本次查询了多张表，需要做join操作
-    // TODO
+    TupleSet join_tuple_set;
+    std::vector<JoinConditionFilter *> join_condition_filters;
+    rc = create_join_condition_filter(db, selects, join_condition_filters);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    join_tables(tuple_sets, join_condition_filters, join_tuple_set);
+    join_tuple_set.print(ss);
   } else {
     // 当前只查询一张表，直接返回结果即可
     tuple_sets.front().print(ss);
@@ -360,9 +539,6 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
           return rc;
         }
       }
-    } else {
-      LOG_WARN("Table [%s] and table [%s] is not equal", table_name, attr.relation_name);
-      return RC::SCHEMA_TABLE_NOT_EQUAL;
     }
   }
 
@@ -400,9 +576,6 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         return rc;
       }
       condition_filters.push_back(condition_filter);
-    } else {
-      LOG_WARN("Table and table is not equal");
-      return RC::SCHEMA_TABLE_NOT_EQUAL;
     }
   }
 

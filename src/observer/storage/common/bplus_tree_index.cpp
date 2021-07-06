@@ -24,7 +24,7 @@ BplusTreeIndex::~BplusTreeIndex() noexcept {
   close();
 }
 
-RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta) {
+RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique) {
   if (inited_) {
     return RC::RECORD_OPENNED;
   }
@@ -34,14 +34,14 @@ RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, co
     return rc;
   }
 
-  rc = index_handler_.create(file_name, field_meta.type(), field_meta.len());
+  rc = index_handler_.create(file_name, field_meta.type(), field_meta.len(), unique);
   if (RC::SUCCESS == rc) {
     inited_ = true;
   }
   return rc;
 }
 
-RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta) {
+RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique) {
   if (inited_) {
     return RC::RECORD_OPENNED;
   }
@@ -50,7 +50,7 @@ RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, cons
     return rc;
   }
 
-  rc = index_handler_.open(file_name);
+  rc = index_handler_.open(file_name, unique);
   if (RC::SUCCESS == rc) {
     inited_ = true;
   }
@@ -67,6 +67,10 @@ RC BplusTreeIndex::close() {
 
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid) {
   return index_handler_.insert_entry(record + field_meta_.offset(), rid);
+}
+
+RC BplusTreeIndex::insert_key(const char *pkey, const RID *rid) {
+  return index_handler_.insert_entry(pkey, rid);
 }
 
 RC BplusTreeIndex::delete_entry(const char *record, const RID *rid) {
@@ -90,7 +94,6 @@ RC BplusTreeIndex::sync() {
   return index_handler_.sync();
 }
 
-////////////////////////////////////////////////////////////////////////////////
 BplusTreeIndexScanner::BplusTreeIndexScanner(BplusTreeScanner *tree_scanner) :
     tree_scanner_(tree_scanner) {
 }

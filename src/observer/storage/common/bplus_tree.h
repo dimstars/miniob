@@ -62,14 +62,14 @@ public:
    * 此函数创建一个名为fileName的索引。
    * attrType描述被索引属性的类型，attrLength描述被索引属性的长度
    */
-  RC create(const char *file_name, AttrType attr_type, int attr_length);
+  RC create(const char *file_name, AttrType attr_type, int attr_length, bool unique = false);
 
   /**
    * 打开名为fileName的索引文件。
    * 如果方法调用成功，则indexHandle为指向被打开的索引句柄的指针。
    * 索引句柄用于在索引中插入或删除索引项，也可用于索引的扫描
    */
-  RC open(const char *file_name);
+  RC open(const char *file_name, bool unique);
 
   /**
    * 关闭句柄indexHandle对应的索引文件
@@ -124,6 +124,7 @@ private:
   int               file_id_ = -1;
   bool              header_dirty_ = false;
   IndexFileHeader   file_header_;
+  bool              unique_index_ = false;   ///唯一索引
 
 private:
   friend class BplusTreeScanner;

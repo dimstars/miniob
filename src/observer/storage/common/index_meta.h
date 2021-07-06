@@ -34,11 +34,12 @@ class IndexMeta {
 public:
   IndexMeta() = default;
 
-  RC init(const char *name, const FieldMeta &field);
+  RC init(const char *name, const FieldMeta &field, bool unique);
 
 public:
   const char *name() const;
   const char *field() const;
+  const char *extended_attr() const;
 
   void desc(std::ostream &os) const;
 public:
@@ -48,5 +49,6 @@ public:
 private:
   std::string       name_;
   std::string       field_;
+  std::string       extended_attr_;
 };
 #endif // __OBSERVER_STORAGE_COMMON_INDEX_META_H__

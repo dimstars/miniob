@@ -152,6 +152,41 @@ int cmp_date(char *left, char *right) {
   return data_l - data_r;
 }
 
+void aggregation_init_string(AggOp *agg, const char *relation_name, const char *attribute_name, AggType type) {
+  RelAttr attr;
+  if(relation_name != nullptr) {
+    attr.relation_name = strdup(relation_name);
+  } else {
+    attr.relation_name = nullptr;
+  }
+  attr.attribute_name = strdup(attribute_name);
+  agg->attribute = attr;
+  agg->type = type;
+}
+
+void aggregation_init_integer(AggOp *agg, const char *relation_name, int attribute_name, AggType type) {
+  RelAttr attr;
+  if(relation_name != nullptr) {
+    attr.relation_name = strdup(relation_name);
+  } else {
+    attr.relation_name = nullptr;
+  }
+  attr.attribute_name = strdup(std::to_string(attribute_name).c_str());
+  agg->attribute = attr;
+  agg->type = type;
+}
+
+void aggregation_destroy(AggOp *agg) {
+  if(agg->attribute.relation_name != nullptr) {
+    free(agg->attribute.relation_name);
+  }
+  agg->attribute.relation_name = nullptr;
+  if(agg->attribute.attribute_name != nullptr) {
+    free(agg->attribute.attribute_name);
+  }
+  agg->attribute.attribute_name = nullptr;
+}
+
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name) {
   if (relation_name != nullptr) {
     relation_attr->relation_name = strdup(relation_name);
@@ -244,8 +279,8 @@ void attr_info_destroy(AttrInfo *attr_info) {
 }
 
 void selects_init(Selects *selects, ...);
-void selects_append_aggregation(Selects *selects, AggOp agg) {
-  selects->aggregation = agg;
+void selects_append_aggregation(Selects *selects, AggOp *agg) {
+  selects->aggregations[selects->aggr_num++] = *agg;
 }
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr) {
   selects->attributes[selects->attr_num++] = *rel_attr;
@@ -263,6 +298,11 @@ void selects_append_conditions(Selects *selects, Condition conditions[], int con
 }
 
 void selects_destroy(Selects *selects) {
+  for (int i = 0; i < selects->aggr_num; i++) {
+    aggregation_destroy(&selects->aggregations[i]);
+  }
+  selects->aggr_num = 0;
+  
   for (int i = 0; i < selects->attr_num; i++) {
     relation_attr_destroy(&selects->attributes[i]);
   }

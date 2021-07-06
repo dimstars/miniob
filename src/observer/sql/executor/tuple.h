@@ -28,6 +28,36 @@
 
 class Table;
 
+// 为了进行聚合运算所维护的统计变量
+typedef struct _MaxStat {
+  Value value;
+} MaxStat;
+
+typedef struct _MinStat {
+  Value value;
+} MinStat;
+
+typedef struct _CountStat {
+  int count;
+} CountStat;
+
+typedef struct _AvgStat {
+  int count;
+  float sum;
+} AvgStat;
+
+union TupleStats {
+  MaxStat maxs;
+  MinStat mins;
+  CountStat counts;
+  AvgStat avgs;
+};
+
+// 目前只在TupleField使用，因此TupleField实现管理
+typedef struct TupleStat {
+  union TupleStats stat;
+} TupleStat;
+
 class Tuple {
 public:
   Tuple() = default;
@@ -45,6 +75,11 @@ public:
   void add(unsigned int value);
   void add(float value);
   void add(const char *s, int len);
+
+  void reset(int value, int index);
+  void reset(unsigned int value, int index);
+  void reset(float value, int index);
+  void reset(const char *s, int len, int index);
 
   const std::vector<std::shared_ptr<TupleValue>> &values() const {
     return values_;
@@ -66,14 +101,36 @@ private:
   std::vector<std::shared_ptr<TupleValue>>  values_;
 };
 
+// 为了支持聚合运算，存放聚合运算关系
 class TupleField {
 public:
-  TupleField(AttrType type, const char *table_name, const char *field_name) :
-          type_(type), table_name_(table_name), field_name_(field_name){
+  TupleField(const TupleField &other) :
+          type_(other.type()), atype_(other.atype()), table_name_(other.table_name()), field_name_(other.field_name()) {
+    stat_reset(other.stat());
+  }
+  TupleField(AttrType type, AggType atype, const char *table_name, const char *field_name) :
+          type_(type), atype_(atype), table_name_(table_name), field_name_(field_name){
+    stat_create();
+  }
+
+  // TupleStat functions
+  void stat_create();
+  void stat_init();
+  void stat_destroy();
+  void stat_value_destroy();
+  void stat_reset(const TupleStat *other);
+  void stat_value_reset(Value *value, const Value *other);
+
+  TupleStat *stat() const {
+    return stat_;
   }
 
   AttrType  type() const{
     return type_;
+  }
+  
+  AggType atype() const {
+    return atype_;
   }
 
   const char *table_name() const {
@@ -86,6 +143,8 @@ public:
   std::string to_string() const;
 private:
   AttrType  type_;
+  AggType     atype_;
+  TupleStat  *stat_;
   std::string table_name_;
   std::string field_name_;
 };
@@ -96,8 +155,8 @@ public:
   TupleSchema() = default;
   ~TupleSchema() = default;
 
-  void add(AttrType type, const char *table_name, const char *field_name);
-  void add_if_not_exists(AttrType type, const char *table_name, const char *field_name);
+  void add(AttrType type, AggType atype, const char *table_name, const char *field_name);
+  void add_if_not_exists(AttrType type, AggType atype, const char *table_name, const char *field_name);
   // void merge(const TupleSchema &other);
   void append(const TupleSchema &other);
 
@@ -109,9 +168,17 @@ public:
     return fields_[index];
   }
 
-  int index_of_field(const char *table_name, const char *field_name) const;
+  int index_of_field(AggType atype, const char *table_name, const char *field_name) const;
+
   void clear() {
+    for(int i = 0; i < fields_.size(); i++) {
+      fields_[i].stat_destroy();
+    }
     fields_.clear();
+  }
+
+  int size() {
+    return fields_.size();
   }
 
   void print(std::ostream &os) const;
@@ -138,6 +205,30 @@ public:
   void add(Tuple && tuple);
 
   void clear();
+
+  void reset(int value, int index) {
+    for(int i = 0; i < size(); i++) {
+      tuples_[i].reset(value, index);
+    }
+  }
+
+  void reset(unsigned int value, int index) {
+    for(int i = 0; i < size(); i++) {
+      tuples_[i].reset(value, index);
+    }
+  }
+
+  void reset(float value, int index) {
+    for(int i = 0; i < size(); i++) {
+      tuples_[i].reset(value, index);
+    }
+  }
+
+  void reset(const char *s, int len, int index) {
+    for(int i = 0; i < size(); i++) {
+      tuples_[i].reset(s, len, index);
+    }
+  }
 
   bool is_empty() const;
   int size() const;

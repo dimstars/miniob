@@ -276,7 +276,9 @@ RC DefaultHandler::update_record(Trx *trx, const char *dbname, const char *relat
   }
 
   // TODO int<->float
-  if(field_meta->type() != value->type) {
+  if ((field_meta->type() == INTS && value->type == FLOATS) || (field_meta->type() == INTS && value->type == FLOATS)) {
+      // do nothing
+  } else if(field_meta->type() != value->type) {
     LOG_WARN("Field type mismatch.");
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   } else if(field_meta->type() == DATES && !check_date_legality((char*)value->data)) {

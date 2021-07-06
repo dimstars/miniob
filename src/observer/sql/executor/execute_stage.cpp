@@ -263,6 +263,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       end_trx_if_need(session, trx, false);
       return rc;
     } else {
+      // WARN 这里调用了TupleSet拷贝构造函数，导致tuple_set内的TupleSchema进行了fields的转移
       tuple_sets.push_back(std::move(tuple_set));
     }
   }
@@ -299,8 +300,32 @@ static RC schema_add_field(Table *table, const char *field_name, TupleSchema &sc
     return RC::SCHEMA_FIELD_MISSING;
   }
 
-  schema.add_if_not_exists(field_meta->type(), table->name(), field_meta->name());
+  schema.add_if_not_exists(field_meta->type(), NOTHING_A, table->name(), field_meta->name());
   return RC::SUCCESS;
+}
+
+static RC schema_add_field_agg(Table *table, AggType atype, const char *field_name, TupleSchema &schema) {
+  // "*"/"-" 是count运算下的特殊属性名，"-"目前指代number
+  if(strcmp(field_name, "*") == 0 || (field_name && field_name[0] >= '0' && field_name[0] <= '9')) {
+    assert(atype == COUNT_A);
+    // 使用任意type不影响count(*)/count(number)，因为count(*)/count(number)这里不考虑具体列
+    schema.add_if_not_exists(INTS, atype, table->name(), field_name);
+    return RC::SUCCESS;
+  } else {
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    if (nullptr == field_meta) {
+      LOG_WARN("No such field. %s.%s", table->name(), field_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    
+    if(atype == AVG_A && (field_meta->type() < INTS || field_meta->type() > FLOATS)) {
+      LOG_WARN("Field can not calculate AVG. %s.%s", table->name(), field_name);
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+
+    schema.add_if_not_exists(field_meta->type(), atype, table->name(), field_meta->name());
+    return RC::SUCCESS;
+  }
 }
 
 // 把和某张表关联的condition都拿出来，生成该表最底层的select 执行节点, 一个执行节点包括需要返回的列、条件
@@ -312,7 +337,14 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
     LOG_WARN("No such table [%s] in db [%s]", table_name, db);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
+  
+  // TODO 目前不支持同时有属性和聚合运算的查询
+  if(selects.attr_num > 0 && selects.aggr_num > 0) {
+    LOG_ERROR("Not support attribute and aggregation both exist now");
+    return RC::SCHEMA_FIELD_NOT_SUPPORT;
+  }
 
+  // 处理查找属性
   for (int i = selects.attr_num - 1; i >= 0; i--) {
     const RelAttr &attr = selects.attributes[i];
     if (nullptr == attr.relation_name || 0 == strcmp(table_name, attr.relation_name)) {
@@ -329,6 +361,22 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       }
     } else {
       LOG_WARN("Table [%s] and table [%s] is not equal", table_name, attr.relation_name);
+      return RC::SCHEMA_TABLE_NOT_EQUAL;
+    }
+  }
+
+  //处理聚合运算符
+  for (int i = selects.aggr_num - 1; i >= 0; i--) {
+    const AggOp &aggr = selects.aggregations[i];
+    if (nullptr == aggr.attribute.relation_name || 0 == strcmp(table_name, aggr.attribute.relation_name)) {
+      // */number在这里同样当成属性处理，在底层逻辑里根据聚合运算另作处理
+      // 列出这张表相关字段
+      RC rc = schema_add_field_agg(table, aggr.type, aggr.attribute.attribute_name, schema);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+    } else {
+      LOG_WARN("Table [%s] and table [%s] is not equal", table_name, aggr.attribute.relation_name);
       return RC::SCHEMA_TABLE_NOT_EQUAL;
     }
   }

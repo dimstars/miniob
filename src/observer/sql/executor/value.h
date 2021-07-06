@@ -32,6 +32,7 @@ public:
 
   virtual void to_string(std::ostream &os) const = 0;
   virtual int compare(const TupleValue &other) const = 0;
+  virtual void reset(TupleValue *other) = 0;
 private:
 };
 
@@ -47,6 +48,12 @@ public:
   int compare(const TupleValue &other) const override {
     const IntValue & int_other = (const IntValue &)other;
     return value_ - int_other.value_;
+  }
+
+  void reset(TupleValue *other) override{
+    IntValue *int_other = (IntValue *)other;
+    value_ = int_other->value_;
+    delete other;
   }
 
 private:
@@ -66,6 +73,13 @@ public:
     const FloatValue & float_other = (const FloatValue &)other;
     return (int)(value_ - float_other.value_);
   }
+
+  void reset(TupleValue *other) override{
+    FloatValue *int_other = (FloatValue *)other;
+    value_ = int_other->value_;
+    delete other;
+  }
+
 private:
   float value_;
 };
@@ -85,6 +99,13 @@ public:
     const StringValue &string_other = (const StringValue &)other;
     return strcmp(value_.c_str(), string_other.value_.c_str());
   }
+
+  void reset(TupleValue *other) override{
+    StringValue *int_other = (StringValue *)other;
+    value_ = int_other->value_;
+    delete other;
+  }
+
 private:
   std::string value_;
 };
@@ -106,6 +127,12 @@ public:
     // TODO may not safe
     unsigned int value_r = date_other.value_;
     return value_ - value_r;
+  }
+
+  void reset(TupleValue *other) override{
+    DateValue *int_other = (DateValue *)other;
+    value_ = int_other->value_;
+    delete other;
   }
 
 private:

@@ -25,6 +25,7 @@ SelectExeNode::SelectExeNode() : table_(nullptr) {
 }
 
 SelectExeNode::~SelectExeNode() {
+  tuple_schema_.clear();
   for (DefaultConditionFilter * &filter : condition_filters_) {
     delete filter;
   }

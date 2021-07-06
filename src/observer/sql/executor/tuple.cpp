@@ -65,9 +65,192 @@ void Tuple::add(const char *s, int len) {
   add(new StringValue(s, len));
 }
 
-////////////////////////////////////////////////////////////////////////////////
+void Tuple::reset(int value, int index) {
+  const std::shared_ptr<TupleValue> &p = get_pointer(index);
+  (*p).reset(new IntValue(value));
+}
 
+void Tuple::reset(unsigned int value, int index) {
+  const std::shared_ptr<TupleValue> &p = get_pointer(index);
+  (*p).reset(new DateValue(value));
+}
+
+void Tuple::reset(float value, int index) {
+  const std::shared_ptr<TupleValue> &p = get_pointer(index);
+  (*p).reset(new FloatValue(value));
+}
+
+void Tuple::reset(const char *s, int len, int index) {
+  const std::shared_ptr<TupleValue> &p = get_pointer(index);
+  (*p).reset(new StringValue(s, len));
+}
+////////////////////////////////////////////////////////////////////////////////
+static std::string agg_type_to_string(AggType atype) {
+  switch (atype) {
+    case MAX_A:
+      return "max";
+      break;
+    case MIN_A:
+      return "min";
+      break;
+    case COUNT_A:
+      return "count";
+      break;
+    case AVG_A:
+      return "avg";
+      break;
+    default:
+      return "";
+      break;
+  }
+}
+
+static void stat_value_init(Value *value, AttrType type) {
+  switch (type) {
+    case CHARS: {
+      value_init_string(value, "");
+    }
+    break;
+    case INTS: {
+      value_init_integer(value, 0);
+    } 
+    break;
+    case FLOATS: {
+      value_init_float(value, 0.0);
+    }
+    break;
+    case DATES: {
+      value_init_date(value, "2000-01-01");
+    }
+    break;
+    default:
+    break;
+  }
+}
+
+// 该函数只在TupleField构造函数调用
+void TupleField::stat_create() {
+  if(atype_ <= AVG_A) {
+      stat_ = (TupleStat *)malloc(sizeof(TupleStat));
+      if(nullptr == stat_) {
+        LOG_ERROR("Failed to alloc memroy for TupleStat. size=%d", sizeof(TupleStat));
+        // TODO 异常处理
+        return;      
+      }
+      stat_init();
+    } else {
+      stat_ = nullptr;
+    }
+}
+
+void TupleField::stat_init() {
+  switch (atype_) {
+    case MAX_A: {
+      memset(&stat_->stat, 0, sizeof(stat_->stat));
+      stat_value_init(&stat_->stat.maxs.value, type_);
+    }
+    break;
+    case MIN_A: {
+      memset(&stat_->stat, 0, sizeof(stat_->stat));
+      stat_value_init(&stat_->stat.mins.value, type_);
+    }
+    break;
+    case COUNT_A: {
+      memset(&stat_->stat, 0, sizeof(stat_->stat));
+    }
+    break;
+    case AVG_A: {
+      memset(&stat_->stat, 0, sizeof(stat_->stat));
+    }
+    break;
+    default:
+    // 不会走到这个分支    
+    break;
+  }
+}
+
+void TupleField::stat_destroy() {
+  if(stat_ != nullptr) {
+    stat_value_destroy();
+    free(stat_);
+    stat_ = nullptr;
+  }
+}
+
+void TupleField::stat_value_destroy() {
+  switch (atype_) {
+    case MAX_A: {
+      value_destroy(&stat_->stat.maxs.value);
+    }
+    break;
+    case MIN_A: {
+      value_destroy(&stat_->stat.mins.value);
+    }
+    break;
+    case COUNT_A:
+    case AVG_A:
+    case NOTHING_A:
+    break;
+  }
+}
+
+void TupleField::stat_reset(const TupleStat *other) {
+  stat_ = (TupleStat *)malloc(sizeof(TupleStat));
+  if(nullptr == stat_) {
+    LOG_ERROR("Failed to alloc memroy for TupleStat. size=%d", sizeof(TupleStat));
+    // TODO 异常处理
+    return;      
+  }
+  switch (atype_) {
+    case MAX_A: {
+      stat_value_reset(&stat_->stat.maxs.value, &other->stat.maxs.value);
+    }
+    break;
+    case MIN_A: {
+      stat_value_reset(&stat_->stat.mins.value, &other->stat.mins.value); 
+    }
+    break;
+    case COUNT_A: {
+      stat_->stat.counts.count = other->stat.counts.count;
+    }
+    break;
+    case AVG_A: {
+      stat_->stat.avgs.count = other->stat.avgs.count;
+      stat_->stat.avgs.sum = other->stat.avgs.sum;
+    }
+    break;
+    case NOTHING_A:
+    break;
+  }
+}
+
+void TupleField::stat_value_reset(Value *value, const Value *other) {
+  switch (other->type) {
+    case CHARS: {
+      value_init_string(value, (char*)other->data);
+    }
+    break;
+    case INTS: {
+      value_init_integer(value, *(int*)other->data);
+    } 
+    break;
+    case FLOATS: {
+      value_init_float(value, *(float*)other->data);
+    }
+    break;
+    case DATES: {
+      value->type = DATES;
+      unsigned int data = *(unsigned int*)other->data;
+      value->data = malloc(sizeof(data));
+      memcpy(value->data, &data, sizeof(data));
+    }
+    break;
+    default:
+    break;
+  }
+}
 std::string TupleField::to_string() const {
+  // TODO 修改tostring
   return std::string(table_name_) + "." + field_name_ + std::to_string(type_);
 }
 
@@ -79,24 +262,25 @@ void TupleSchema::from_table(const Table *table, TupleSchema &schema) {
   for (int i = 0; i < field_num; i++) {
     const FieldMeta *field_meta = table_meta.field(i);
     if (field_meta->visible()) {
-      schema.add(field_meta->type(), table_name, field_meta->name());
+      schema.add(field_meta->type(), NOTHING_A, table_name, field_meta->name());
     }
   }
 }
 
-void TupleSchema::add(AttrType type, const char *table_name, const char *field_name) {
-  fields_.emplace_back(type, table_name, field_name);
+void TupleSchema::add(AttrType type, AggType atype, const char *table_name, const char *field_name) {
+  fields_.emplace_back(type, atype, table_name, field_name);
 }
 
-void TupleSchema::add_if_not_exists(AttrType type, const char *table_name, const char *field_name) {
+void TupleSchema::add_if_not_exists(AttrType type, AggType atype, const char *table_name, const char *field_name) {
   for (const auto &field: fields_) {
-    if (0 == strcmp(field.table_name(), table_name) &&
+    if (atype == field.atype() &&
+        0 == strcmp(field.table_name(), table_name) &&
         0 == strcmp(field.field_name(), field_name)) {
       return;
     }
   }
 
-  add(type, table_name, field_name);
+  add(type, atype, table_name, field_name);
 }
 
 void TupleSchema::append(const TupleSchema &other) {
@@ -106,11 +290,12 @@ void TupleSchema::append(const TupleSchema &other) {
   }
 }
 
-int TupleSchema::index_of_field(const char *table_name, const char *field_name) const {
+int TupleSchema::index_of_field(AggType atype, const char *table_name, const char *field_name) const {
   const int size = fields_.size();
   for (int i = 0; i < size; i++) {
     const TupleField &field = fields_[i];
-    if (0 == strcmp(field.table_name(), table_name) && 0 == strcmp(field.field_name(), field_name)) {
+    if (atype == field.atype() && 
+        0 == strcmp(field.table_name(), table_name) && 0 == strcmp(field.field_name(), field_name)) {
       return i;
     }
   }
@@ -131,16 +316,32 @@ void TupleSchema::print(std::ostream &os) const {
 
   for (std::vector<TupleField>::const_iterator iter = fields_.begin(), end = --fields_.end();
        iter != end; ++iter) {
-    if (table_names.size() > 1) {
-      os << iter->table_name() << ".";
+    if(iter->atype() == NOTHING_A) {
+      if (table_names.size() > 1 && iter->table_name() != nullptr) {
+        os << iter->table_name() << ".";
+      }
+      os << iter->field_name() << " | ";
+    } else {
+      os << agg_type_to_string(iter->atype()) << "(";
+      if(table_names.size() > 1 && iter->table_name() != nullptr) {
+        os << iter->table_name() << ".";
+      }
+      os << iter->field_name() << ")" << " | ";
     }
-    os << iter->field_name() << " | ";
   }
 
-  if (table_names.size() > 1) {
-    os << fields_.back().table_name() << ".";
+  if(fields_.back().atype() == NOTHING_A) {
+    if (table_names.size() > 1 && fields_.back().table_name() != nullptr) {
+      os << fields_.back().table_name() << ".";
+    }
+    os << fields_.back().field_name() << std::endl;
+  } else {
+    os << agg_type_to_string(fields_.back().atype()) << "(";
+    if(table_names.size() > 1 && fields_.back().table_name() != nullptr) {
+      os << fields_.back().table_name() << ".";
+    }
+    os << fields_.back().field_name() << ")" << std::endl;
   }
-  os << fields_.back().field_name() << std::endl;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -216,6 +417,245 @@ const std::vector<Tuple> &TupleSet::tuples() const {
 }
 
 /////////////////////////////////////////////////////////////////////////////
+// 非聚合运算
+static void normal_tuple_add(const FieldMeta *field_meta, Tuple &tuple, const char *record) {
+  // assert(field_meta != nullptr);
+  switch (field_meta->type()) {
+    case INTS: {
+      int value = *(int*)(record + field_meta->offset());
+      tuple.add(value);
+    }
+    break;
+    case FLOATS: {
+      float value = *(float *)(record + field_meta->offset());
+      tuple.add(value);
+    }
+      break;
+    case CHARS: {
+      const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
+      tuple.add(s, strlen(s));
+    }
+    break;
+    case DATES: {
+      unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
+      tuple.add(value);
+    }
+    break;
+    default: {
+      LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
+    }
+  }
+}
+
+/** TODO
+ * 聚合运算，目前只考虑只有聚合运算或只有非聚合运算的情况，不考虑group by的情况
+ * 这里实现为每条record计算聚合运算结果，更新TupleSet中的Tuple
+ * 也可以选择实现为每条record都加入TupleSet并计算聚合运算结果，但不更新Tuple，最后清空TupleSet，插入一条聚合运算结果
+ */ 
+// MAX运算
+static void max_tuple_add(TupleSet &tuple_set, const TupleField &field, \
+  const FieldMeta *field_meta, Tuple &tuple, const char *record, int index) {
+  // assert(field_meta != nullptr);
+  assert(field.stat() != nullptr);
+  switch (field_meta->type()) {
+    case INTS: {
+      int value = *(int*)(record + field_meta->offset());
+      if(tuple_set.is_empty()) {
+        *(int*)(field.stat()->stat.maxs.value.data) = value;
+        tuple.add(value);
+      } else if(value > *(int*)(field.stat()->stat.maxs.value.data)) {
+        *(int*)(field.stat()->stat.maxs.value.data) = value;
+        tuple_set.reset(value, index);
+      }
+    }
+    break;
+    case FLOATS: {
+      float value = *(float *)(record + field_meta->offset());
+      if(tuple_set.is_empty()) {
+        *(float*)(field.stat()->stat.maxs.value.data) = value;
+        tuple.add(value);
+      } else if(value > *(float*)(field.stat()->stat.maxs.value.data)) {
+        *(float*)(field.stat()->stat.maxs.value.data) = value;
+        tuple_set.reset(value, index);
+      }
+    }
+      break;
+    case CHARS: {
+      const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
+      if(tuple_set.is_empty()) {
+        free(field.stat()->stat.maxs.value.data);
+        value_init_string(&(field.stat()->stat.maxs.value), s);
+        tuple.add(s, strlen(s));
+      } else if(0 < strcmp(s, (char*)(field.stat()->stat.maxs.value.data))) {
+          free(field.stat()->stat.maxs.value.data);
+          value_init_string(&(field.stat()->stat.maxs.value), s);
+          tuple_set.reset(s, strlen(s), index);
+      }
+    }
+    break;
+    case DATES: {
+      unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
+      if(tuple_set.is_empty()) {
+        *(unsigned int*)(field.stat()->stat.maxs.value.data) = value;
+        tuple.add(value);
+      } else if(value > *(unsigned int*)(field.stat()->stat.maxs.value.data)) {
+        *(unsigned int*)(field.stat()->stat.maxs.value.data) = value;
+        tuple_set.reset(value, index);
+      }
+    }
+    break;
+    default: {
+      LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
+    }
+  }
+}
+
+// MIN运算
+static void min_tuple_add(TupleSet &tuple_set, const TupleField &field, \
+  const FieldMeta *field_meta, Tuple &tuple, const char *record, int index) {
+  // assert(field_meta != nullptr);
+  assert(field.stat() != nullptr);
+  switch (field_meta->type()) {
+    case INTS: {
+      int value = *(int*)(record + field_meta->offset());
+      if(tuple_set.is_empty()) {
+        *(int*)(field.stat()->stat.mins.value.data) = value;
+        tuple.add(value);
+      } else if(value < *(int*)(field.stat()->stat.mins.value.data)) {
+        *(int*)(field.stat()->stat.mins.value.data) = value;
+        tuple_set.reset(value, index);
+      }
+    }
+    break;
+    case FLOATS: {
+      float value = *(float *)(record + field_meta->offset());
+      if(tuple_set.is_empty()) {
+        *(float*)(field.stat()->stat.mins.value.data) = value;
+        tuple.add(value);
+      } else if(value < *(float*)(field.stat()->stat.mins.value.data)) {
+        *(float*)(field.stat()->stat.mins.value.data) = value;
+        tuple_set.reset(value, index);
+      }
+    }
+      break;
+    case CHARS: {
+      const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
+      if(tuple_set.is_empty()) {
+        free(field.stat()->stat.mins.value.data);
+        value_init_string(&(field.stat()->stat.mins.value), s);
+        tuple.add(s, strlen(s));
+      } else if(0 > strcmp(s, (char*)(field.stat()->stat.mins.value.data))) {
+          free(field.stat()->stat.mins.value.data);
+          value_init_string(&(field.stat()->stat.mins.value), s);
+          tuple_set.reset(s, strlen(s), index);
+      }
+    }
+    break;
+    case DATES: {
+      unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
+      if(tuple_set.is_empty()) {
+        *(unsigned int*)(field.stat()->stat.mins.value.data) = value;
+        tuple.add(value);
+      } else if(value < *(unsigned int*)(field.stat()->stat.mins.value.data)) {
+        *(unsigned int*)(field.stat()->stat.mins.value.data) = value;
+        tuple_set.reset(value, index);
+      }
+    }
+    break;
+    default: {
+      LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
+    }
+  }
+}
+
+// COUNT运算
+static void count_tuple_add(TupleSet &tuple_set, const TupleField &field, \
+  Tuple &tuple, const char *record, int index) {
+  // assert(field_meta != nullptr);
+  assert(field.stat() != nullptr);
+  switch (field.type()) { // TODO 分类型是为了支持null的过滤，需要结合field.field_name_，暂时不支持
+    case INTS: {
+      if(tuple_set.is_empty()) {
+        field.stat()->stat.counts.count = 1;
+        tuple.add(1);
+      } else {
+        tuple_set.reset(++(field.stat()->stat.counts.count), index);
+      }
+    }
+    break;
+    case FLOATS: {
+      if(tuple_set.is_empty()) {
+        field.stat()->stat.counts.count = 1;
+        tuple.add(1);
+      } else {
+        tuple_set.reset(++(field.stat()->stat.counts.count), index);
+      }
+    }
+    break;
+    case CHARS: {
+      if(tuple_set.is_empty()) {
+        field.stat()->stat.counts.count = 1;
+        tuple.add(1);
+      } else {
+        tuple_set.reset(++(field.stat()->stat.counts.count), index);
+      }
+    }
+    break;
+    case DATES: {
+      if(tuple_set.is_empty()) {
+        field.stat()->stat.counts.count = 1;
+        tuple.add(1);
+      } else {
+        tuple_set.reset(++(field.stat()->stat.counts.count), index);
+      }
+    }
+    break;
+    default: {
+      LOG_PANIC("Unsupported field type. type=%d", field.type());
+    }
+  }
+}
+
+// AVG运算
+static void avg_tuple_add(TupleSet &tuple_set, const TupleField &field, \
+  const FieldMeta *field_meta, Tuple &tuple, const char *record, int index) {
+  // assert(field_meta != nullptr);
+  assert(field.stat() != nullptr);
+  switch (field_meta->type()) {
+    case INTS: {
+      int value = *(int*)(record + field_meta->offset());
+      if(tuple_set.is_empty()) {
+        field.stat()->stat.avgs.count = 1;
+        field.stat()->stat.avgs.sum = (float)(value);
+        tuple.add((float)value);
+      } else {
+        ++field.stat()->stat.avgs.count;
+        field.stat()->stat.avgs.sum += (float)(value);
+        tuple_set.reset(field.stat()->stat.avgs.sum/field.stat()->stat.avgs.count, index);
+      }
+    }
+    break;
+    case FLOATS: {
+      float value = *(float *)(record + field_meta->offset());
+      if(tuple_set.is_empty()) {
+        field.stat()->stat.avgs.count = 1;
+        field.stat()->stat.avgs.sum = value;
+        tuple.add((float)value);
+      } else {
+        ++field.stat()->stat.avgs.count;
+        field.stat()->stat.avgs.sum += value;
+        tuple_set.reset(field.stat()->stat.avgs.sum/field.stat()->stat.avgs.count, index);
+      }
+    }
+    break;
+    case CHARS: 
+    case DATES: 
+    default: {
+      LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
+    }
+  }
+}
+
 TupleRecordConverter::TupleRecordConverter(Table *table, TupleSet &tuple_set) :
       table_(table), tuple_set_(tuple_set){
 }
@@ -224,37 +664,40 @@ void TupleRecordConverter::add_record(const char *record) {
   const TupleSchema &schema = tuple_set_.schema();
   Tuple tuple;
   const TableMeta &table_meta = table_->table_meta();
+  int index = 0;
+  int normal = 0;
   for (const TupleField &field : schema.fields()) {
-    const FieldMeta *field_meta = table_meta.field(field.field_name());
-    // assert field_meta !=nullptr
-    switch (field_meta->type()) {
-      case INTS: {
-        int value = *(int*)(record + field_meta->offset());
-        tuple.add(value);
+    switch (field.atype()){
+      case MAX_A: {
+        const FieldMeta *field_meta = table_meta.field(field.field_name());
+        max_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
       }
       break;
-      case FLOATS: {
-        float value = *(float *)(record + field_meta->offset());
-        tuple.add(value);
-      }
-        break;
-      case CHARS: {
-        const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
-        tuple.add(s, strlen(s));
+      case MIN_A: {
+        const FieldMeta *field_meta = table_meta.field(field.field_name());
+        min_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
       }
       break;
-      case DATES: {
-        unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
-        tuple.add(value);
+      case COUNT_A: {
+        count_tuple_add(tuple_set_, field, tuple, record, index);
       }
       break;
-      default: {
-        LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
+      case AVG_A: {
+        const FieldMeta *field_meta = table_meta.field(field.field_name());
+        avg_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
       }
+      break;
+      case NOTHING_A: {
+        const FieldMeta *field_meta = table_meta.field(field.field_name());
+        normal_tuple_add(field_meta, tuple, record);
+        normal = 1;
+      }
+      break;
     }
+    index++;
   }
 
-  tuple_set_.add(std::move(tuple));
+  if(normal || tuple_set_.is_empty()) tuple_set_.add(std::move(tuple));
 }
 
 

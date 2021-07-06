@@ -285,8 +285,9 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
-    if (field->type() != value.type) {
-      // TODO int<->float
+    if ((field->type() == INTS && value.type == FLOATS) || (field->type() == INTS && value.type == FLOATS)) {
+      // do nothing
+    } else if (field->type() != value.type) {
       LOG_ERROR("Invalid value type. field name=%s, type=%d, but given=%d",
         field->name(), field->type(), value.type);
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
@@ -303,7 +304,22 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
-    memcpy(record + field->offset(), value.data, field->len());
+    // TODO 为了不修改const参数，额外使用空间，后续可尝试优化
+    if(field->type() == INTS && value.type == FLOATS) {
+      int data = (int)*(float*)value.data;
+      Value v;
+      value_init_integer(&v, data);
+      memcpy(record + field->offset(), v.data, field->len());
+      value_destroy(&v);
+    } else if(field->type() == FLOATS && value.type == INTS) {
+      float data = (float)*(int*)value.data;
+      Value v;
+      value_init_float(&v, data);
+      memcpy(record + field->offset(), v.data, field->len());
+      value_destroy(&v);
+    } else {
+      memcpy(record + field->offset(), value.data, field->len());
+    }
   }
 
   record_out = record;
@@ -552,7 +568,22 @@ public:
     RC rc = RC::SUCCESS;
 
     const FieldMeta *field = table_.table_meta_.field(attribute_name_);
-    memcpy(record->data + field->offset(), value_->data, field->len());
+
+    if(field->type() == INTS && value_->type == FLOATS) {
+      int data = (int)*(float*)value_->data;
+      Value v;
+      value_init_integer(&v, data);
+      memcpy(record->data + field->offset(), v.data, field->len());
+      value_destroy(&v);
+    } else if(field->type() == FLOATS && value_->type == INTS) {
+      float data = (float)*(int*)value_->data;
+      Value v;
+      value_init_float(&v, data);
+      memcpy(record->data + field->offset(), v.data, field->len());
+      value_destroy(&v);
+    } else {
+      memcpy(record->data + field->offset(), value_->data, field->len());
+    }
 
     rc = table_.update_record(trx_, record);
     if (rc == RC::SUCCESS) {

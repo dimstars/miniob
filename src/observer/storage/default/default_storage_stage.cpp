@@ -170,6 +170,7 @@ void DefaultStorageStage::handle_event(StageEvent *event) {
       const Inserts &inserts = sql->sstr.insertion;
       const char *table_name = inserts.relation_name;
       rc = handler_->insert_record(current_trx, current_db, table_name, inserts.value_num, inserts.values);
+      // TODO 似乎没有释放value的data
       snprintf(response, sizeof(response), "%s\n", rc == RC::SUCCESS ? "SUCCESS" : "FAILURE");
     }
     break;

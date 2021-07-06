@@ -21,6 +21,7 @@
 #include "record_manager.h"
 #include "common/log/log.h"
 #include "storage/common/table.h"
+#include "sql/executor/tuple.h"
 
 using namespace common;
 
@@ -179,6 +180,198 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
       // TODO
     }
   }
+
+  switch (comp_op_)
+  {
+  case EQUAL_TO:
+    return 0 == cmp_result;
+  case LESS_EQUAL:
+    return cmp_result <= 0;
+  case NOT_EQUAL:
+    return cmp_result != 0;
+  case LESS_THAN:
+    return cmp_result < 0;
+  case GREAT_EQUAL:
+    return cmp_result >= 0;
+  case GREAT_THAN:
+    return cmp_result > 0;
+  
+  default:
+    break;
+  }
+
+  LOG_PANIC("Never should print this.");
+  return cmp_result; // should not go here
+}
+
+JoinConditionFilter::JoinConditionFilter() {
+}
+JoinConditionFilter::~JoinConditionFilter() {
+}
+
+RC JoinConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right,
+                             const char * table_left, const char * table_right, const char * field_left, const char * field_right, CompOp comp_op) {
+  // 只需要判断一个，因为不相等的情况一定是int/float
+  if (type_left < CHARS || type_left > DATES) {
+    LOG_ERROR("Invalid condition with unsupported attribute type: %d", type_left);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  if (comp_op < EQUAL_TO || comp_op >= NO_OP) {
+    LOG_ERROR("Invalid condition with unsupported compare operation: %d", comp_op);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  left_ = left;
+  right_ = right;
+  type_left_ = type_left;
+  type_right_ = type_right;
+  table_left_ = std::string(table_left);
+  table_right_ = std::string(table_right);
+  field_left_ = std::string(field_left);
+  field_right_ = std::string(field_right);
+  comp_op_ = comp_op;
+  return RC::SUCCESS;
+}
+
+RC JoinConditionFilter::init(Table &table_left, Table &table_right, const Condition &condition) {
+  const TableMeta &table_meta_left = table_left.table_meta();
+  const TableMeta &table_meta_right = table_right.table_meta();
+  ConDesc left;
+  ConDesc right;
+
+  AttrType type_left = UNDEFINED;
+  AttrType type_right = UNDEFINED;
+
+  if (1 == condition.left_is_attr) {
+    left.is_attr = true;
+    const FieldMeta *field_left = table_meta_left.field(condition.left_attr.attribute_name);
+    if (nullptr == field_left) {
+      LOG_WARN("No such field in condition. %s.%s", table_left.name(), condition.left_attr.attribute_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    left.attr_length = field_left->len();
+    left.attr_offset = field_left->offset();
+
+    type_left = field_left->type();
+  } else {
+    if(condition.left_value.type == DATES && !check_date_legality((char*)condition.left_value.data)) { // 校验date类型
+      // TODO 没有考虑大小端问题
+      LOG_WARN("Field value in condition is illeagl. %s.%s", table_left.name(), condition.left_attr.attribute_name);
+      return RC::SCHEMA_FIELD_VALUE_ILLEGAL;
+    }
+    left.is_attr = false;
+    left.value = condition.left_value.data; // 校验type 或者转换类型
+    type_left = condition.left_value.type;
+  }
+
+  if (1 == condition.right_is_attr) {
+    right.is_attr = true;
+    const FieldMeta *field_right = table_meta_right.field(condition.right_attr.attribute_name);
+    if (nullptr == field_right) {
+      LOG_WARN("No such field in condition. %s.%s", table_right.name(), condition.right_attr.attribute_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    right.attr_length = field_right->len();
+    right.attr_offset = field_right->offset();
+    type_right = field_right->type();
+  } else {
+    if(condition.right_value.type == DATES) { // 校验date类型
+      // TODO 没有考虑大小端问题
+      if(!check_date_legality((char*)condition.right_value.data)) {
+        LOG_WARN("Field value in condition is illeagl. %s.%s", table_right.name(), condition.right_attr.attribute_name);
+        return RC::SCHEMA_FIELD_VALUE_ILLEGAL;
+      }
+    }
+    right.is_attr = false;
+    right.value = condition.right_value.data;
+    type_right = condition.right_value.type;
+  }
+
+  // 校验和转换
+  if((type_left == FLOATS && type_right == INTS) || (type_left == INTS && type_right == FLOATS)) {
+    // do nothing
+    // 在filter里进行转换比较
+  } else if(type_left != type_right) {
+    LOG_WARN("Field type mismatch.");
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
+
+  const char * table_name_left  = table_left.name();
+  const char * table_name_right = table_right.name();
+  const char * field_name_left  = condition.left_attr.attribute_name;
+  const char * field_name_right = condition.right_attr.attribute_name;
+
+  return init(left, right, type_left, type_right, table_name_left, table_name_right, field_name_left, field_name_right, condition.comp);
+}
+
+bool JoinConditionFilter::filter(const Record &rec) const {
+  return false;
+}
+
+TupleValue * value_to_tuple_value(const char *value, AttrType type) {
+  switch(type) {
+    case CHARS: {
+      return new StringValue(value);
+    }
+    break;
+    case INTS: {
+      return new IntValue(*(int *)value);
+    }
+    break;
+    case FLOATS: {
+      return new FloatValue(*(float *)value);
+    }
+    break;
+    case DATES: {
+      return new DateValue(*(unsigned int *)value);
+    }
+    break;
+    default: {
+      return nullptr;
+    }
+  }
+}
+
+bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const {
+  char *left_value = nullptr;
+  char *right_value = nullptr;
+  TupleValue * left_tuple_value = nullptr;
+  TupleValue * right_tuple_value = nullptr;
+
+  if (left_.is_attr) { // value
+    std::vector<const TupleField>::iterator field_iter = schema.fields().begin();
+    std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter = tuple.values().begin();
+    for (; field_iter != schema.fields().end(); ++field_iter, ++value_iter) {
+      if (0 == strcmp(field_iter->table_name(), table_left_.c_str()) && 0 == strcmp(field_iter->field_name(), field_left_.c_str())) {
+        left_tuple_value = value_iter->get();
+        break;
+      }
+    }
+  } else {
+    left_value = (char *)left_.value;
+    left_tuple_value = value_to_tuple_value(left_value, type_left_);
+  }
+
+  if (right_.is_attr) {
+    std::vector<const TupleField>::iterator field_iter = schema.fields().begin();
+    std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter = tuple.values().begin();
+    for (; field_iter != schema.fields().end(); ++field_iter, ++value_iter) {
+      if (0 == strcmp(field_iter->table_name(), table_right_.c_str()) && 0 == strcmp(field_iter->field_name(), field_right_.c_str())) {
+        right_tuple_value = value_iter->get();
+        break;
+      }
+    }
+  } else {
+    right_value = (char *)right_.value;
+    right_tuple_value = value_to_tuple_value(right_value, type_right_);
+  }
+
+  if (left_tuple_value == nullptr || right_tuple_value == nullptr) {
+    return false;
+  }
+
+  int cmp_result = left_tuple_value->compare(*right_tuple_value);
 
   switch (comp_op_)
   {

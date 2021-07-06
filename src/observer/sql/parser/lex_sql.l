@@ -62,6 +62,7 @@ QUOTE   [\'\"]
 [Vv][Aa][Ll][Uu][Ee][Ss]                 position=strdup(yytext);RETURN_TOKEN(VALUES);
 [Dd][Ee][Ll][Ee][Tt][Ee]                 position=strdup(yytext);RETURN_TOKEN(DELETE);
 [Uu][Pp][Dd][Aa][Tt][Ee]                 position=strdup(yytext);RETURN_TOKEN(UPDATE);
+[Uu][Nn][Ii][Qq][Uu][Ee]				 position=strdup(yytext);RETURN_TOKEN(UNIQUE);
 [Ss][Ee][Tt]							               position=strdup(yytext);RETURN_TOKEN(SET);
 [Mm][Aa][Xx]	 						 position=strdup(yytext);RETURN_TOKEN(MAX);
 [Mm][Ii][Nn]							 position=strdup(yytext);RETURN_TOKEN(MIN);

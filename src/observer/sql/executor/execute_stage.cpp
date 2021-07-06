@@ -144,6 +144,7 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
     case SCF_DESC_TABLE:
     case SCF_DROP_TABLE:
     case SCF_CREATE_INDEX:
+    case SCF_CREATE_UNIQUE_INDEX:
     case SCF_DROP_INDEX: 
     case SCF_LOAD_DATA: {
       StorageEvent *storage_event = new (std::nothrow) StorageEvent(exe_event);

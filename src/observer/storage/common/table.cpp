@@ -121,6 +121,19 @@ RC Table::drop() {
     return RC::IOERR;
   }
 
+  //删除索引文件
+  const int index_num = table_meta_.index_num();
+  for (int i = 0; i < index_num; i++) {
+    const IndexMeta *index_meta = table_meta_.index(i);
+    std::string index_file = index_data_file(base_dir_.c_str(), name(), index_meta->name());
+    delete indexes_[i];
+    if (remove(index_file.c_str()) != 0) {
+      LOG_ERROR("Failed to remove index file. file name = %s, errmsg = %s", index_file.c_str(), strerror(errno));
+      return RC::IOERR;
+    }
+  }
+
+
   // 删除数据文件
   std::string data_file = base_dir_ + "/" + std::string(table_meta_.name()) + TABLE_DATA_SUFFIX;
   if (remove(data_file.c_str()) != 0) {
@@ -163,7 +176,8 @@ RC Table::open(const char *meta_file, const char *base_dir) {
 
     BplusTreeIndex *index = new BplusTreeIndex();
     std::string index_file = index_data_file(base_dir, name(), index_meta->name());
-    rc = index->open(index_file.c_str(), *index_meta, *field_meta);
+    bool unique = strstr(index_meta->extended_attr(),"unique") != nullptr;
+    rc = index->open(index_file.c_str(), *index_meta, *field_meta, unique);
     if (rc != RC::SUCCESS) {
       delete index;
       LOG_ERROR("Failed to open index. table=%s, index=%s, file=%s, rc=%d:%s",
@@ -480,7 +494,7 @@ static RC insert_index_record_reader_adapter(Record *record, void *context) {
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_name) {
+RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_name, bool unique) {
   if (index_name == nullptr || common::is_blank(index_name) ||
       attribute_name == nullptr || common::is_blank(attribute_name)) {
     return RC::INVALID_ARGUMENT;
@@ -496,7 +510,7 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   }
 
   IndexMeta new_index_meta;
-  RC rc = new_index_meta.init(index_name, *field_meta);
+  RC rc = new_index_meta.init(index_name, *field_meta, unique);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -504,7 +518,7 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   // 创建索引相关数据
   BplusTreeIndex *index = new BplusTreeIndex();
   std::string index_file = index_data_file(base_dir_.c_str(), name(), index_name);
-  rc = index->create(index_file.c_str(), new_index_meta, *field_meta);
+  rc = index->create(index_file.c_str(), new_index_meta, *field_meta, unique);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
@@ -561,34 +575,64 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
 class RecordUpdater {
 public:
   RecordUpdater(Table &table, Trx *trx, const char *attribute_name, const Value *value) : 
-    table_(table), trx_(trx), attribute_name_(attribute_name), value_(value) {
+    table_(table), trx_(trx), attribute_name_(attribute_name){
+      index_ = table_.find_index_by_field(attribute_name);
+      const FieldMeta *field = table_.table_meta_.field(attribute_name_);
+      if(field->type() == INTS && value->type == FLOATS) {
+        int data = (int)*(float*)value->data;
+        value_init_integer(&value_, data);
+      } else if(field->type() == FLOATS && value->type == INTS) {
+        float data = (float)*(int*)value->data;
+        value_init_float(&value_, data);
+      } else {
+        value_.type = value->type;
+        value_.data = strdup((char*)value->data);
+      }
+  }
+  ~RecordUpdater(){
+    value_destroy(&value_);
   }
 
-  RC update_record(Record *record) {
-    RC rc = RC::SUCCESS;
-
+  RC collect_records(Record *record){
     const FieldMeta *field = table_.table_meta_.field(attribute_name_);
+    if(0 != strncmp((char*)value_.data, record->data + field->offset(), field->len()))
+      rids_.push_back(record->rid);
+    return RC::SUCCESS;
+  }
 
-    if(field->type() == INTS && value_->type == FLOATS) {
-      int data = (int)*(float*)value_->data;
-      Value v;
-      value_init_integer(&v, data);
-      memcpy(record->data + field->offset(), v.data, field->len());
-      value_destroy(&v);
-    } else if(field->type() == FLOATS && value_->type == INTS) {
-      float data = (float)*(int*)value_->data;
-      Value v;
-      value_init_float(&v, data);
-      memcpy(record->data + field->offset(), v.data, field->len());
-      value_destroy(&v);
-    } else {
-      memcpy(record->data + field->offset(), value_->data, field->len());
+  RC update_record() {
+    RC rc = RC::SUCCESS;
+    const FieldMeta *field = table_.table_meta_.field(attribute_name_);
+    
+    if(index_){
+      //update有唯一索引的列时，不能超过1个
+      if(strstr(index_->index_meta().extended_attr(),"unique") != nullptr && rids_.size() > 2)
+        return RC::RECORD_DUPLICATE_KEY;
+    }
+    Record record;
+    for(int i = 0; i < rids_.size(); ++i){
+      rc = table_.record_handler_->get_record(&rids_[i],&record);
+      if(RC::SUCCESS != rc){
+        return rc;
+      }
+      //update index
+      if(index_){
+        rc = index_->insert_key((char*)value_.data, &record.rid);
+        if(RC::SUCCESS != rc){
+          //update唯一索引的列时，value_和其他记录冲突会报错
+          return rc;
+        }
+        index_->delete_entry(record.data,&record.rid);
+      }
+      //update data
+      memcpy(record.data + field->offset(), (char*)value_.data, field->len());
+      rc = table_.update_record(trx_, &record);
+      if (rc == RC::SUCCESS) {
+        updated_count_++;
+      }
     }
 
-    rc = table_.update_record(trx_, record);
-    if (rc == RC::SUCCESS) {
-      updated_count_++;
-    }
+    
     return rc;
   }
 
@@ -600,13 +644,16 @@ private:
   Table & table_;
   Trx *trx_;
   const char *attribute_name_;
-  const Value *value_;
+  Value value_;
   int updated_count_ = 0;
+  Index *index_;
+  std::vector<RID> rids_;
 };
 
 static RC record_reader_update_adapter(Record *record, void *context) {
   RecordUpdater &record_updater = *(RecordUpdater *)context;
-  return record_updater.update_record(record);
+  //return record_updater.update_record(record);
+  return record_updater.collect_records(record);
 }
 
 RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num, const Condition conditions[], int *updated_count) {
@@ -617,8 +664,8 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   if (rc != RC::SUCCESS) {
     return rc;
   }
-
-  rc = scan_record(trx, &condition_filter, -1, &updater, record_reader_update_adapter);
+  scan_record(trx, &condition_filter, -1, &updater, record_reader_update_adapter);
+  rc = updater.update_record();
   if (updated_count != nullptr) {
     *updated_count = updater.updated_count();
   }
@@ -740,6 +787,15 @@ RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error
     }
   }
   return rc;
+}
+
+Index *Table::find_index_by_field(const char *field_name) const {
+  for (Index *index: indexes_) {
+    if (0 == strcmp(index->index_meta().field(), field_name)) {
+      return index;
+    }
+  }
+  return nullptr;
 }
 
 Index *Table::find_index(const char *index_name) const {

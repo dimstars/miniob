@@ -66,7 +66,7 @@ public:
 
   RC scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, void (*record_reader)(const char *data, void *context));
 
-  RC create_index(Trx *trx, const char *index_name, const char *attribute_name);
+  RC create_index(Trx *trx, const char *index_name, const char *attribute_name, bool unique = false);
 
 public:
   const char *name() const;
@@ -103,6 +103,7 @@ private:
 
 private:
   Index *find_index(const char *index_name) const;
+  Index *find_index_by_field(const char *field_name) const;
 
 private:
   std::string             base_dir_;

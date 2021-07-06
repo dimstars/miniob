@@ -28,11 +28,12 @@ public:
   BplusTreeIndex() = default;
   virtual ~BplusTreeIndex() noexcept;
 
-  RC create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta);
-  RC open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta);
+  RC create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique = false);
+  RC open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique = false);
   RC close();
 
   RC insert_entry(const char *record, const RID *rid) override;
+  RC insert_key(const char *pkey, const RID *rid) override;
   RC delete_entry(const char *record, const RID *rid) override;
 
   IndexScanner *create_scanner(CompOp comp_op, const char *value) override;

@@ -33,7 +33,7 @@ RC BplusTreeHandler::sync() {
   return disk_buffer_pool_->flush_all_pages(file_id_);
 }
 
-RC BplusTreeHandler::create(const char *file_name, AttrType attr_type, int attr_length)
+RC BplusTreeHandler::create(const char *file_name, AttrType attr_type, int attr_length, bool unique)
 {
   BPPageHandle page_handle;
   IndexNode *root;
@@ -95,6 +95,7 @@ RC BplusTreeHandler::create(const char *file_name, AttrType attr_type, int attr_
 
   disk_buffer_pool_ = disk_buffer_pool;
   file_id_ = file_id;
+  unique_index_ = unique;
 
   memcpy(&file_header_, pdata, sizeof(file_header_));
   header_dirty_ = false;
@@ -102,7 +103,7 @@ RC BplusTreeHandler::create(const char *file_name, AttrType attr_type, int attr_
   return SUCCESS;
 }
 
-RC BplusTreeHandler::open(const char *file_name) {
+RC BplusTreeHandler::open(const char *file_name, bool unique) {
   RC rc;
   BPPageHandle page_handle;
   char *pdata;
@@ -128,6 +129,7 @@ RC BplusTreeHandler::open(const char *file_name) {
   header_dirty_ = false;
   disk_buffer_pool_ = disk_buffer_pool;
   file_id_ = file_id;
+  unique_index_ = unique;
 
   rc = disk_buffer_pool->unpin_page(&page_handle);
   if(rc!=SUCCESS){
@@ -824,6 +826,20 @@ RC BplusTreeHandler::insert_entry(const char *pkey, const RID *rid) {
     return rc;
   }
   leaf=(IndexNode *)(pdata+sizeof(IndexFileHeader));
+
+  if(unique_index_){
+      IndexNode *node = get_index_node(pdata);
+      int tmp;
+      for(int insert_pos = 0; insert_pos < node->key_num; insert_pos++){
+      //TODO:允许多个NULL值
+        tmp = CompareKey(pkey, node->keys + insert_pos * file_header_.key_length, file_header_.attr_type, file_header_.attr_length);
+        if (tmp == 0) {
+          return RC::RECORD_DUPLICATE_KEY;
+        }
+        if(tmp < 0)
+          break;
+    }
+  }
 
   if(leaf->key_num<file_header_.order-1){
     rc = disk_buffer_pool_->unpin_page(&page_handle);

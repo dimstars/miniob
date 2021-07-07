@@ -130,7 +130,9 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
     case SCF_SELECT: { // select
       RC rc = do_select(current_db, sql, exe_event->sql_event()->session_event());
       if (rc != RC::SUCCESS) {
-        session_event->set_response(strrc(rc));
+        char response[256];
+        snprintf(response, sizeof(response), "%s\n", "FAILURE");
+        session_event->set_response(response);
       }
       exe_event->done_immediate();
     }
@@ -485,7 +487,7 @@ static RC schema_add_field(Table *table, const char *field_name, TupleSchema &sc
 }
 
 static RC schema_add_field_agg(Table *table, AggType atype, const char *field_name, TupleSchema &schema) {
-  // "*"/"-" 是count运算下的特殊属性名，"-"目前指代number
+  // */number 是count运算下的特殊属性名
   if(strcmp(field_name, "*") == 0 || (field_name && field_name[0] >= '0' && field_name[0] <= '9')) {
     assert(atype == COUNT_A);
     // 使用任意type不影响count(*)/count(number)，因为count(*)/count(number)这里不考虑具体列

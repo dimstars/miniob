@@ -122,13 +122,24 @@ Server *init_server() {
   return server;
 }
 
-void quit_signal_handle(int signum) {
-  LOG_INFO("Receive signal: %d", signum);
+/**
+ * 如果收到terminal信号的时候，正在处理某些事情，比如打日志，并且拿着日志的锁
+ * 那么直接在signal_handler里面处理的话，可能会导致死锁
+ * 所以这里单独创建一个线程
+ */
+void *quit_thread_func(void *_signum) {
+  intptr_t signum = (intptr_t)_signum;
+  LOG_INFO("Receive signal: %ld", signum);
   if (g_server) {
     g_server->shutdown();
     delete g_server;
     g_server = nullptr;
   }
+  return nullptr;
+}
+void quit_signal_handle(int signum) {
+  pthread_t tid;
+  pthread_create(&tid, nullptr, quit_thread_func, (void *)(intptr_t)signum);
 }
 
 int main(int argc, char **argv) {

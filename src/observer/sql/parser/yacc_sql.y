@@ -13,15 +13,18 @@ extern char * position;
 
 typedef struct ParserContext {
   Query * ssql;
-	int select_length;
+  int select_length;
   int condition_length;
   int from_length;
   int value_length;
+  int tuple_num;
+  int tuple_length[MAX_NUM];
+  Value tuples[MAX_NUM][MAX_NUM];
   Value values[MAX_NUM];
   Condition conditions[MAX_NUM];
   CompOp comp;
   AggOp agg;
-	char id[MAX_NUM];
+  char id[MAX_NUM];
 } ParserContext;
 
 //获取子串
@@ -45,7 +48,7 @@ void yyerror(yyscan_t scanner, const char *str) {
 	context->from_length = 0;
 	context->select_length = 0;
 	context->value_length = 0;
-  context->ssql->sstr.insertion.value_num = 0;
+  	context->ssql->sstr.insertion.tuple_num = 0;
 	context->ssql->sstr.errors = position;
 	printf("parse sql failed. error=%s", str);
 }
@@ -295,30 +298,48 @@ ID_get:
 	}
 	;
 
-	
 insert:				/*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE SEMICOLON 
+    INSERT INTO ID VALUES tuple tuple_list SEMICOLON 
 		{
-			// CONTEXT->values[CONTEXT->value_length++] = *$6;
-
-			CONTEXT->ssql->flag=SCF_INSERT;//"insert";
-			// CONTEXT->ssql->sstr.insertion.relation_name = $3;
-			// CONTEXT->ssql->sstr.insertion.value_num = CONTEXT->value_length;
-			// for(i = 0; i < CONTEXT->value_length; i++){
-			// 	CONTEXT->ssql->sstr.insertion.values[i] = CONTEXT->values[i];
-      // }
-			inserts_init(&CONTEXT->ssql->sstr.insertion, $3, CONTEXT->values, CONTEXT->value_length);
-
-      //临时变量清零
-      CONTEXT->value_length=0;
+			CONTEXT->ssql->flag=SCF_INSERT;
+			inserts_init(&CONTEXT->ssql->sstr.insertion, $3, CONTEXT->tuples, CONTEXT->tuple_num, CONTEXT->tuple_length);
+      		//临时变量清零
+      		for (int i = 0; i < CONTEXT->tuple_num; i++) {
+				CONTEXT->tuple_length[i] = 0;
+			}
+			CONTEXT->tuple_num = 0;
     }
-
+	;
+tuple_list:
+	| COMMA tuple tuple_list {
+	}
+	;
+tuple:
+	LBRACE tuple_value value_list RBRACE {
+		CONTEXT->tuple_num++;
+	}
+	;
 value_list:
-    /* empty */
-    | COMMA value value_list  { 
-  		// CONTEXT->values[CONTEXT->value_length++] = *$2;
-	  }
+    | COMMA tuple_value value_list  { 
+	  	}
     ;
+tuple_value:
+    NUMBER {
+  			value_init_integer(&CONTEXT->tuples[CONTEXT->tuple_num][CONTEXT->tuple_length[CONTEXT->tuple_num]++], $1);
+		}
+    |FLOAT {
+  			value_init_float(&CONTEXT->tuples[CONTEXT->tuple_num][CONTEXT->tuple_length[CONTEXT->tuple_num]++], $1);
+		}
+    |SSS {
+			$1 = substr($1,1,strlen($1)-2);
+  			value_init_string(&CONTEXT->tuples[CONTEXT->tuple_num][CONTEXT->tuple_length[CONTEXT->tuple_num]++], $1);
+		}
+	|DATE {
+			$1 = substr($1,1,strlen($1)-2);
+			value_init_date(&CONTEXT->tuples[CONTEXT->tuple_num][CONTEXT->tuple_length[CONTEXT->tuple_num]++], $1);
+		}
+    ;
+
 value:
     NUMBER{	
   		value_init_integer(&CONTEXT->values[CONTEXT->value_length++], $1);

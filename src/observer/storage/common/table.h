@@ -61,6 +61,7 @@ public:
   RC open(const char *meta_file, const char *base_dir);
   
   RC insert_record(Trx *trx, int value_num, const Value *values);
+  RC insert_records(Trx *trx, int tuple_num, const int value_nums[], const Value values[][MAX_NUM]);
   RC update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num, const Condition conditions[], int *updated_count);
   RC delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count);
 

@@ -117,7 +117,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
     // do nothing
     // 在filter里进行转换比较
   } else if(type_left != type_right) {
-    LOG_WARN("Field type mismatch.");
+    LOG_WARN("Field type mismatch. left = %d, right = %d", type_left, type_right);
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 

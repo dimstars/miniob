@@ -260,6 +260,7 @@ RC Table::insert_record(Trx *trx, Record *record) {
   }
   return rc;
 }
+
 RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
   if (value_num <= 0 || nullptr == values ) {
     LOG_ERROR("Invalid argument. value num=%d, values=%p", value_num, values);
@@ -279,6 +280,18 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
   rc = insert_record(trx, &record);
   delete record_data;
   return rc;
+}
+
+RC Table::insert_records(Trx *trx, int tuple_num, const int value_nums[], const Value values[][MAX_NUM]) {
+  for (int i = 0; i < tuple_num; i++) {
+    RC rc = insert_record(trx, value_nums[i], values[i]);
+    if (rc != RC::SUCCESS) {
+      // TODO 在trx=nullptr时手动调用delete_record进行回退
+      return rc;
+    }
+  }
+
+  return RC::SUCCESS;
 }
 
 const char *Table::name() const {

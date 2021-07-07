@@ -31,6 +31,7 @@ ConditionFilter::~ConditionFilter() {
 DefaultConditionFilter::DefaultConditionFilter() {
 }
 DefaultConditionFilter::~DefaultConditionFilter() {
+  //TODO 释放ConDesc里的value.data空间
 }
 
 RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op) {
@@ -116,6 +117,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
   if((type_left == FLOATS && type_right == INTS) || (type_left == INTS && type_right == FLOATS)) {
     // do nothing
     // 在filter里进行转换比较
+    LOG_WARN("Field type mismatch. left = %d, right = %d", type_left, type_right);
   } else if(type_left != type_right) {
     LOG_WARN("Field type mismatch. left = %d, right = %d", type_left, type_right);
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
@@ -155,9 +157,26 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
         int right = *(int*)right_value;
         cmp_result = left - right;
       } else {
-        int left = *(int*)left_value;
+        // eg. 1 op 1.5
+        float left = (float)(*(int*)left_value);
         float right = *(float*)right_value;
-        cmp_result = (int)(left - right);
+        switch (comp_op_)
+        {
+        case EQUAL_TO:
+          return left == right;
+        case LESS_EQUAL:
+          return left <= right;
+        case NOT_EQUAL:
+          return left != right;
+        case LESS_THAN:
+          return left < right;
+        case GREAT_EQUAL:
+          return left >= right;
+        case GREAT_THAN:
+          return left > right;
+        default:
+          break;
+        }
       }
     }
     break;
@@ -168,8 +187,24 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
         cmp_result = (int)(left - right);
       } else {
         float left = *(float*)left_value;
-        int right = *(int*)right_value;
-        cmp_result = (int)(left - right);
+        float right = (float)(*(int*)right_value);
+        switch (comp_op_)
+        {
+        case EQUAL_TO:
+          return left == right;
+        case LESS_EQUAL:
+          return left <= right;
+        case NOT_EQUAL:
+          return left != right;
+        case LESS_THAN:
+          return left < right;
+        case GREAT_EQUAL:
+          return left >= right;
+        case GREAT_THAN:
+          return left > right;
+        default:
+          break;
+        }
       }
     }
     break;

@@ -157,31 +157,53 @@ static int CmpRid(const RID *rid1, const RID *rid2) {
     return -1;
   return 0;
 }
-int CompareKey(const char *pdata, const char *pkey,AttrType attr_type,int attr_length) { // TODO 简化
+int CompareKey(const char *pdata, const char *pkey, AttrType data_type, AttrType key_type, int attr_length) { // TODO 简化
   int i1,i2;
   float f1,f2;
   const char *s1,*s2;
-  switch(attr_type){
+  switch(data_type){
     case INTS: {
-      i1 = *(int *) pdata;
-      i2 = *(int *) pkey;
-      if (i1 > i2)
-        return 1;
-      if (i1 < i2)
-        return -1;
-      if (i1 == i2)
-        return 0;
+      if(key_type == INTS) {
+        i1 = *(int *) pdata;
+        i2 = *(int *) pkey;
+        if (i1 > i2)
+          return 1;
+        if (i1 < i2)
+          return -1;
+        if (i1 == i2)
+          return 0;
+      } else {
+        f1 = (float)*(int *) pdata;
+        f2 = *(float *) pkey;
+        if (f1 > f2)
+          return 1;
+        if (f1 < f2)
+          return -1;
+        if (f1 == f2)
+          return 0;
+      }
     }
       break;
     case FLOATS: {
-      f1 = *(float *) pdata;
-      f2 = *(float *) pkey;
-      if (f1 > f2)
-        return 1;
-      if (f1 < f2)
-        return -1;
-      if (f1 == f2)
-        return 0;
+      if(key_type == FLOATS) {
+        f1 = *(float *) pdata;
+        f2 = *(float *) pkey;
+        if (f1 > f2)
+          return 1;
+        if (f1 < f2)
+          return -1;
+        if (f1 == f2)
+          return 0;
+      } else {
+        f1 = *(float *) pdata;
+        f2 = (float)*(int *) pkey;
+        if (f1 > f2)
+          return 1;
+        if (f1 < f2)
+          return -1;
+        if (f1 == f2)
+          return 0;
+      }
     }
       break;
     case CHARS: {
@@ -191,14 +213,14 @@ int CompareKey(const char *pdata, const char *pkey,AttrType attr_type,int attr_l
     }
       break;
     default:{
-      LOG_PANIC("Unknown attr type: %d", attr_type);
+      LOG_PANIC("Unknown attr type: %d", data_type);
     }
   }
   return -2;//This means error happens
 }
-int CmpKey(AttrType attr_type, int attr_length, const char *pdata, const char *pkey)
+int CmpKey(AttrType data_type, AttrType key_type, int attr_length, const char *pdata, const char *pkey)
 {
-  int result = CompareKey(pdata, pkey, attr_type, attr_length);
+  int result = CompareKey(pdata, pkey, data_type, key_type, attr_length);
   if (0 != result) {
     return result;
   }
@@ -207,7 +229,7 @@ int CmpKey(AttrType attr_type, int attr_length, const char *pdata, const char *p
   return CmpRid(rid1, rid2);
 }
 
-RC BplusTreeHandler::find_leaf(const char *pkey,PageNum *leaf_page) {
+RC BplusTreeHandler::find_leaf(const char *pkey, AttrType ktype, PageNum *leaf_page) {
   RC rc;
   BPPageHandle page_handle;
   IndexNode *node;
@@ -225,7 +247,8 @@ RC BplusTreeHandler::find_leaf(const char *pkey,PageNum *leaf_page) {
   node = get_index_node(pdata);
   while(0 == node->is_leaf){
     for(i = 0; i < node->key_num; i++){
-      tmp = CmpKey(file_header_.attr_type, file_header_.attr_length,pkey,node->keys + i * file_header_.key_length);
+      tmp = CmpKey(ktype, file_header_.attr_type, \
+                    file_header_.attr_length,pkey,node->keys + i * file_header_.key_length);
       if(tmp < 0)
         break;
     }
@@ -274,7 +297,8 @@ RC BplusTreeHandler::insert_into_leaf(PageNum leaf_page, const char *pkey, const
   node = get_index_node(pdata);
 
   for(insert_pos = 0; insert_pos < node->key_num; insert_pos++){
-    tmp = CmpKey(file_header_.attr_type, file_header_.attr_length, pkey, node->keys + insert_pos * file_header_.key_length);
+    tmp = CmpKey(file_header_.attr_type, file_header_.attr_type, \
+                  file_header_.attr_length, pkey, node->keys + insert_pos * file_header_.key_length);
     if (tmp == 0) {
       return RC::RECORD_DUPLICATE_KEY;
     }
@@ -394,7 +418,7 @@ RC BplusTreeHandler::insert_into_leaf_after_split(PageNum leaf_page, const char 
   }
 
   for(insert_pos=0;insert_pos<leaf->key_num;insert_pos++){
-    tmp=CmpKey(file_header_.attr_type, file_header_.attr_length, pkey, leaf->keys+insert_pos*file_header_.key_length);
+    tmp=CmpKey(file_header_.attr_type, file_header_.attr_type, file_header_.attr_length, pkey, leaf->keys+insert_pos*file_header_.key_length);
     if(tmp<0)
       break;
   }
@@ -808,7 +832,7 @@ RC BplusTreeHandler::insert_entry(const char *pkey, const RID *rid) {
   }
   memcpy(key,pkey,file_header_.attr_length);
   memcpy(key + file_header_.attr_length, rid, sizeof(*rid));
-  rc= find_leaf(key, &leaf_page);
+  rc= find_leaf(key, file_header_.attr_type, &leaf_page);
   if(rc!=SUCCESS){
     free(key);
     return rc;
@@ -831,8 +855,9 @@ RC BplusTreeHandler::insert_entry(const char *pkey, const RID *rid) {
       IndexNode *node = get_index_node(pdata);
       int tmp;
       for(int insert_pos = 0; insert_pos < node->key_num; insert_pos++){
-      //TODO:允许多个NULL值
-        tmp = CompareKey(pkey, node->keys + insert_pos * file_header_.key_length, file_header_.attr_type, file_header_.attr_length);
+        //TODO:允许多个NULL值
+        // 对于隐式转换而言，此处pkey一定是已经经过隐式转换的数据
+        tmp = CompareKey(pkey, node->keys + insert_pos * file_header_.key_length, file_header_.attr_type, file_header_.attr_type, file_header_.attr_length);
         if (tmp == 0) {
           return RC::RECORD_DUPLICATE_KEY;
         }
@@ -889,7 +914,7 @@ RC BplusTreeHandler::get_entry(const char *pkey,RID *rid) {
   memcpy(key,pkey,file_header_.attr_length);
   memcpy(key+file_header_.attr_length,rid,sizeof(RID));
 
-  rc=find_leaf(key,&leaf_page);
+  rc=find_leaf(key, file_header_.attr_type, &leaf_page);
   if(rc!=SUCCESS){
     free(key);
     return rc;
@@ -908,7 +933,7 @@ RC BplusTreeHandler::get_entry(const char *pkey,RID *rid) {
 
   leaf = get_index_node(pdata);
   for(i=0;i<leaf->key_num;i++){
-    if(CmpKey(file_header_.attr_type, file_header_.attr_length,key,leaf->keys+(i*file_header_.key_length))==0){
+    if(CmpKey(file_header_.attr_type, file_header_.attr_type, file_header_.attr_length,key,leaf->keys+(i*file_header_.key_length))==0){
       memcpy(rid,leaf->rids+i,sizeof(RID));
       free(key);
       return SUCCESS;
@@ -938,7 +963,7 @@ RC BplusTreeHandler::delete_entry_from_node(PageNum node_page,const char *pkey) 
   node = get_index_node(pdata);
 
   for(delete_index=0;delete_index<node->key_num;delete_index++){
-    tmp=CmpKey(file_header_.attr_type, file_header_.attr_length, pkey, node->keys+delete_index*file_header_.key_length);
+    tmp=CmpKey(file_header_.attr_type, file_header_.attr_type, file_header_.attr_length, pkey, node->keys+delete_index*file_header_.key_length);
     if(tmp==0)
       break;
   }
@@ -1467,7 +1492,7 @@ RC BplusTreeHandler::delete_entry(const char *data, const RID *rid) {
   memcpy(pkey,data,file_header_.attr_length);
   memcpy(pkey + file_header_.attr_length, rid ,sizeof(*rid));
 
-  rc=find_leaf(pkey,&leaf_page);
+  rc=find_leaf(pkey, file_header_.attr_type, &leaf_page);
   if(rc!=SUCCESS){
     free(pkey);
     return rc;
@@ -1551,7 +1576,7 @@ RC BplusTreeHandler::print_tree() {
   return SUCCESS;
 }
 
-RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, PageNum *page_num, int *rididx) {
+RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, AttrType ktype, PageNum *page_num, int *rididx) {
   BPPageHandle page_handle;
   IndexNode *node;
   PageNum leaf_page,next;
@@ -1577,7 +1602,7 @@ RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, 
   memcpy(pkey, key, file_header_.attr_length);
   memcpy(pkey + file_header_.attr_length, &rid, sizeof(RID));
 
-  rc = find_leaf(pkey, &leaf_page);
+  rc = find_leaf(pkey, ktype, &leaf_page);
   if(rc != SUCCESS){
     free(pkey);
     return rc;
@@ -1598,7 +1623,7 @@ RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, 
 
     node = get_index_node(pdata);
     for(i = 0; i < node->key_num; i++){
-      tmp=CompareKey(node->keys+i*file_header_.key_length,key,file_header_.attr_type,file_header_.attr_length);
+      tmp=CompareKey(node->keys+i*file_header_.key_length,key,file_header_.attr_type,ktype,file_header_.attr_length);
       if(compop == EQUAL_TO ||compop == GREAT_EQUAL){
         if(tmp>=0){
           rc = disk_buffer_pool_->get_page_num(&page_handle, page_num);
@@ -1688,13 +1713,14 @@ RC BplusTreeHandler::get_first_leaf_page(PageNum *leaf_page) {
 BplusTreeScanner::BplusTreeScanner(BplusTreeHandler &index_handler) : index_handler_(index_handler){
 }
 
-RC BplusTreeScanner::open(CompOp comp_op,const char *value) {
+RC BplusTreeScanner::open(CompOp comp_op, const char *value, AttrType type) {
   RC rc;
   if(opened_){
     return RC::RECORD_OPENNED;
   }
 
   comp_op_ = comp_op;
+  type_ = type;
 
   char *value_copy =(char *)malloc(index_handler_.file_header_.attr_length);
   if(value_copy == nullptr){
@@ -1703,7 +1729,7 @@ RC BplusTreeScanner::open(CompOp comp_op,const char *value) {
   }
   memcpy(value_copy, value, index_handler_.file_header_.attr_length);
   value_ = value_copy; // TODO free value_
-  rc = index_handler_.find_first_index_satisfied(comp_op, value, &next_page_num_, &index_in_node_);
+  rc = index_handler_.find_first_index_satisfied(comp_op, value, type, &next_page_num_, &index_in_node_);
   if(rc != SUCCESS){
     if(rc == RC::RECORD_EOF){
       next_page_num_ = -1;
@@ -1833,12 +1859,22 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
   AttrType  attr_type = index_handler_.file_header_.attr_type;
   switch(attr_type){
     case INTS:
-      i1=*(int *)pkey;
-      i2=*(int *)value_;
+      if(type_ == INTS) {
+        i1=*(int *)pkey;
+        i2=*(int *)value_;
+      } else {
+        f1=(float)*(int *)pkey;
+        f2=*(float *)value_;
+      }
       break;
     case FLOATS:
-      f1=*(float *)pkey;
-      f2=*(float *)value_;
+      if(type_ == FLOATS) {
+        f1=*(float *)pkey;
+        f2=*(float *)value_;
+      } else {
+        f1=*(int *)pkey;
+        f2=(float)*(int *)value_;
+      }
       break;
     case CHARS:
       s1=pkey;
@@ -1855,7 +1891,10 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     case EQUAL_TO:
       switch(attr_type){
         case INTS:
-          flag=(i1==i2);
+          if(type_ == INTS)
+            flag=(i1==i2);
+          else 
+            flag=(f1==f2);
           break;
         case FLOATS:
           flag=(f1==f2);
@@ -1870,7 +1909,10 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     case LESS_THAN:
       switch(attr_type){
         case INTS:
-          flag=(i1<i2);
+          if(type_ == INTS)
+            flag=(i1<i2);
+          else 
+            flag=(f1<f2);
           break;
         case FLOATS:
           flag=(f1<f2);
@@ -1885,7 +1927,10 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     case GREAT_THAN:
       switch(attr_type){
         case INTS:
-          flag=(i1>i2);
+          if(type_ == INTS)
+            flag=(i1>i2);
+          else 
+            flag=(f1>f2);
           break;
         case FLOATS:
           flag=(f1>f2);
@@ -1900,7 +1945,10 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     case LESS_EQUAL:
       switch(attr_type){
         case INTS:
-          flag=(i1<=i2);
+          if(type_ == INTS)
+            flag=(i1<=i2);
+          else 
+            flag=(f1<=f2);
           break;
         case FLOATS:
           flag=(f1<=f2);
@@ -1915,7 +1963,10 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     case GREAT_EQUAL:
       switch(attr_type){
         case INTS:
-          flag=(i1>=i2);
+          if(type_ == INTS)
+            flag=(i1>=i2);
+          else 
+            flag=(f1>=f2);
           break;
         case FLOATS:
           flag=(f1>=f2);
@@ -1930,7 +1981,10 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     case NOT_EQUAL:
       switch(attr_type){
         case INTS:
-          flag=(i1!=i2);
+          if(type_ == INTS)
+            flag=(i1!=i2);
+          else 
+            flag=(f1!=f2);
           break;
         case FLOATS:
           flag=(f1!=f2);

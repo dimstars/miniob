@@ -61,6 +61,14 @@ public:
     return right_;
   }
 
+  const AttrType left_type() const {
+    return type_left_;
+  }
+
+  const AttrType right_type() const {
+    return type_right_;
+  }
+
   CompOp comp_op() const {
     return comp_op_;
   }

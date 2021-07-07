@@ -823,12 +823,37 @@ Index *Table::find_index(const char *index_name) const {
 IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
   const ConDesc *field_cond_desc = nullptr;
   const ConDesc *value_cond_desc = nullptr;
+  AttrType value_type = UNDEFINED;
+  CompOp op = NO_OP;
   if (filter.left().is_attr && !filter.right().is_attr) {
     field_cond_desc = &filter.left();
     value_cond_desc = &filter.right();
+    value_type = filter.right_type();
+    op = filter.comp_op();
   } else if (filter.right().is_attr && !filter.left().is_attr) {
     field_cond_desc = &filter.right();
     value_cond_desc = &filter.left();
+    value_type = filter.left_type();
+    switch (filter.comp_op())
+    {
+      case LESS_EQUAL: 
+        op =GREAT_EQUAL;
+      break;
+      case LESS_THAN:  //"<"			3
+        op = GREAT_THAN;
+      break;
+      case GREAT_EQUAL: //">="			4
+        op = LESS_EQUAL;
+      break;
+      case GREAT_THAN: //">"           5
+        op = LESS_THAN;
+      break;
+      case NO_OP:
+      case EQUAL_TO:
+      case NOT_EQUAL:
+        op = filter.comp_op();
+      break;
+    }
   }
   if (field_cond_desc == nullptr || value_cond_desc == nullptr) {
     return nullptr;
@@ -851,7 +876,7 @@ IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
     return nullptr;
   }
 
-  return index->create_scanner(filter.comp_op(), (const char *)value_cond_desc->value);
+  return index->create_scanner(op, (const char *)value_cond_desc->value, value_type);
 }
 
 IndexScanner *Table::find_index_for_scan(const ConditionFilter *filter) {

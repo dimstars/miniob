@@ -36,7 +36,7 @@ public:
   RC insert_key(const char *pkey, const RID *rid) override;
   RC delete_entry(const char *record, const RID *rid) override;
 
-  IndexScanner *create_scanner(CompOp comp_op, const char *value) override;
+  IndexScanner *create_scanner(CompOp comp_op, const char *value, AttrType type) override;
 
   RC sync() override;
 

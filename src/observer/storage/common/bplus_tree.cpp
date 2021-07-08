@@ -315,7 +315,6 @@ int CmpKey(AttrType data_type, AttrType key_type, int attr_length, const char *p
   return CmpRid(rid1, rid2);
 }
 
-
 int CmpMutiKey(Attr * attrs, int num, const char *record, const char *pkey)
 {
   int result = 0;

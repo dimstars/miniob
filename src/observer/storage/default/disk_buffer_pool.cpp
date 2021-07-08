@@ -599,10 +599,6 @@ RC LruCache::flush(int file_desc, PageNum page_num){
           return rc;
         }
       }
-      it->next->pre = it->pre;
-      it->pre->next = it->next;
-      it->next = free_list_;
-      free_list_ = it;
     }
   }
   return RC::SUCCESS;
@@ -618,12 +614,7 @@ RC LruCache::flush_file(int file_desc){
         return rc;
       }
     }
-    it->second->next->pre = it->second->pre;
-    it->second->pre->next = it->second->next;
-    it->second->next = free_list_;
-    free_list_ = it->second;
   }
-  hash_map.erase(file_desc);
   return RC::SUCCESS;
 }
 

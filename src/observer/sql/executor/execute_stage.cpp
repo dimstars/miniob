@@ -178,6 +178,7 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
       session_event->set_response(strrc(rc));
       exe_event->done_immediate();
     }
+
     break;
     case SCF_ROLLBACK: {
       Trx *trx = session_event->get_client()->session->current_trx();

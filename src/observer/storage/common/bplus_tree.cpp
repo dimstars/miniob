@@ -23,7 +23,7 @@
 #include "sql/parser/parse_defs.h"
 
 IndexNode * BplusTreeHandler::get_index_node(char *page_data) const {
-  IndexNode *node = (IndexNode  *)(page_data + sizeof(IndexFileHeader));
+  IndexNode *node = (IndexNode  *)(page_data + sizeof(IndexFileHeader) + file_header_.attr_num * sizeof(Attr));
   node->keys = (char *)node + sizeof(IndexNode);
   node->rids = (RID *)(node->keys + file_header_.order * file_header_.key_length);
   return node;
@@ -32,7 +32,90 @@ IndexNode * BplusTreeHandler::get_index_node(char *page_data) const {
 RC BplusTreeHandler::sync() {
   return disk_buffer_pool_->flush_all_pages(file_id_);
 }
+RC BplusTreeHandler::create(const char *file_name, const std::vector<const FieldMeta*> &field_meta, bool unique){
+  BPPageHandle page_handle;
+  IndexNode *root;
+  char *pdata;
+  RC rc;
+  DiskBufferPool *disk_buffer_pool = theGlobalDiskBufferPool();
+  rc = disk_buffer_pool->create_file(file_name);
+  if(rc!=SUCCESS){
+    return rc;s
+  }
 
+  int file_id;
+  rc = disk_buffer_pool->open_file(file_name, &file_id);
+  if(rc != SUCCESS){
+    LOG_ERROR("Failed to open file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+  rc = disk_buffer_pool->allocate_page(file_id, &page_handle);
+  if(rc!=SUCCESS){
+    LOG_ERROR("Failed to allocate page. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+  rc = disk_buffer_pool->get_data(&page_handle, &pdata);
+  if(rc!=SUCCESS){
+    LOG_ERROR("Failed to get data. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+
+  PageNum page_num;
+  rc = disk_buffer_pool->get_page_num(&page_handle, &page_num);
+  if(rc!=SUCCESS){
+    LOG_ERROR("Failed to get page num. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+
+  IndexFileHeader *file_header =(IndexFileHeader *)pdata;
+ // file_header->attr_length = attr_length;
+ // file_header->key_length = attr_length + sizeof(RID);
+  //file_header->attr_type = attr_type;
+  file_header->node_num = 1;
+  file_header->order=((int)BP_PAGE_DATA_SIZE-sizeof(IndexFileHeader)-sizeof(IndexNode))/(attr_length+2*sizeof(RID));
+  file_header->root_page = page_num;
+  file_header->attr_num = field_meta.size();
+  file_header_.attr_num = file_header->attr_num;
+  Attr *pattr = pdata + sizeof(IndexFileHeader);
+  file_header->key_length = 0;
+  for(int i = 0; i < field_meta.size(); ++i){
+    pattr->length = field_meta[i]->len();
+    pattr->type = field_meta[i]->type();    
+    pattr->offset = field_meta[i]->offset();
+    pattr ++;
+    file_header->key_length += pattr->length;
+  }
+  
+  root = get_index_node(pdata);
+  root->is_leaf = 1;
+  root->key_num = 0;
+  root->parent = -1;
+  root->keys = nullptr;
+  root->rids = nullptr;
+
+  rc = disk_buffer_pool->mark_dirty(&page_handle);
+  if(rc!=SUCCESS){
+    return rc;
+  }
+
+  rc = disk_buffer_pool->unpin_page(&page_handle);
+  if(rc!=SUCCESS){
+    return rc;
+  }
+
+  disk_buffer_pool_ = disk_buffer_pool;
+  file_id_ = file_id;
+  unique_index_ = unique;
+
+  memcpy(&file_header_, pdata, sizeof(file_header_));
+  file_header_.attrs = (Attr*)malloc(sizeof(Attr) * field_meta.size());
+  memcpy(file_header_.attrs, pdata + sizeof(file_header_), sizeof(Attr) * field_meta.size());
+  header_dirty_ = false;
+
+  return SUCCESS;
+
+}
+/*
 RC BplusTreeHandler::create(const char *file_name, AttrType attr_type, int attr_length, bool unique)
 {
   BPPageHandle page_handle;
@@ -42,7 +125,7 @@ RC BplusTreeHandler::create(const char *file_name, AttrType attr_type, int attr_
   DiskBufferPool *disk_buffer_pool = theGlobalDiskBufferPool();
   rc = disk_buffer_pool->create_file(file_name);
   if(rc!=SUCCESS){
-    return rc;
+    return rc;s
   }
 
   int file_id;
@@ -102,7 +185,7 @@ RC BplusTreeHandler::create(const char *file_name, AttrType attr_type, int attr_
 
   return SUCCESS;
 }
-
+*/
 RC BplusTreeHandler::open(const char *file_name, bool unique) {
   RC rc;
   BPPageHandle page_handle;
@@ -125,7 +208,10 @@ RC BplusTreeHandler::open(const char *file_name, bool unique) {
   if(rc!=SUCCESS){
     return rc;
   }
-  memcpy(&file_header_,pdata,sizeof(IndexFileHeader));
+  memcpy(&file_header_,pdata,sizeof(file_header_));
+  file_header_.attrs = (Attr*)malloc(sizeof(Attr) * field_meta.size());
+  memcpy(file_header_.attrs, pdata + sizeof(file_header_), sizeof(Attr) * field_meta.size());
+
   header_dirty_ = false;
   disk_buffer_pool_ = disk_buffer_pool;
   file_id_ = file_id;
@@ -227,6 +313,60 @@ int CmpKey(AttrType data_type, AttrType key_type, int attr_length, const char *p
   RID *rid1 = (RID *) (pdata + attr_length);
   RID *rid2 = (RID *) (pkey + attr_length);
   return CmpRid(rid1, rid2);
+}
+
+
+int CmpMutiKey(Attr * attrs, int num, const char *record, const char *pkey)
+{
+  int result = 0;
+  int offset = 0;
+  for(int i = 0; i < num && result == 0; ++i){
+    result = CompareKey(record + (attrs+i)->offset, pkey + offset, (attrs+i)->type, (attrs+i)->length);
+    offset += (attrs+i)->length;
+  }
+  if (0 != result) {
+    return result;
+  }
+  RID *rid1 = (RID *) (record + offset);
+  RID *rid2 = (RID *) (pkey + offset);
+  return CmpRid(rid1, rid2);
+}
+
+RC BplusTreeHandler::find_record_leaf(const char *record, PageNum *leaf_page, RID *rid){
+  RC rc;
+  BPPageHandle page_handle;
+  IndexNode *node;
+  char *pdata;
+  int i,tmp;
+  rc = disk_buffer_pool_->get_this_page(file_id_, file_header_.root_page, &page_handle);
+  if(rc!=SUCCESS){
+    return rc;
+  }
+  rc = disk_buffer_pool_->get_data(&page_handle, &pdata);
+  if(rc!=SUCCESS){
+    return rc;
+  }
+  node = get_index_node(pdata);
+  while(0 == node->is_leaf){
+    for(i = 0; i < node->key_num; i++){
+      tmp = CmpMutiKey(file_header_.attrs, file_header_.attr_num, record, node->keys + i * file_header_.key_length);
+      if(tmp < 0)
+        break;
+    }
+    rc = disk_buffer_pool_->unpin_page(&page_handle);
+    if(rc!=SUCCESS){
+      return rc;
+    }
+    rc = disk_buffer_pool_->get_this_page(file_id_, node->rids[i].page_num, &page_handle);
+    if(rc!=SUCCESS){
+      return rc;
+    }
+    rc = disk_buffer_pool_->get_data(&page_handle, &pdata);
+    if(rc!=SUCCESS){
+      return rc;
+    }
+    node = get_index_node(pdata);
+  }
 }
 
 RC BplusTreeHandler::find_leaf(const char *pkey, AttrType ktype, PageNum *leaf_page) {
@@ -814,6 +954,10 @@ RC BplusTreeHandler::insert_into_new_root(PageNum left_page, const char *pkey, P
   file_header_.root_page=root_page;
   header_dirty_ = true;
   return SUCCESS;
+}
+
+RC BplusTreeHandler::insert_entry(const char *record, const RID *rid){
+  
 }
 
 RC BplusTreeHandler::insert_entry(const char *pkey, const RID *rid) {

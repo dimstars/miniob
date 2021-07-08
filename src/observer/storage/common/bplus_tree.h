@@ -24,13 +24,21 @@
 #include "storage/default/disk_buffer_pool.h"
 #include "sql/parser/parse_defs.h"
 
+struct Attr{
+  int length;
+  int offset; //record中的offset
+  AttrType type;
+};
+
 struct IndexFileHeader {
-  int attr_length;
+//  int attr_length;
   int key_length;
-  AttrType attr_type;
+ // AttrType attr_type;
   PageNum root_page; // 初始时，root_page一定是1
   int node_num;
   int order;
+  int attr_num;
+  Attr *attrs;
 };
 
 struct IndexNode {
@@ -62,8 +70,13 @@ public:
    * 此函数创建一个名为fileName的索引。
    * attrType描述被索引属性的类型，attrLength描述被索引属性的长度
    */
-  RC create(const char *file_name, AttrType attr_type, int attr_length, bool unique = false);
+  //RC create(const char *file_name, AttrType attr_type, int attr_length, bool unique = false);
 
+  /**
+   * 此函数创建一个名为fileName的多列/单列索引。
+   * field_meta描述描述被索引属性,unique描述是否为唯一索引
+   */
+  RC create(const char *file_name, const std::vector<const FieldMeta*> &field_meta, bool unique);
   /**
    * 打开名为fileName的索引文件。
    * 如果方法调用成功，则indexHandle为指向被打开的索引句柄的指针。

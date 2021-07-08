@@ -136,7 +136,6 @@ public:
     if ((rc != page_handler.init(*disk_buffer_pool_, file_id_, rid->page_num)) != RC::SUCCESS) {
       return rc;
     }
-
     return page_handler.update_record_in_place(rid, updater);
   }
 

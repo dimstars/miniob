@@ -24,7 +24,7 @@ BplusTreeIndex::~BplusTreeIndex() noexcept {
   close();
 }
 
-RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique) {
+RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta*> &field_meta, bool unique) {
   if (inited_) {
     return RC::RECORD_OPENNED;
   }

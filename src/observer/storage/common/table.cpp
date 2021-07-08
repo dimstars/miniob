@@ -608,6 +608,7 @@ public:
 
   RC collect_records(Record *record){
     const FieldMeta *field = table_.table_meta_.field(attribute_name_);
+    LOG_INFO("collect record");
     if(0 != strncmp((char*)value_.data, record->data + field->offset(), field->len()))
       rids_.push_back(record->rid);
     return RC::SUCCESS;

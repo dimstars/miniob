@@ -61,7 +61,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
 
   AttrType type_left = UNDEFINED;
   AttrType type_right = UNDEFINED;
-
+  LOG_INFO("condition filter init");
   if (1 == condition.left_is_attr) {
     left.is_attr = true;
     const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name);
@@ -156,6 +156,7 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
         int left = *(int*)left_value;
         int right = *(int*)right_value;
         cmp_result = left - right;
+        LOG_INFO("1 left = %d, right = %d, cmp_res = %d", left, right, cmp_result);
       } else {
         // eg. 1 op 1.5
         float left = (float)(*(int*)left_value);
@@ -185,6 +186,7 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
         float left = *(float*)left_value;
         float right = *(float*)right_value;
         cmp_result = (int)(left - right);
+        LOG_INFO("3 left = %f, right = %f, cmp_res = %d", left, right, cmp_result);
       } else {
         float left = *(float*)left_value;
         float right = (float)(*(int*)right_value);
@@ -210,8 +212,10 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
     break;
     case DATES: {
       cmp_result = cmp_date(left_value, right_value);
+      LOG_INFO("5");
     }
     default: {
+      LOG_INFO("6");
       // TODO
     }
   }

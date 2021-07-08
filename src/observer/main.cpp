@@ -42,6 +42,7 @@ void usage() {
   std::cout << "Useage " << std::endl;
   std::cout << "-p: server port. if not specified, the item in the config file will be used" << std::endl;
   std::cout << "-f: path of config file." << std::endl;
+  std::cout << "-s: use unix socket and the argument is socket address" << std::endl;
   exit(0);
 }
 
@@ -57,6 +58,9 @@ void parse_parameter(int argc, char **argv) {
   extern char *optarg;
   while ((opt = getopt(argc, argv, "dp:s:f:o:e:h")) > 0) {
     switch (opt) {
+    case 's':
+      process_param->set_unix_socket_path(optarg);
+      break;
     case 'p':
       process_param->set_server_port(atoi(optarg));
       break;
@@ -117,6 +121,11 @@ Server *init_server() {
   server_param.listen_addr = listen_addr;
   server_param.max_connection_num = max_connection_num;
   server_param.port = port;
+
+  if (process_param->get_unix_socket_path().size() > 0) {
+    server_param.use_unix_socket = true;
+    server_param.unix_socket_path = process_param->get_unix_socket_path();
+  }
 
   Server *server = new Server(server_param);
   return server;

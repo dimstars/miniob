@@ -27,6 +27,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include "common/defs.h"
@@ -42,33 +43,40 @@ bool is_exit_command(const char *cmd) {
          0 == strncasecmp("bye", cmd, 3);
 }
 
-int main(int argc, char *argv[]) {
-  char *server_host = (char *)LOCAL_HOST;
-  if (argc >= 2) {
-    server_host = argv[1];
-  }
-  int server_port = PORT_DEFAULT;
-  if (argc >= 3) {
-    server_port = atoi(argv[2]);
+int init_unix_sock(const char *unix_sock_path) {
+  int sockfd = socket(PF_UNIX, SOCK_STREAM, 0);
+  if (sockfd < 0) {
+    fprintf(stderr, "failed to create unix socket. %s", strerror(errno));
+    return -1;
   }
 
-  const char *prompt_str = "miniob > ";
+  struct sockaddr_un sockaddr;
+  memset(&sockaddr, 0, sizeof(sockaddr));
+  sockaddr.sun_family = PF_UNIX;
+  snprintf(sockaddr.sun_path, sizeof(sockaddr.sun_path), "%s", unix_sock_path);
 
-  int sockfd, send_bytes;
-  // char send[MAXLINE];
+  if (connect(sockfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
+    fprintf(stderr, "failed to connect to server. unix socket path '%s'. error %s",
+        sockaddr.sun_path, strerror(errno));
+    close(sockfd);
+    return -1;
+  }
+  return sockfd;
+}
 
-  char send_buf[MAX_MEM_BUFFER_SIZE];
-  // char buf[MAXDATASIZE];
+int init_tcp_sock(const char *server_host, int server_port) {
   struct hostent *host;
   struct sockaddr_in serv_addr;
 
   if ((host = gethostbyname(server_host)) == NULL) {
     fprintf(stderr, "gethostbyname failed. errmsg=%d:%s\n", errno, strerror(errno));
-    exit(1);
+    return -1;
   }
+
+  int sockfd;
   if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     fprintf(stderr, "create socket error. errmsg=%d:%s\n", errno, strerror(errno));
-    exit(1);
+    return -1;
   }
 
   serv_addr.sin_family = AF_INET;
@@ -79,8 +87,47 @@ int main(int argc, char *argv[]) {
   if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) ==
       -1) {
     fprintf(stderr, "Failed to connect. errmsg=%d:%s\n", errno, strerror(errno));
-    exit(1);
+    close(sockfd);
+    return -1;
   }
+  return sockfd;
+}
+int main(int argc, char *argv[]) {
+  const char *unix_socket_path = nullptr;
+  const char *server_host = "127.0.0.1";
+  int server_port = PORT_DEFAULT;
+  int opt;
+  extern char *optarg;
+  while ((opt = getopt(argc, argv, "s:h:p:")) > 0) {
+    switch (opt) {
+    case 's':
+      unix_socket_path = optarg;
+      break;
+    case 'p':
+      server_port = atoi(optarg);
+      break;
+    case 'h':
+      server_host = optarg;
+      break;
+    }
+  }
+
+  const char *prompt_str = "miniob > ";
+
+  int sockfd, send_bytes;
+  // char send[MAXLINE];
+
+  if (unix_socket_path != nullptr) {
+    sockfd = init_unix_sock(unix_socket_path);
+  } else {
+    sockfd = init_tcp_sock(server_host, server_port);
+  }
+  if (sockfd < 0) {
+    return 1;
+  }
+
+  char send_buf[MAX_MEM_BUFFER_SIZE];
+  // char buf[MAXDATASIZE];
 
   fputs(prompt_str, stdout);
   while (fgets(send_buf, MAX_MEM_BUFFER_SIZE, stdin) != NULL) {
@@ -93,7 +140,7 @@ int main(int argc, char *argv[]) {
       break;
     }
 
-    if ((send_bytes = send(sockfd, send_buf, strlen(send_buf) + 1, 0)) == -1) {
+    if ((send_bytes = write(sockfd, send_buf, strlen(send_buf) + 1)) == -1) {
       fprintf(stderr, "send error: %d:%s \n", errno, strerror(errno));
       exit(1);
     }

@@ -20,6 +20,9 @@
 #include "sql/executor/tuple.h"
 #include "storage/common/table.h"
 #include "common/log/log.h"
+#include "common/lang/bitmap.h"
+
+using namespace common;
 
 Tuple::Tuple(const Tuple &other) {
   LOG_PANIC("Copy constructor of tuple is not supported");
@@ -49,40 +52,40 @@ void Tuple::add(TupleValue *value) {
 void Tuple::add(const std::shared_ptr<TupleValue> &other) {
   values_.emplace_back(other);
 }
-void Tuple::add(int value) {
-  add(new IntValue(value));
+void Tuple::add(int value, AttrType type) {
+  add(new IntValue(value, type));
 }
 
-void Tuple::add(unsigned int value) {
-  add(new DateValue(value));
+void Tuple::add(unsigned int value, AttrType type) {
+  add(new DateValue(value, type));
 }
 
-void Tuple::add(float value) {
-  add(new FloatValue(value));
+void Tuple::add(float value, AttrType type) {
+  add(new FloatValue(value, type));
 }
 
-void Tuple::add(const char *s, int len) {
-  add(new StringValue(s, len));
+void Tuple::add(const char *s, int len, AttrType type) {
+  add(new StringValue(s, len, type));
 }
 
 void Tuple::reset(int value, int index) {
   const std::shared_ptr<TupleValue> &p = get_pointer(index);
-  (*p).reset(new IntValue(value));
+  (*p).reset(new IntValue(value, INTS));
 }
 
 void Tuple::reset(unsigned int value, int index) {
   const std::shared_ptr<TupleValue> &p = get_pointer(index);
-  (*p).reset(new DateValue(value));
+  (*p).reset(new DateValue(value, DATES));
 }
 
 void Tuple::reset(float value, int index) {
   const std::shared_ptr<TupleValue> &p = get_pointer(index);
-  (*p).reset(new FloatValue(value));
+  (*p).reset(new FloatValue(value, FLOATS));
 }
 
 void Tuple::reset(const char *s, int len, int index) {
   const std::shared_ptr<TupleValue> &p = get_pointer(index);
-  (*p).reset(new StringValue(s, len));
+  (*p).reset(new StringValue(s, len, CHARS));
 }
 ////////////////////////////////////////////////////////////////////////////////
 static std::string agg_type_to_string(AggType atype) {
@@ -121,6 +124,9 @@ static void stat_value_init(Value *value, AttrType type) {
     break;
     case DATES: {
       value_init_date(value, "2000-01-01");
+    }
+    case NULLS: {
+      
     }
     break;
     default:
@@ -418,33 +424,55 @@ const std::vector<Tuple> &TupleSet::tuples() const {
 
 /////////////////////////////////////////////////////////////////////////////
 // 非聚合运算
-static void normal_tuple_add(const FieldMeta *field_meta, Tuple &tuple, const char *record) {
+static bool normal_tuple_add(const FieldMeta *field_meta, Tuple &tuple, const char *record) {
+  Bitmap bitmap(const_cast<char*>(record), RECORD_BITMAP_BITS);
   // assert(field_meta != nullptr);
   switch (field_meta->type()) {
     case INTS: {
-      int value = *(int*)(record + field_meta->offset());
-      tuple.add(value);
+      if(bitmap.get_bit(field_meta->index())) {
+        const char *s = "null";
+        tuple.add(s, strlen(s), NULLS);
+      } else {
+        int value = *(int*)(record + field_meta->offset());
+        tuple.add(value, INTS);
+      }
     }
     break;
     case FLOATS: {
-      float value = *(float *)(record + field_meta->offset());
-      tuple.add(value);
+      if(bitmap.get_bit(field_meta->index())) {
+        const char *s = "null";
+        tuple.add(s, strlen(s), NULLS);
+      } else {
+        float value = *(float *)(record + field_meta->offset());
+        tuple.add(value, FLOATS);
+      }
     }
       break;
     case CHARS: {
-      const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
-      tuple.add(s, strlen(s));
+      if(bitmap.get_bit(field_meta->index())) {
+        const char *s = "null";
+        tuple.add(s, strlen(s), NULLS);
+      } else {
+        const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
+        tuple.add(s, strlen(s), CHARS);
+      }
     }
     break;
     case DATES: {
-      unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
-      tuple.add(value);
+      if(bitmap.get_bit(field_meta->index())) {
+        const char *s = "null";
+        tuple.add(s, strlen(s), NULLS);
+      } else {
+        unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
+        tuple.add(value, DATES);
+      }
     }
     break;
     default: {
       LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
     }
   }
+  return true;
 }
 
 /** TODO
@@ -453,16 +481,20 @@ static void normal_tuple_add(const FieldMeta *field_meta, Tuple &tuple, const ch
  * 也可以选择实现为每条record都加入TupleSet并计算聚合运算结果，但不更新Tuple，最后清空TupleSet，插入一条聚合运算结果
  */ 
 // MAX运算
-static void max_tuple_add(TupleSet &tuple_set, const TupleField &field, \
+static bool max_tuple_add(TupleSet &tuple_set, const TupleField &field, \
   const FieldMeta *field_meta, Tuple &tuple, const char *record, int index) {
   // assert(field_meta != nullptr);
   assert(field.stat() != nullptr);
+  Bitmap bitmap(const_cast<char*>(record), RECORD_BITMAP_BITS);
+  if(bitmap.get_bit(field_meta->index())) return false;
+
   switch (field_meta->type()) {
     case INTS: {
       int value = *(int*)(record + field_meta->offset());
       if(tuple_set.is_empty()) {
         *(int*)(field.stat()->stat.maxs.value.data) = value;
-        tuple.add(value);
+        tuple.add(value, INTS);
+        return true;
       } else if(value > *(int*)(field.stat()->stat.maxs.value.data)) {
         *(int*)(field.stat()->stat.maxs.value.data) = value;
         tuple_set.reset(value, index);
@@ -473,19 +505,21 @@ static void max_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       float value = *(float *)(record + field_meta->offset());
       if(tuple_set.is_empty()) {
         *(float*)(field.stat()->stat.maxs.value.data) = value;
-        tuple.add(value);
+        tuple.add(value, FLOATS);
+        return true;
       } else if(value > *(float*)(field.stat()->stat.maxs.value.data)) {
         *(float*)(field.stat()->stat.maxs.value.data) = value;
         tuple_set.reset(value, index);
       }
     }
-      break;
+    break;
     case CHARS: {
       const char *s = record + field_meta->offset();  // 现在当做Cstring来处理
       if(tuple_set.is_empty()) {
         free(field.stat()->stat.maxs.value.data);
         value_init_string(&(field.stat()->stat.maxs.value), s);
-        tuple.add(s, strlen(s));
+        tuple.add(s, strlen(s), CHARS);
+        return true;
       } else if(0 < strcmp(s, (char*)(field.stat()->stat.maxs.value.data))) {
           free(field.stat()->stat.maxs.value.data);
           value_init_string(&(field.stat()->stat.maxs.value), s);
@@ -497,7 +531,8 @@ static void max_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
       if(tuple_set.is_empty()) {
         *(unsigned int*)(field.stat()->stat.maxs.value.data) = value;
-        tuple.add(value);
+        tuple.add(value, DATES);
+        return true;
       } else if(value > *(unsigned int*)(field.stat()->stat.maxs.value.data)) {
         *(unsigned int*)(field.stat()->stat.maxs.value.data) = value;
         tuple_set.reset(value, index);
@@ -508,19 +543,24 @@ static void max_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
     }
   }
+  return false;
 }
 
 // MIN运算
-static void min_tuple_add(TupleSet &tuple_set, const TupleField &field, \
+static bool min_tuple_add(TupleSet &tuple_set, const TupleField &field, \
   const FieldMeta *field_meta, Tuple &tuple, const char *record, int index) {
   // assert(field_meta != nullptr);
   assert(field.stat() != nullptr);
+  Bitmap bitmap(const_cast<char*>(record), RECORD_BITMAP_BITS);
+  if(bitmap.get_bit(field_meta->index())) return false;
+
   switch (field_meta->type()) {
     case INTS: {
       int value = *(int*)(record + field_meta->offset());
       if(tuple_set.is_empty()) {
         *(int*)(field.stat()->stat.mins.value.data) = value;
-        tuple.add(value);
+        tuple.add(value, INTS);
+        return true;
       } else if(value < *(int*)(field.stat()->stat.mins.value.data)) {
         *(int*)(field.stat()->stat.mins.value.data) = value;
         tuple_set.reset(value, index);
@@ -531,7 +571,8 @@ static void min_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       float value = *(float *)(record + field_meta->offset());
       if(tuple_set.is_empty()) {
         *(float*)(field.stat()->stat.mins.value.data) = value;
-        tuple.add(value);
+        tuple.add(value, FLOATS);
+        return true;
       } else if(value < *(float*)(field.stat()->stat.mins.value.data)) {
         *(float*)(field.stat()->stat.mins.value.data) = value;
         tuple_set.reset(value, index);
@@ -543,7 +584,8 @@ static void min_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       if(tuple_set.is_empty()) {
         free(field.stat()->stat.mins.value.data);
         value_init_string(&(field.stat()->stat.mins.value), s);
-        tuple.add(s, strlen(s));
+        tuple.add(s, strlen(s), CHARS);
+        return true;
       } else if(0 > strcmp(s, (char*)(field.stat()->stat.mins.value.data))) {
           free(field.stat()->stat.mins.value.data);
           value_init_string(&(field.stat()->stat.mins.value), s);
@@ -555,7 +597,8 @@ static void min_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
       if(tuple_set.is_empty()) {
         *(unsigned int*)(field.stat()->stat.mins.value.data) = value;
-        tuple.add(value);
+        tuple.add(value, DATES);
+        return true;
       } else if(value < *(unsigned int*)(field.stat()->stat.mins.value.data)) {
         *(unsigned int*)(field.stat()->stat.mins.value.data) = value;
         tuple_set.reset(value, index);
@@ -566,68 +609,53 @@ static void min_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
     }
   }
+  return false;
 }
 
 // COUNT运算
-static void count_tuple_add(TupleSet &tuple_set, const TupleField &field, \
-  Tuple &tuple, const char *record, int index) {
-  // assert(field_meta != nullptr);
-  assert(field.stat() != nullptr);
-  switch (field.type()) { // TODO 分类型是为了支持null的过滤，需要结合field.field_name_，暂时不支持
-    case INTS: {
-      if(tuple_set.is_empty()) {
-        field.stat()->stat.counts.count = 1;
-        tuple.add(1);
-      } else {
-        tuple_set.reset(++(field.stat()->stat.counts.count), index);
-      }
-    }
-    break;
-    case FLOATS: {
-      if(tuple_set.is_empty()) {
-        field.stat()->stat.counts.count = 1;
-        tuple.add(1);
-      } else {
-        tuple_set.reset(++(field.stat()->stat.counts.count), index);
-      }
-    }
-    break;
-    case CHARS: {
-      if(tuple_set.is_empty()) {
-        field.stat()->stat.counts.count = 1;
-        tuple.add(1);
-      } else {
-        tuple_set.reset(++(field.stat()->stat.counts.count), index);
-      }
-    }
-    break;
-    case DATES: {
-      if(tuple_set.is_empty()) {
-        field.stat()->stat.counts.count = 1;
-        tuple.add(1);
-      } else {
-        tuple_set.reset(++(field.stat()->stat.counts.count), index);
-      }
-    }
-    break;
-    default: {
-      LOG_PANIC("Unsupported field type. type=%d", field.type());
-    }
-  }
-}
-
-// AVG运算
-static void avg_tuple_add(TupleSet &tuple_set, const TupleField &field, \
+static bool count_tuple_add(TupleSet &tuple_set, const TupleField &field, \
   const FieldMeta *field_meta, Tuple &tuple, const char *record, int index) {
   // assert(field_meta != nullptr);
   assert(field.stat() != nullptr);
+  Bitmap bitmap(const_cast<char*>(record), RECORD_BITMAP_BITS);
+
+  bool include_null = false;
+
+  if(field.field_name()[0] == '*' || (field.field_name()[0] >= '0' && field.field_name()[0] <= '9')) {
+    include_null = true;
+  }
+
+  if(tuple_set.is_empty()) {
+    if(include_null || !bitmap.get_bit(field_meta->index())) {
+      field.stat()->stat.counts.count = 1;
+    } else if(bitmap.get_bit(field_meta->index())) {
+      field.stat()->stat.counts.count = 0;
+    }
+    tuple.add(field.stat()->stat.counts.count, INTS);
+    return true;
+  } else if(include_null || !bitmap.get_bit(field_meta->index())) {
+    tuple_set.reset(++(field.stat()->stat.counts.count), index);
+  }
+  
+  return false;
+}
+
+// AVG运算
+static bool avg_tuple_add(TupleSet &tuple_set, const TupleField &field, \
+  const FieldMeta *field_meta, Tuple &tuple, const char *record, int index) {
+  // assert(field_meta != nullptr);
+  assert(field.stat() != nullptr);
+  Bitmap bitmap(const_cast<char*>(record), RECORD_BITMAP_BITS);
+  if(bitmap.get_bit(field_meta->index())) return false;
+
   switch (field_meta->type()) {
     case INTS: {
       int value = *(int*)(record + field_meta->offset());
       if(tuple_set.is_empty()) {
         field.stat()->stat.avgs.count = 1;
         field.stat()->stat.avgs.sum = (float)(value);
-        tuple.add((float)value);
+        tuple.add((float)value, FLOATS);
+        return true;
       } else {
         ++field.stat()->stat.avgs.count;
         field.stat()->stat.avgs.sum += (float)(value);
@@ -640,7 +668,8 @@ static void avg_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       if(tuple_set.is_empty()) {
         field.stat()->stat.avgs.count = 1;
         field.stat()->stat.avgs.sum = value;
-        tuple.add((float)value);
+        tuple.add((float)value, FLOATS);
+        return true;
       } else {
         ++field.stat()->stat.avgs.count;
         field.stat()->stat.avgs.sum += value;
@@ -654,6 +683,7 @@ static void avg_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
     }
   }
+  return false;
 }
 
 TupleRecordConverter::TupleRecordConverter(Table *table, TupleSet &tuple_set) :
@@ -665,39 +695,39 @@ void TupleRecordConverter::add_record(const char *record) {
   Tuple tuple;
   const TableMeta &table_meta = table_->table_meta();
   int index = 0;
-  int normal = 0;
+  bool rc = false;
   for (const TupleField &field : schema.fields()) {
     switch (field.atype()){
       case MAX_A: {
         const FieldMeta *field_meta = table_meta.field(field.field_name());
-        max_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
+        rc = max_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
       }
       break;
       case MIN_A: {
         const FieldMeta *field_meta = table_meta.field(field.field_name());
-        min_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
+        rc = min_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
       }
       break;
       case COUNT_A: {
-        count_tuple_add(tuple_set_, field, tuple, record, index);
+        const FieldMeta *field_meta = table_meta.field(field.field_name());
+        rc = count_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
       }
       break;
       case AVG_A: {
         const FieldMeta *field_meta = table_meta.field(field.field_name());
-        avg_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
+        rc = avg_tuple_add(tuple_set_, field, field_meta, tuple, record, index);
       }
       break;
       case NOTHING_A: {
         const FieldMeta *field_meta = table_meta.field(field.field_name());
-        normal_tuple_add(field_meta, tuple, record);
-        normal = 1;
+        rc = normal_tuple_add(field_meta, tuple, record);
       }
       break;
     }
     index++;
   }
 
-  if(normal || tuple_set_.is_empty()) tuple_set_.add(std::move(tuple));
+  if(rc) tuple_set_.add(std::move(tuple));
 }
 
 

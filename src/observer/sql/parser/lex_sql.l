@@ -51,6 +51,10 @@ QUOTE   [\'\"]
 [Tt][Aa][Bb][Ll][Ee][Ss]			           position=strdup(yytext);RETURN_TOKEN(TABLES);
 [Ii][Nn][Dd][Ee][Xx]                  	 position=strdup(yytext);RETURN_TOKEN(INDEX);
 [Oo][Nn]								                 position=strdup(yytext);RETURN_TOKEN(ON);
+[Ii][Ss]								 position=strdup(yytext);RETURN_TOKEN(IS);
+[Nn][Oo][Tt]							 position=strdup(yytext);RETURN_TOKEN(NOT);
+[Nn][Uu][Ll][Ll]							position=strdup(yytext);RETURN_TOKEN(NULL_T);
+[Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]			position=strdup(yytext);RETURN_TOKEN(NULLABLE);
 [Ss][Hh][Oo][Ww]                         position=strdup(yytext);RETURN_TOKEN(SHOW);
 [Ss][Yy][Nn][Cc]                         position=strdup(yytext);RETURN_TOKEN(SYNC);
 [Ss][Ee][Ll][Ee][Cc][Tt]                 position=strdup(yytext);RETURN_TOKEN(SELECT);

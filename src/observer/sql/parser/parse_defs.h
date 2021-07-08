@@ -25,7 +25,8 @@
 #define MAX_ATTR_NAME 20
 #define MAX_ERROR_MESSAGE 20
 #define MAX_DATA 50
-
+#define RECORD_BITMAP 4 // 4字节，32bit的bitmap
+#define RECORD_BITMAP_BITS RECORD_BITMAP * 8
 //属性结构体
 typedef struct {
   char *relation_name;  // relation name (may be NULL) 表名
@@ -33,12 +34,12 @@ typedef struct {
 } RelAttr;
 
 typedef enum {
-  EQUAL_TO,  //"="			0
-  LESS_EQUAL, //"<="          1
-  NOT_EQUAL, //"<>"			2
-  LESS_THAN,  //"<"			3
-  GREAT_EQUAL, //">="			4
-  GREAT_THAN, //">"           5
+  EQUAL_TO,  //"=" or is null         0 
+  LESS_EQUAL, //"<="                  1
+  NOT_EQUAL, //"<>" or is not null    2
+  LESS_THAN,  //"<"                   3
+  GREAT_EQUAL, //">="                 4
+  GREAT_THAN, //">"                   5
   NO_OP
 } CompOp;
 
@@ -48,7 +49,8 @@ typedef enum {
   CHARS, 
   INTS, 
   FLOATS,
-  DATES // 0x(yyyyyyyyyyyyyymmmmmdddddd) // 14bit|5bit|6bit // 9999-19-39
+  DATES, // 0x(yyyyyyyyyyyyyymmmmmdddddd) // 14bit|5bit|6bit // 9999-19-39
+  NULLS
 } AttrType;
 
 //聚合运算类型
@@ -71,6 +73,13 @@ typedef struct _Value {
   AttrType type;    // type of value
   void *   data;    // value
 } Value;
+
+// null条件 // TODO del
+typedef enum {
+  IS_NULL,
+  IS_NOT_NULL,
+  IS_NORMAL
+} NullOp;
 
 typedef struct _Condition {
   int     left_is_attr;  // TRUE if left-hand side is an attribute
@@ -124,6 +133,7 @@ typedef struct  {
   char *name;                      // Attribute name
   AttrType type;                   // Type of attribute
   int length;                      // Length of attribute
+  int nullable;                    // whether support null
 } AttrInfo;
 
 // struct of craete_table
@@ -219,13 +229,14 @@ void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
 void value_init_date(Value *value, const char *v);
+void value_init_null(Value *value);
 void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
                     int right_is_attr, RelAttr *right_attr, Value *right_value);
 void condition_destroy(Condition *condition);
 
-void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, int length);
+void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, int length, int nullable);
 void attr_info_destroy(AttrInfo *attr_info);
 
 void selects_init(Selects *selects, ...);

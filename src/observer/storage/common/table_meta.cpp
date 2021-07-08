@@ -47,7 +47,8 @@ void TableMeta::swap(TableMeta &other) noexcept{
 RC TableMeta::init_sys_fields() {
   sys_fields_.reserve(1);
   FieldMeta field_meta;
-  RC rc = field_meta.init(Trx::trx_field_name(), Trx::trx_field_type(), 0, Trx::trx_field_len(), false);
+  // WARN 考虑到列数最多为20，这里用4字节作为record首部的bitmap，用来指代每一列是否是null，如果列数上限变化，需要修改RECORD_BITMAP
+  RC rc = field_meta.init(Trx::trx_field_name(), Trx::trx_field_type(), RECORD_BITMAP, Trx::trx_field_len(), 0, false, false);
   if (rc != RC::SUCCESS) {
     LOG_PANIC("Failed to init trx field. rc = %d:%s", rc, strrc(rc));
     return rc;
@@ -84,7 +85,7 @@ RC TableMeta::init(const char *name, int field_num, const AttrInfo attributes[])
 
   for (int i = 0; i < field_num; i++) {
     const AttrInfo &attr_info = attributes[i];
-    rc = fields_[i + sys_fields_.size()].init(attr_info.name, attr_info.type, field_offset, attr_info.length, true);
+    rc = fields_[i + sys_fields_.size()].init(attr_info.name, attr_info.type, field_offset, attr_info.length, i + sys_fields_.size(), true, attr_info.nullable);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name);
       return rc;

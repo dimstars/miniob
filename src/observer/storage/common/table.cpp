@@ -26,6 +26,7 @@
 #include "storage/common/table_meta.h"
 #include "common/log/log.h"
 #include "common/lang/string.h"
+#include "common/lang/bitmap.h"
 #include "storage/default/disk_buffer_pool.h"
 #include "storage/common/record_manager.h"
 #include "storage/common/condition_filter.h"
@@ -33,6 +34,8 @@
 #include "storage/common/index.h"
 #include "storage/common/bplus_tree_index.h"
 #include "storage/trx/trx.h"
+
+using namespace common;
 
 Table::Table() : 
     data_buffer_pool_(nullptr),
@@ -312,8 +315,13 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
-    if ((field->type() == INTS && value.type == FLOATS) || (field->type() == INTS && value.type == FLOATS)) {
+    if ((field->type() == INTS && value.type == FLOATS) 
+          || (field->type() == INTS && value.type == FLOATS)
+          || (field->nullable() && value.type == NULLS)) {
       // do nothing
+    } else if(!field->nullable() && value.type == NULLS) {
+      LOG_ERROR("Null not support. field name=%s", field->name());
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     } else if (field->type() != value.type) {
       LOG_ERROR("Invalid value type. field name=%s, type=%d, but given=%d",
         field->name(), field->type(), value.type);
@@ -327,6 +335,8 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
   // 复制所有字段的值
   int record_size = table_meta_.record_size();
   char *record = new char [record_size];
+
+  Bitmap bitmap(record, RECORD_BITMAP_BITS);
 
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
@@ -344,6 +354,8 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
       value_init_float(&v, data);
       memcpy(record + field->offset(), v.data, field->len());
       value_destroy(&v);
+    } else if(value.type == NULLS) {
+      bitmap.set_bit(field->index());
     } else {
       memcpy(record + field->offset(), value.data, field->len());
     }
@@ -597,6 +609,8 @@ public:
       } else if(field->type() == FLOATS && value->type == INTS) {
         float data = (float)*(int*)value->data;
         value_init_float(&value_, data);
+      } else if(value->type == NULLS) {
+        value_init_null(&value_);
       } else {
         value_.type = value->type;
         value_.data = strdup((char*)value->data);
@@ -608,8 +622,13 @@ public:
 
   RC collect_records(Record *record){
     const FieldMeta *field = table_.table_meta_.field(attribute_name_);
-    if(0 != strncmp((char*)value_.data, record->data + field->offset(), field->len()))
+    Bitmap bitmap(record->data, RECORD_BITMAP_BITS);
+    if((value_.type == NULLS && !bitmap.get_bit(field->index())) 
+        || bitmap.get_bit(field->index())
+        || 0 != strncmp((char*)value_.data, record->data + field->offset(), field->len())) {
       rids_.push_back(record->rid);
+    }
+      
     return RC::SUCCESS;
   }
 
@@ -638,7 +657,15 @@ public:
         index_->delete_entry(record.data,&record.rid);
       }
       //update data
-      memcpy(record.data + field->offset(), (char*)value_.data, field->len());
+      Bitmap bitmap(record.data, RECORD_BITMAP_BITS);
+      if(value_.type == NULLS) {
+        bitmap.set_bit(field->index());
+        // record内的原数据没有清除
+      } else {
+        memcpy(record.data + field->offset(), (char*)value_.data, field->len());
+        if(bitmap.get_bit(field->index())) bitmap.clear_bit(field->index());
+      }
+      
       rc = table_.update_record(trx_, &record);
       if (rc == RC::SUCCESS) {
         updated_count_++;

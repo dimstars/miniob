@@ -20,6 +20,7 @@
 #include "condition_filter.h"
 #include "record_manager.h"
 #include "common/log/log.h"
+#include "common/lang/bitmap.h"
 #include "storage/common/table.h"
 #include "sql/executor/tuple.h"
 
@@ -35,9 +36,13 @@ DefaultConditionFilter::~DefaultConditionFilter() {
 }
 
 RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op) {
-  // 只需要判断一个，因为不相等的情况一定是int/float
+  // 左边一定是非NULL
   if (type_left < CHARS || type_left > DATES) {
-    LOG_ERROR("Invalid condition with unsupported attribute type: %d", type_left);
+    LOG_ERROR("Invalid condition with unsupported left attribute type: %d", type_left);
+    return RC::INVALID_ARGUMENT;
+  }
+  if (type_left < CHARS || type_left > NULLS) {
+    LOG_ERROR("Invalid condition with unsupported right attribute type: %d", type_right);
     return RC::INVALID_ARGUMENT;
   }
 
@@ -71,6 +76,8 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
     }
     left.attr_length = field_left->len();
     left.attr_offset = field_left->offset();
+    left.attr_index = field_left->index();
+    left.nullable = field_left->nullable();
 
     type_left = field_left->type();
   } else {
@@ -93,6 +100,9 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
     }
     right.attr_length = field_right->len();
     right.attr_offset = field_right->offset();
+    right.attr_index = field_right->index();
+    right.nullable = field_right->nullable();
+
     type_right = field_right->type();
   } else {
     if(condition.right_value.type == DATES) { // 校验date类型
@@ -114,7 +124,19 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
 //  }
   // NOTE：这里没有实现不同类型的数据比较，比如整数跟浮点数之间的对比
   // 但是选手们还是要实现。这个功能在预选赛中会出现
-  if((type_left == FLOATS && type_right == INTS) || (type_left == INTS && type_right == FLOATS)) {
+
+  // TODO 优化过滤
+  // if(left.is_attr && !left.nullable && condition.comp == EQUAL_TO && !right.is_attr && type_right == NULLS) {
+  //   LOG_WARN("Field left is not nullable. so filter all");
+  //   return RC::SCHEMA_CONDITION_FILTER_ALL;
+  // } 
+
+  if(left.is_attr && !left.nullable && condition.comp == NOT_EQUAL && !right.is_attr && type_right == NULLS) {
+    LOG_WARN("Field left is not nullable. so filter nothing");
+    return RC::SCHEMA_CONDITION_INVALID;
+  } else if((type_left == FLOATS && type_right == INTS) 
+    || (type_left == INTS && type_right == FLOATS)
+    || type_right == NULLS) {
     // do nothing
     // 在filter里进行转换比较
     LOG_WARN("Field type mismatch. left = %d, right = %d", type_left, type_right);
@@ -129,6 +151,33 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
 bool DefaultConditionFilter::filter(const Record &rec) const {
   char *left_value = nullptr;
   char *right_value = nullptr;
+
+  Bitmap bitmap(rec.data, RECORD_BITMAP_BITS);
+
+  // 首先处理任何出现null的情况
+  if (left_.is_attr && !right_.is_attr && type_right_ == NULLS) { // WARN 一般是不会出现左右都是属性的情况
+    // 说明是null运算
+    switch(comp_op_) {
+      case EQUAL_TO: {
+        return bitmap.get_bit(left_.attr_index);
+      }
+      break;
+      case NOT_EQUAL: {
+        return !bitmap.get_bit(left_.attr_index);
+      }
+      break;
+      case LESS_EQUAL:
+      case LESS_THAN:
+      case GREAT_EQUAL:
+      case GREAT_THAN:
+      case NO_OP:
+        LOG_PANIC("Never should print this.");
+    }
+  } 
+  if (right_.is_attr && bitmap.get_bit(right_.attr_index)) { // 右边是属性，说明是比较运算，只要record对应值为null就返回false
+    return false;
+  }
+
 
   if (left_.is_attr) { // value
     left_value = (char *)(rec.data + left_.attr_offset);
@@ -181,30 +230,24 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
     }
     break;
     case FLOATS: {
-      if(type_right_ == FLOATS) {
-        float left = *(float*)left_value;
-        float right = *(float*)right_value;
-        cmp_result = (int)(left - right);
-      } else {
-        float left = *(float*)left_value;
-        float right = (float)(*(int*)right_value);
-        switch (comp_op_)
-        {
-        case EQUAL_TO:
-          return left == right;
-        case LESS_EQUAL:
-          return left <= right;
-        case NOT_EQUAL:
-          return left != right;
-        case LESS_THAN:
-          return left < right;
-        case GREAT_EQUAL:
-          return left >= right;
-        case GREAT_THAN:
-          return left > right;
-        default:
-          break;
-        }
+      float left = *(float*)left_value;
+      float right = type_right_ == FLOATS ? *(float*)right_value : (float)(*(int*)right_value);
+      switch (comp_op_)
+      {
+      case EQUAL_TO:
+        return left == right;
+      case LESS_EQUAL:
+        return left <= right;
+      case NOT_EQUAL:
+        return left != right;
+      case LESS_THAN:
+        return left < right;
+      case GREAT_EQUAL:
+        return left >= right;
+      case GREAT_THAN:
+        return left > right;
+      default:
+        break;
       }
     }
     break;
@@ -278,50 +321,28 @@ RC JoinConditionFilter::init(Table &table_left, Table &table_right, const Condit
   AttrType type_left = UNDEFINED;
   AttrType type_right = UNDEFINED;
 
-  if (1 == condition.left_is_attr) {
-    left.is_attr = true;
-    const FieldMeta *field_left = table_meta_left.field(condition.left_attr.attribute_name);
-    if (nullptr == field_left) {
-      LOG_WARN("No such field in condition. %s.%s", table_left.name(), condition.left_attr.attribute_name);
-      return RC::SCHEMA_FIELD_MISSING;
-    }
-    left.attr_length = field_left->len();
-    left.attr_offset = field_left->offset();
 
-    type_left = field_left->type();
-  } else {
-    if(condition.left_value.type == DATES && !check_date_legality((char*)condition.left_value.data)) { // 校验date类型
-      // TODO 没有考虑大小端问题
-      LOG_WARN("Field value in condition is illeagl. %s.%s", table_left.name(), condition.left_attr.attribute_name);
-      return RC::SCHEMA_FIELD_VALUE_ILLEGAL;
-    }
-    left.is_attr = false;
-    left.value = condition.left_value.data; // 校验type 或者转换类型
-    type_left = condition.left_value.type;
+  left.is_attr = true;
+  const FieldMeta *field_left = table_meta_left.field(condition.left_attr.attribute_name);
+  if (nullptr == field_left) {
+    LOG_WARN("No such field in condition. %s.%s", table_left.name(), condition.left_attr.attribute_name);
+    return RC::SCHEMA_FIELD_MISSING;
   }
+  left.attr_length = field_left->len();
+  left.attr_offset = field_left->offset();
 
-  if (1 == condition.right_is_attr) {
-    right.is_attr = true;
-    const FieldMeta *field_right = table_meta_right.field(condition.right_attr.attribute_name);
-    if (nullptr == field_right) {
-      LOG_WARN("No such field in condition. %s.%s", table_right.name(), condition.right_attr.attribute_name);
-      return RC::SCHEMA_FIELD_MISSING;
-    }
-    right.attr_length = field_right->len();
-    right.attr_offset = field_right->offset();
-    type_right = field_right->type();
-  } else {
-    if(condition.right_value.type == DATES) { // 校验date类型
-      // TODO 没有考虑大小端问题
-      if(!check_date_legality((char*)condition.right_value.data)) {
-        LOG_WARN("Field value in condition is illeagl. %s.%s", table_right.name(), condition.right_attr.attribute_name);
-        return RC::SCHEMA_FIELD_VALUE_ILLEGAL;
-      }
-    }
-    right.is_attr = false;
-    right.value = condition.right_value.data;
-    type_right = condition.right_value.type;
+  type_left = field_left->type();
+
+  right.is_attr = true;
+  const FieldMeta *field_right = table_meta_right.field(condition.right_attr.attribute_name);
+  if (nullptr == field_right) {
+    LOG_WARN("No such field in condition. %s.%s", table_right.name(), condition.right_attr.attribute_name);
+    return RC::SCHEMA_FIELD_MISSING;
   }
+  right.attr_length = field_right->len();
+  right.attr_offset = field_right->offset();
+  type_right = field_right->type();
+  
 
   // 校验和转换
   if((type_left == FLOATS && type_right == INTS) || (type_left == INTS && type_right == FLOATS)) {
@@ -344,66 +365,73 @@ bool JoinConditionFilter::filter(const Record &rec) const {
   return false;
 }
 
-TupleValue * value_to_tuple_value(const char *value, AttrType type) {
-  switch(type) {
-    case CHARS: {
-      return new StringValue(value);
-    }
-    break;
-    case INTS: {
-      return new IntValue(*(int *)value);
-    }
-    break;
-    case FLOATS: {
-      return new FloatValue(*(float *)value);
-    }
-    break;
-    case DATES: {
-      return new DateValue(*(unsigned int *)value);
-    }
-    break;
-    default: {
-      return nullptr;
-    }
-  }
-}
-
 bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const {
-  char *left_value = nullptr;
-  char *right_value = nullptr;
   TupleValue * left_tuple_value = nullptr;
   TupleValue * right_tuple_value = nullptr;
 
-  if (left_.is_attr) { // value
-    std::vector<const TupleField>::iterator field_iter = schema.fields().begin();
-    std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter = tuple.values().begin();
-    for (; field_iter != schema.fields().end(); ++field_iter, ++value_iter) {
-      if (0 == strcmp(field_iter->table_name(), table_left_.c_str()) && 0 == strcmp(field_iter->field_name(), field_left_.c_str())) {
-        left_tuple_value = value_iter->get();
-        break;
-      }
+  std::vector<const TupleField>::iterator field_iter = schema.fields().begin();
+  std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter = tuple.values().begin();
+  for (; field_iter != schema.fields().end(); ++field_iter, ++value_iter) {
+    if (0 == strcmp(field_iter->table_name(), table_left_.c_str()) && 0 == strcmp(field_iter->field_name(), field_left_.c_str())) {
+      left_tuple_value = value_iter->get();
+      break;
     }
-  } else {
-    left_value = (char *)left_.value;
-    left_tuple_value = value_to_tuple_value(left_value, type_left_);
   }
-
-  if (right_.is_attr) {
-    std::vector<const TupleField>::iterator field_iter = schema.fields().begin();
-    std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter = tuple.values().begin();
-    for (; field_iter != schema.fields().end(); ++field_iter, ++value_iter) {
-      if (0 == strcmp(field_iter->table_name(), table_right_.c_str()) && 0 == strcmp(field_iter->field_name(), field_right_.c_str())) {
-        right_tuple_value = value_iter->get();
-        break;
-      }
+  
+  field_iter = schema.fields().begin();
+  value_iter = tuple.values().begin();
+  for (; field_iter != schema.fields().end(); ++field_iter, ++value_iter) {
+    if (0 == strcmp(field_iter->table_name(), table_right_.c_str()) && 0 == strcmp(field_iter->field_name(), field_right_.c_str())) {
+      right_tuple_value = value_iter->get();
+      break;
     }
-  } else {
-    right_value = (char *)right_.value;
-    right_tuple_value = value_to_tuple_value(right_value, type_right_);
   }
 
   if (left_tuple_value == nullptr || right_tuple_value == nullptr) {
     return false;
+  }
+  
+  // 任何null值不满足任何比较条件，只有is null或is not null支持null比较
+  if (left_tuple_value->get_type() == NULLS || right_tuple_value->get_type() == NULLS) return false;
+
+  // 处理int/float的比较
+  if(left_tuple_value->get_type() == FLOATS || right_tuple_value->get_type() == FLOATS) {
+    float left, right;
+    if(left_tuple_value->get_type() == INTS && right_tuple_value->get_type() == FLOATS) {
+      IntValue *left_tmp_value = dynamic_cast<IntValue *>(left_tuple_value);
+      FloatValue *right_tmp_value = dynamic_cast<FloatValue *>(right_tuple_value);
+      left = (float)left_tmp_value->get_value();
+      right = right_tmp_value->get_value();
+    } else if(left_tuple_value->get_type() == FLOATS && right_tuple_value->get_type() == INTS) {
+      IntValue *right_tmp_value = dynamic_cast<IntValue *>(right_tuple_value);
+      FloatValue *left_tmp_value = dynamic_cast<FloatValue *>(left_tuple_value);
+      left = left_tmp_value->get_value();
+      right = (float)right_tmp_value->get_value();
+    } else {
+      FloatValue *left_tmp_value = dynamic_cast<FloatValue *>(left_tuple_value);
+      FloatValue *right_tmp_value = dynamic_cast<FloatValue *>(right_tuple_value);
+      left = left_tmp_value->get_value();
+      right = right_tmp_value->get_value();
+    }
+    switch (comp_op_)
+    {
+      case EQUAL_TO:
+        return left == right;
+      case LESS_EQUAL:
+        return left <= right;
+      case NOT_EQUAL:
+        return left != right;
+      case LESS_THAN:
+        return left < right;
+      case GREAT_EQUAL:
+        return left >= right;
+      case GREAT_THAN:
+        return left > right;
+      default: {
+        LOG_PANIC("Never should print this.");
+        return false;
+      }
+    }
   }
 
   int cmp_result = left_tuple_value->compare(*right_tuple_value);

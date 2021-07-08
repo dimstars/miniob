@@ -78,6 +78,8 @@ QUOTE   [\'\"]
 [Ll][Oo][Aa][Dd]			                   { position=strdup(yytext);RETURN_TOKEN(LOAD);}
 [Dd][Aa][Tt][Aa]	                       { position=strdup(yytext);RETURN_TOKEN(DATA);}
 [Ii][Nn][Ff][Ii][Ll][Ee]                 { position=strdup(yytext);RETURN_TOKEN(INFILE);}
+[Ii][Nn][Nn][Ee][Rr]                     { position=strdup(yytext);RETURN_TOKEN(INNER);}
+[Jj][Oo][Ii][Nn]                         { position=strdup(yytext);RETURN_TOKEN(JOIN);}
 {ID}							                       { yylval->string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(ID);}
 "("								                       { position=strdup(yytext);RETURN_TOKEN(LBRACE);}
 ")"								                       position=strdup(yytext);RETURN_TOKEN(RBRACE);

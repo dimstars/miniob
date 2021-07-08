@@ -69,6 +69,14 @@ class ProcessParam {
     return server_port_;
   }
 
+  void set_unix_socket_path(const char *unix_socket_path) {
+    unix_socket_path_ = unix_socket_path;
+  }
+  
+  const std::string &get_unix_socket_path() const {
+    return unix_socket_path_;
+  }
+
  private:
   std::string std_out_;            // The output file
   std::string std_err_;            // The err output file
@@ -77,6 +85,7 @@ class ProcessParam {
   bool demon;                    // whether demon or not
   std::vector<std::string> args; // arguments
   int server_port_ = -1;         // server port(if valid, will overwrite the port in the config file)
+  std::string unix_socket_path_;
 };
 
 ProcessParam*& the_process_param();

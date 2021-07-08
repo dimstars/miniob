@@ -48,6 +48,8 @@ private:
 private:
   int set_non_block(int fd);
   int start();
+  int start_tcp_server();
+  int start_unix_socket_server();
 
 private:
   bool started_;
@@ -61,6 +63,14 @@ private:
   static common::Stage *session_stage_;
   static common::SimpleTimer *read_socket_metric_;
   static common::SimpleTimer *write_socket_metric_;
+};
+
+class Communicator {
+public:
+  virtual ~Communicator() = default;
+  virtual int init(const ServerParam &server_param) = 0;
+  virtual int start() = 0;
+  virtual int stop() = 0;
 };
 
 #endif //__OBSERVER_NET_SERVER_H__

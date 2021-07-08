@@ -29,6 +29,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include "common/lang/mutex.h"
@@ -51,14 +52,6 @@ ServerParam::ServerParam() {
   listen_addr = INADDR_ANY;
   max_connection_num = MAX_CONNECTION_NUM_DEFAULT;
   port = PORT_DEFAULT;
-}
-
-ServerParam::ServerParam(const ServerParam &other) {
-  if (&other != this) {
-    this->listen_addr = other.listen_addr;
-    this->max_connection_num = other.max_connection_num;
-    this->port = other.port;
-  }
 }
 
 Server::Server(ServerParam input_server_param) : server_param_(input_server_param) {
@@ -244,13 +237,16 @@ void Server::accept(int fd, short ev, void *arg) {
     return;
   }
 
-  int yes = 1;
-  ret = setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes));
-  if (ret < 0) {
-    LOG_ERROR("Failed to set socket of %s option as : TCP_NODELAY %s\n",
-              addr_str.c_str(), strerror(errno));
-    ::close(client_fd);
-    return;
+  if (!instance->server_param_.use_unix_socket) {
+    // unix socket不支持设置NODELAY
+    int yes = 1;
+    ret = setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes));
+    if (ret < 0) {
+      LOG_ERROR("Failed to set socket of %s option as : TCP_NODELAY %s\n",
+                addr_str.c_str(), strerror(errno));
+      ::close(client_fd);
+      return;
+    }
   }
 
   ConnectionContext *client_context = new ConnectionContext();
@@ -286,6 +282,13 @@ void Server::accept(int fd, short ev, void *arg) {
 }
 
 int Server::start() {
+  if (server_param_.use_unix_socket) {
+    return start_unix_socket_server();
+  } else {
+    return start_tcp_server();
+  }
+}
+int Server::start_tcp_server() {
   int ret = 0;
   struct sockaddr_in sa;
 
@@ -351,6 +354,64 @@ int Server::start() {
   return 0;
 }
 
+int Server::start_unix_socket_server() {
+
+  int ret = 0;
+  server_socket_ = socket(PF_UNIX, SOCK_STREAM, 0);
+  if (server_socket_ < 0) {
+    LOG_ERROR("socket(): can not create unix socket: %s.", strerror(errno));
+    return -1;
+  }
+
+  ret = set_non_block(server_socket_);
+  if (ret < 0) {
+    LOG_ERROR("Failed to set socket option non-blocking:%s. ", strerror(errno));
+    ::close(server_socket_);
+    return -1;
+  }
+
+  unlink(server_param_.unix_socket_path.c_str());
+
+  struct sockaddr_un sockaddr;
+  memset(&sockaddr, 0, sizeof(sockaddr));
+  sockaddr.sun_family = PF_UNIX;
+  snprintf(sockaddr.sun_path, sizeof(sockaddr.sun_path), "%s", server_param_.unix_socket_path.c_str());
+
+  ret = bind(server_socket_, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
+  if (ret < 0) {
+    LOG_ERROR("bind(): can not bind server socket(path=%s), %s", sockaddr.sun_path, strerror(errno));
+    ::close(server_socket_);
+    return -1;
+  }
+
+  ret = listen(server_socket_, server_param_.max_connection_num);
+  if (ret < 0) {
+    LOG_ERROR("listen(): can not listen server socket, %s", strerror(errno));
+    ::close(server_socket_);
+    return -1;
+  }
+  LOG_INFO("Listen on unix socket: %s", sockaddr.sun_path);
+
+  listen_ev_ = event_new(event_base_, server_socket_, EV_READ | EV_PERSIST, accept, this);
+  if (listen_ev_ == nullptr) {
+    LOG_ERROR("Failed to create listen event, %s.", strerror(errno));
+    ::close(server_socket_);
+    return -1;
+  }
+
+  ret = event_add(listen_ev_, nullptr);
+  if (ret < 0) {
+    LOG_ERROR("event_add(): can not add accept event into libevent, %s",
+              strerror(errno));
+    ::close(server_socket_);
+    return -1;
+  }
+
+  started_ = true;
+  LOG_INFO("Observer start success");
+  return 0;
+}
+
 int Server::serve() {
   event_base_ = event_base_new();
   if (event_base_ == nullptr) {
@@ -378,11 +439,16 @@ void Server::shutdown() {
   exit_time.tv_sec += 10;
   event_base_loopexit(event_base_, &exit_time);
 
-  event_del(listen_ev_);
-  event_free(listen_ev_);
-  listen_ev_ = nullptr;
-  event_base_free(event_base_);
-  event_base_ = nullptr;
+  if (listen_ev_ != nullptr) {
+    event_del(listen_ev_);
+    event_free(listen_ev_);
+    listen_ev_ = nullptr;
+  }
+
+  if (event_base_ != nullptr) {
+    event_base_free(event_base_);
+    event_base_ = nullptr;
+  }
 
   started_ = false;
   LOG_INFO("Server quit");

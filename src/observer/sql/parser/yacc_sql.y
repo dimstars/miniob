@@ -113,6 +113,8 @@ ParserContext *get_context(yyscan_t scanner) {
 		MIN
 		COUNT
 		AVG
+		INNER
+		JOIN
 
 %union {
     struct _Attr *attr;
@@ -393,7 +395,36 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->from_length=0;
 			CONTEXT->select_length=0;
 			CONTEXT->value_length = 0;
+		}
+	| SELECT select_attr FROM ID join_list where SEMICOLON {
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+
+		CONTEXT->ssql->flag=SCF_SELECT;//"select";
+		// CONTEXT->ssql->sstr.selection.attr_num = CONTEXT->select_length;
+
+		//临时变量清零
+		CONTEXT->condition_length=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
 	}
+	;
+
+join_list:
+	inner_join ID ON condition condition_list join_list_ {
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
+	}
+	;
+join_list_:
+	| inner_join ID ON condition condition_list join_list_ {
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
+	}
+	;
+inner_join:
+	INNER JOIN {}
+	| JOIN {}
 	;
 
 select_attr:

@@ -34,14 +34,16 @@ public:
   FieldMeta();
   ~FieldMeta() = default;
 
-  RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible);
+  RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, int attr_index, bool visible, bool nullable);
 
 public:
   const char *name() const;
   AttrType    type() const;
   int         offset() const;
+  int         index() const;
   int         len() const;
   bool        visible() const;
+  bool        nullable() const;
 
 public:
   void desc(std::ostream &os) const;
@@ -53,7 +55,9 @@ private:
   std::string  name_;
   AttrType     attr_type_;
   int          attr_offset_;  // 在一个record中的偏移
+  int          attr_index_;   // 在一个record中的位置，用来定位bitmap
   int          attr_len_;
   bool         visible_;
+  bool         nullable_;
 };
 #endif // __OBSERVER_STORAGE_COMMON_FIELD_META_H__

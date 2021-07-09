@@ -30,8 +30,10 @@ class Table;
 
 struct ConDesc {
   bool   is_attr;     // 是否属性，false 表示是值
+  bool   nullable;    // 如果是属性，表示属性是否支持null，TODO 如果不支持，is null可以直接过滤所有
   int    attr_length; // 如果是属性，表示属性值长度
   int    attr_offset; // 如果是属性，表示在记录中的偏移量
+  int    attr_index;  // 如果是属性，表示在记录中的索引位置
   void * value;       // 如果是值类型，这里记录值的数据
 };
 

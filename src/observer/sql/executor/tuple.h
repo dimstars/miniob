@@ -71,10 +71,10 @@ public:
 
   void add(TupleValue *value);
   void add(const std::shared_ptr<TupleValue> &other);
-  void add(int value);
-  void add(unsigned int value);
-  void add(float value);
-  void add(const char *s, int len);
+  void add(int value, AttrType type);
+  void add(unsigned int value, AttrType type);
+  void add(float value, AttrType type);
+  void add(const char *s, int len, AttrType type);
 
   void reset(int value, int index);
   void reset(unsigned int value, int index);

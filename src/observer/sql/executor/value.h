@@ -25,6 +25,8 @@
 #include <string>
 #include <ostream>
 
+#include "sql/parser/parse.h"
+
 class TupleValue {
 public:
   TupleValue() = default;
@@ -33,12 +35,17 @@ public:
   virtual void to_string(std::ostream &os) const = 0;
   virtual int compare(const TupleValue &other) const = 0;
   virtual void reset(TupleValue *other) = 0;
+  virtual void set_type(AttrType type) { type_ = type;}
+  virtual AttrType get_type() const { return type_;}
+
 private:
+  AttrType type_;   // 用来判断null // 为了做int/float的隐式转换 // TODO 优化
 };
 
 class IntValue : public TupleValue {
 public:
-  explicit IntValue(int value) : value_(value) {
+  explicit IntValue(int value, AttrType type) : value_(value) {
+    set_type(type);
   }
 
   void to_string(std::ostream &os) const override {
@@ -56,13 +63,16 @@ public:
     delete other;
   }
 
+  int get_value() const { return value_;}
+
 private:
   int value_;
 };
 
 class FloatValue : public TupleValue {
 public:
-  explicit FloatValue(float value) : value_(value) {
+  explicit FloatValue(float value,  AttrType type) : value_(value) {
+    set_type(type);
   }
 
   void to_string(std::ostream &os) const override {
@@ -80,15 +90,19 @@ public:
     delete other;
   }
 
+  float get_value() const { return value_;}
+
 private:
   float value_;
 };
 
 class StringValue : public TupleValue {
 public:
-  StringValue(const char *value, int len) : value_(value, len){
+  StringValue(const char *value, int len, AttrType type) : value_(value, len){
+    set_type(type);
   }
-  explicit StringValue(const char *value) : value_(value) {
+  explicit StringValue(const char *value, AttrType type) : value_(value) {
+    set_type(type);
   }
 
   void to_string(std::ostream &os) const override {
@@ -112,7 +126,8 @@ private:
 
 class DateValue : public TupleValue {
 public: 
-  explicit DateValue(unsigned int value) : value_(value) {
+  explicit DateValue(unsigned int value, AttrType type) : value_(value) {
+    set_type(type);
   }
 
   void to_string(std::ostream &os) const override {

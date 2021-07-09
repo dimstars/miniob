@@ -25,6 +25,7 @@ typedef struct ParserContext {
   CompOp comp;
   AggOp agg;
   char id[MAX_NUM];
+  Value null_value;
 } ParserContext;
 
 //获取子串
@@ -115,6 +116,10 @@ ParserContext *get_context(yyscan_t scanner) {
 		AVG
 		INNER
 		JOIN
+		IS
+		NOT
+		NULL_T
+		NULLABLE
 
 %union {
     struct _Attr *attr;
@@ -262,7 +267,7 @@ attr_def:
     ID_get type LBRACE number RBRACE 
 		{
 			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, $4);
+			attr_info_init(&attribute, CONTEXT->id, $2, $4, 1);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char)); // TODO FATAL
 			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
@@ -270,16 +275,44 @@ attr_def:
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length = $4;
 			CONTEXT->value_length++;
 		}
+	|ID_get type LBRACE number RBRACE NOT NULL_T
+		{
+			AttrInfo attribute;
+			attr_info_init(&attribute, CONTEXT->id, $2, $4, 0);
+			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+			CONTEXT->value_length++;
+		}
+	|ID_get type LBRACE number RBRACE NULLABLE
+		{
+			AttrInfo attribute;
+			attr_info_init(&attribute, CONTEXT->id, $2, $4, 1);
+			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+			CONTEXT->value_length++;
+		}
     |ID_get type
 		{
 			AttrInfo attribute;
 			// TODO 如果支持NULL，需要考虑如何用4字节表示或其他方式
-			attr_info_init(&attribute, CONTEXT->id, $2, 4);
+			attr_info_init(&attribute, CONTEXT->id, $2, 4, 1);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
 			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].type=$2;  
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].length=4; // default attribute length
+			CONTEXT->value_length++;
+		}
+	|ID_get type NOT NULL_T
+		{
+			AttrInfo attribute;
+			attr_info_init(&attribute, CONTEXT->id, $2, 4, 0);
+			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
+			CONTEXT->value_length++;
+		}
+	|ID_get type NULLABLE
+		{
+			AttrInfo attribute;
+			attr_info_init(&attribute, CONTEXT->id, $2, 4, 1);
+			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			CONTEXT->value_length++;
 		}
     ;
@@ -340,6 +373,9 @@ tuple_value:
 			$1 = substr($1,1,strlen($1)-2);
 			value_init_date(&CONTEXT->tuples[CONTEXT->tuple_num][CONTEXT->tuple_length[CONTEXT->tuple_num]++], $1);
 		}
+	|NULL_T {
+			value_init_null(&CONTEXT->tuples[CONTEXT->tuple_num][CONTEXT->tuple_length[CONTEXT->tuple_num]++]);
+		}
     ;
 
 value:
@@ -374,6 +410,15 @@ update:			/*  update 语句的语法解析树*/
 		{
 			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
 			Value *value = &CONTEXT->values[0];
+			updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
+					CONTEXT->conditions, CONTEXT->condition_length);
+			CONTEXT->condition_length = 0;
+		}
+	| UPDATE ID SET ID EQ NULL_T where SEMICOLON
+		{
+			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
+			Value *value = &CONTEXT->null_value;
+			value_init_null(value);
 			updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
 					CONTEXT->conditions, CONTEXT->condition_length);
 			CONTEXT->condition_length = 0;
@@ -431,6 +476,11 @@ select_attr:
     STAR {  
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		}
+	| ID DOT STAR attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $1, "*");
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
     | ID attr_list {
@@ -496,6 +546,11 @@ select_attr:
     ;
 attr_list:
     /* empty */
+	| COMMA ID DOT STAR attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $2, "*");
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		}
     | COMMA ID attr_list {
 			RelAttr attr;
 			relation_attr_init(&attr, NULL, $2);
@@ -602,7 +657,7 @@ condition:
 			// $$->right_value = *$3;
 
 		}
-		|value comOp value 
+	|value comOp value 
 		{
 			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 2];
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
@@ -622,7 +677,7 @@ condition:
 			// $$->right_value = *$3;
 
 		}
-		|ID comOp ID 
+	|ID comOp ID 
 		{
 			RelAttr left_attr;
 			relation_attr_init(&left_attr, NULL, $1);
@@ -725,6 +780,54 @@ condition:
 			// $$->right_attr.relation_name=$5;
 			// $$->right_attr.attribute_name=$7;
     }
+	|ID IS NULL_T
+		{
+			RelAttr left_attr;
+			relation_attr_init(&left_attr, NULL, $1);
+			
+			Value *right_value = &CONTEXT->null_value;
+			value_init_null(right_value);
+
+			Condition condition;
+			condition_init(&condition, EQUAL_TO, 1, &left_attr, NULL, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		}
+	|ID DOT ID IS NULL_T
+		{
+			RelAttr left_attr;
+			relation_attr_init(&left_attr, $1, $3);
+
+			Value *right_value = &CONTEXT->null_value;;
+			value_init_null(right_value);
+
+			Condition condition;
+			condition_init(&condition, EQUAL_TO, 1, &left_attr, NULL, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		}
+	|ID IS NOT NULL_T
+		{
+			RelAttr left_attr;
+			relation_attr_init(&left_attr, NULL, $1);
+			
+			Value *right_value = &CONTEXT->null_value;;
+			value_init_null(right_value);
+
+			Condition condition;
+			condition_init(&condition, NOT_EQUAL, 1, &left_attr, NULL, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		}
+	|ID DOT ID IS NOT NULL_T
+		{
+			RelAttr left_attr;
+			relation_attr_init(&left_attr, $1, $3);
+
+			Value *right_value = &CONTEXT->null_value;;
+			value_init_null(right_value);
+
+			Condition condition;
+			condition_init(&condition, NOT_EQUAL, 1, &left_attr, NULL, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+		}
     ;
 
 comOp:

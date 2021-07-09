@@ -285,8 +285,13 @@ RC DefaultHandler::update_record(Trx *trx, const char *dbname, const char *relat
   }
 
   // TODO int<->float
-  if ((field_meta->type() == INTS && value->type == FLOATS) || (field_meta->type() == INTS && value->type == FLOATS)) {
+  if ((field_meta->type() == INTS && value->type == FLOATS) 
+      || (field_meta->type() == INTS && value->type == FLOATS)
+      || (field_meta->nullable() && value->type == NULLS)) {
       // do nothing
+  } else if(!field_meta->nullable() && value->type == NULLS) {
+    LOG_ERROR("Null not support. field name=%s", field_meta->name());
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   } else if(field_meta->type() != value->type) {
     LOG_WARN("Field type mismatch.");
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;

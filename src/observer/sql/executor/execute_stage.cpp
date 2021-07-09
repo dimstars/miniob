@@ -132,7 +132,7 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
       if (rc != RC::SUCCESS) {
         char response[256];
         snprintf(response, sizeof(response), "%s\n", "FAILURE");
-        session_event->set_response(response);
+        session_event->set_response(strrc(rc));
       }
       exe_event->done_immediate();
     }
@@ -322,6 +322,10 @@ RC check_attr_in_table(std::vector<Table *> tables, const RelAttr &attr, AttrTyp
     int exist = false;
     for (int j = 0; j < tables.size(); j++) {
       if (0 == strcmp(tables[j]->name(), attr.relation_name)) {
+        if (0 == strcmp(attr.attribute_name, "*")) {
+          // 
+          return RC::SCHEMA_FIELD_REDUNDAN;
+        }
         const FieldMeta * field = tables[j]->table_meta().field(attr.attribute_name);
         if (nullptr == field) {
           // 属性不存在
@@ -359,7 +363,7 @@ RC check_meta_select(const char *db, const Selects &selects) {
     const RelAttr &attr = selects.attributes[i];
     AttrType type;
     RC rc = check_attr_in_table(tables, attr, type);
-    if (rc != RC::SUCCESS) {
+    if (rc != RC::SCHEMA_FIELD_REDUNDAN && rc != RC::SUCCESS) {
       return rc;
     }
   }
@@ -381,7 +385,8 @@ RC check_meta_select(const char *db, const Selects &selects) {
         return rc;
       }
     }
-    if (left_type != right_type && ((left_type != INTS && left_type != FLOATS) || (right_type != INTS && right_type != FLOATS))) {
+
+    if (right_type != NULLS && left_type != right_type && ((left_type != INTS && left_type != FLOATS) || (right_type != INTS && right_type != FLOATS))) {
       // 条件表达式两边类型不匹配，并且其中一个不是int或float类型，不能转换类型
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
@@ -564,7 +569,6 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
   std::vector<DefaultConditionFilter *> condition_filters;
   for (int i = 0; i < selects.condition_num; i++) {
     const Condition &condition = selects.conditions[i];
-    // TODO 这里需要支持多表操作, 如 t1.id == t2.id
     if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
         (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_name)) ||  // 左边是属性右边是值
         (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_name)) ||  // 左边是值，右边是属性名
@@ -573,7 +577,10 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
         ) {
       DefaultConditionFilter *condition_filter = new DefaultConditionFilter();
       RC rc = condition_filter->init(*table, condition);
-      if (rc != RC::SUCCESS) {
+      if (rc == RC::SCHEMA_CONDITION_INVALID) {
+        delete condition_filter;
+        continue;
+      } else if (rc != RC::SUCCESS) {
         delete condition_filter; // free space
         return rc;
       }

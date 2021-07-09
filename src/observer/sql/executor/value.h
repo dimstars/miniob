@@ -81,7 +81,14 @@ public:
 
   int compare(const TupleValue &other) const override {
     const FloatValue & float_other = (const FloatValue &)other;
-    return (int)(value_ - float_other.value_);
+    float result = value_ - float_other.value_;
+    if (result > 0) { // 浮点数没有考虑精度问题
+      return 1;
+    }
+    if (result < 0) {
+      return -1;
+    }
+    return 0;
   }
 
   void reset(TupleValue *other) override{

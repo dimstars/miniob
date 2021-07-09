@@ -36,25 +36,25 @@ QUOTE   [\'\"]
 {WS}                    /* ignore whitespace */;
 \n																						 ;			
 
-[\-]?{DIGIT}+					                  { yylval->number=atoi(yytext); position=strdup(yytext); RETURN_TOKEN(NUMBER);}
-[\-]?{DIGIT}+{DOT}{DIGIT}+				      { yylval->floats=(float)(atof(yytext)); position=strdup(yytext); RETURN_TOKEN(FLOAT);}
+[\-]?{DIGIT}+                            { yylval->number=atoi(yytext); position=strdup(yytext); RETURN_TOKEN(NUMBER);}
+[\-]?{DIGIT}+{DOT}{DIGIT}+               { yylval->floats=(float)(atof(yytext)); position=strdup(yytext); RETURN_TOKEN(FLOAT);}
 
-";"                 	 				           RETURN_TOKEN(SEMICOLON);
-{DOT}                 					         RETURN_TOKEN(DOT);
-"*"                   					         position=strdup(yytext);RETURN_TOKEN(STAR);
-[Ee][Xx][Ii][Tt]						             position=strdup(yytext); RETURN_TOKEN(EXIT);
-[Hh][Ee][Ll][Pp]                    	   position=strdup(yytext); RETURN_TOKEN(HELP);
+";"                                      RETURN_TOKEN(SEMICOLON);
+{DOT}                                    RETURN_TOKEN(DOT);
+"*"                                      position=strdup(yytext);RETURN_TOKEN(STAR);
+[Ee][Xx][Ii][Tt]                         position=strdup(yytext); RETURN_TOKEN(EXIT);
+[Hh][Ee][Ll][Pp]                         position=strdup(yytext); RETURN_TOKEN(HELP);
 [Dd][Ee][Ss][Cc]                         position=strdup(yytext); RETURN_TOKEN(DESC);
 [Cc][Rr][Ee][Aa][Tt][Ee]                 position=strdup(yytext);RETURN_TOKEN(CREATE);
-[Dd][Rr][Oo][Pp]                    	   position=strdup(yytext);RETURN_TOKEN(DROP);
-[Tt][Aa][Bb][Ll][Ee]					           position=strdup(yytext);RETURN_TOKEN(TABLE);
-[Tt][Aa][Bb][Ll][Ee][Ss]			           position=strdup(yytext);RETURN_TOKEN(TABLES);
-[Ii][Nn][Dd][Ee][Xx]                  	 position=strdup(yytext);RETURN_TOKEN(INDEX);
-[Oo][Nn]								                 position=strdup(yytext);RETURN_TOKEN(ON);
-[Ii][Ss]								 position=strdup(yytext);RETURN_TOKEN(IS);
-[Nn][Oo][Tt]							 position=strdup(yytext);RETURN_TOKEN(NOT);
-[Nn][Uu][Ll][Ll]							position=strdup(yytext);RETURN_TOKEN(NULL_T);
-[Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]			position=strdup(yytext);RETURN_TOKEN(NULLABLE);
+[Dd][Rr][Oo][Pp]                         position=strdup(yytext);RETURN_TOKEN(DROP);
+[Tt][Aa][Bb][Ll][Ee]                     position=strdup(yytext);RETURN_TOKEN(TABLE);
+[Tt][Aa][Bb][Ll][Ee][Ss]                 position=strdup(yytext);RETURN_TOKEN(TABLES);
+[Ii][Nn][Dd][Ee][Xx]                     position=strdup(yytext);RETURN_TOKEN(INDEX);
+[Oo][Nn]                                 position=strdup(yytext);RETURN_TOKEN(ON);
+[Ii][Ss]                                 position=strdup(yytext);RETURN_TOKEN(IS);
+[Nn][Oo][Tt]                             position=strdup(yytext);RETURN_TOKEN(NOT);
+[Nn][Uu][Ll][Ll]                         position=strdup(yytext);RETURN_TOKEN(NULL_T);
+[Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]         position=strdup(yytext);RETURN_TOKEN(NULLABLE);
 [Ss][Hh][Oo][Ww]                         position=strdup(yytext);RETURN_TOKEN(SHOW);
 [Ss][Yy][Nn][Cc]                         position=strdup(yytext);RETURN_TOKEN(SYNC);
 [Ss][Ee][Ll][Ee][Cc][Tt]                 position=strdup(yytext);RETURN_TOKEN(SELECT);
@@ -62,12 +62,12 @@ QUOTE   [\'\"]
 [Ww][Hh][Ee][Rr][Ee]                  	 position=strdup(yytext);RETURN_TOKEN(WHERE);
 [Aa][Nn][Dd]                             position=strdup(yytext);RETURN_TOKEN(AND);
 [Ii][Nn][Ss][Ee][rR][tT]                 position=strdup(yytext);RETURN_TOKEN(INSERT);
-[Ii][Nn][Tt][Oo]					 	             position=strdup(yytext);RETURN_TOKEN(INTO);
+[Ii][Nn][Tt][Oo]                         position=strdup(yytext);RETURN_TOKEN(INTO);
 [Vv][Aa][Ll][Uu][Ee][Ss]                 position=strdup(yytext);RETURN_TOKEN(VALUES);
 [Dd][Ee][Ll][Ee][Tt][Ee]                 position=strdup(yytext);RETURN_TOKEN(DELETE);
 [Uu][Pp][Dd][Aa][Tt][Ee]                 position=strdup(yytext);RETURN_TOKEN(UPDATE);
-[Uu][Nn][Ii][Qq][Uu][Ee]				 position=strdup(yytext);RETURN_TOKEN(UNIQUE);
-[Ss][Ee][Tt]							               position=strdup(yytext);RETURN_TOKEN(SET);
+[Uu][Nn][Ii][Qq][Uu][Ee]                 position=strdup(yytext);RETURN_TOKEN(UNIQUE);
+[Ss][Ee][Tt]                             position=strdup(yytext);RETURN_TOKEN(SET);
 [Mm][Aa][Xx]	 						 position=strdup(yytext);RETURN_TOKEN(MAX);
 [Mm][Ii][Nn]							 position=strdup(yytext);RETURN_TOKEN(MIN);
 [Cc][Oo][Uu][Nn][Tt]				     position=strdup(yytext);RETURN_TOKEN(COUNT);
@@ -75,18 +75,19 @@ QUOTE   [\'\"]
 [Bb][Ee][Gg][Ii][Nn]                     { position=strdup(yytext); RETURN_TOKEN(TRX_BEGIN);}
 [Cc][Oo][Mm][Mm][Ii][Tt]                 { position=strdup(yytext); RETURN_TOKEN(TRX_COMMIT);}
 [Rr][Oo][Ll][Ll][Bb][Aa][Cc][Kk]         { position=strdup(yytext); RETURN_TOKEN(TRX_ROLLBACK);}
-[Ii][Nn][Tt]					                   { position=strdup(yytext);RETURN_TOKEN(INT_T);}
-[Cc][Hh][Aa][Rr]				                 { position=strdup(yytext);RETURN_TOKEN(STRING_T);}
-[Ff][Ll][Oo][Aa][Tt]			               { position=strdup(yytext);RETURN_TOKEN(FLOAT_T);}
-[Dd][Aa][Tt][Ee]							{ position=strdup(yytext);RETURN_TOKEN(DATE_T);}
-[Ll][Oo][Aa][Dd]			                   { position=strdup(yytext);RETURN_TOKEN(LOAD);}
-[Dd][Aa][Tt][Aa]	                       { position=strdup(yytext);RETURN_TOKEN(DATA);}
+[Ii][Nn][Tt]                             { position=strdup(yytext);RETURN_TOKEN(INT_T);}
+[Cc][Hh][Aa][Rr]                         { position=strdup(yytext);RETURN_TOKEN(STRING_T);}
+[Ff][Ll][Oo][Aa][Tt]                     { position=strdup(yytext);RETURN_TOKEN(FLOAT_T);}
+[Dd][Aa][Tt][Ee]                         { position=strdup(yytext);RETURN_TOKEN(DATE_T);}
+[Ll][Oo][Aa][Dd]                         { position=strdup(yytext);RETURN_TOKEN(LOAD);}
+[Dd][Aa][Tt][Aa]                         { position=strdup(yytext);RETURN_TOKEN(DATA);}
 [Ii][Nn][Ff][Ii][Ll][Ee]                 { position=strdup(yytext);RETURN_TOKEN(INFILE);}
 [Ii][Nn][Nn][Ee][Rr]                     { position=strdup(yytext);RETURN_TOKEN(INNER);}
 [Jj][Oo][Ii][Nn]                         { position=strdup(yytext);RETURN_TOKEN(JOIN);}
-{ID}							                       { yylval->string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(ID);}
-"("								                       { position=strdup(yytext);RETURN_TOKEN(LBRACE);}
-")"								                       position=strdup(yytext);RETURN_TOKEN(RBRACE);
+[Ii][Nn]                                 { position=strdup(yytext);RETURN_TOKEN(IN);}
+{ID}                                     { yylval->string=strdup(yytext);position=strdup(yytext);RETURN_TOKEN(ID);}
+"("                                      { position=strdup(yytext);RETURN_TOKEN(LBRACE);}
+")"                                      position=strdup(yytext);RETURN_TOKEN(RBRACE);
 
 ","                                      position=strdup(yytext);RETURN_TOKEN(COMMA);
 "="                                      position=strdup(yytext);RETURN_TOKEN(EQ);

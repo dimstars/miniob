@@ -40,6 +40,7 @@ typedef enum {
   LESS_THAN,  //"<"                   3
   GREAT_EQUAL, //">="                 4
   GREAT_THAN, //">"                   5
+  WHERE_IN, //"in"                    6
   NO_OP
 } CompOp;
 
@@ -91,10 +92,11 @@ typedef struct _Condition {
                          // 1时，操作符右边是属性名，0时，是属性值
   RelAttr right_attr;    // right-hand side attribute if right_is_attr = TRUE 右边的属性
   Value   right_value;   // right-hand side value if right_is_attr = FALSE
+  struct Selects *sub_selects;  // subquery if not null
 } Condition;
 
 // struct of select
-typedef struct {
+typedef struct Selects {
   int   aggr_num;                  // Size of aggrs in Select clause
   AggOp aggregations[MAX_NUM];     // aggregations operator
   int attr_num;                    // Length of attrs in Select clause
@@ -234,6 +236,7 @@ void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
                     int right_is_attr, RelAttr *right_attr, Value *right_value);
+void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects);
 void condition_destroy(Condition *condition);
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, int length, int nullable);

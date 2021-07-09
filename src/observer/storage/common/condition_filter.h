@@ -49,8 +49,8 @@ public:
   DefaultConditionFilter();
   virtual ~DefaultConditionFilter();
 
-  RC init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op);
-  RC init(Table &table, const Condition &condition);
+  RC init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op, TupleSet *tuple_set);
+  RC init(Table &table, const Condition &condition, TupleSet *tuple_set);
 
   virtual bool filter(const Record &rec) const;
 
@@ -81,6 +81,7 @@ private:
   AttrType type_left_;
   AttrType type_right_;
   CompOp   comp_op_;
+  TupleSet *tuple_set_;
 };
 
 class JoinConditionFilter : public ConditionFilter {

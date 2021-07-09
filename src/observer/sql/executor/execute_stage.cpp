@@ -40,7 +40,8 @@
 
 using namespace common;
 
-RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node);
+RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, std::vector<TupleSet> &sub_tuple_sets, SelectExeNode &select_node);
+RC do_sub_select(const char *db, const Selects &selects, SessionEvent *session_event, TupleSet &tuple_set);
 
 //! Constructor
 ExecuteStage::ExecuteStage(const char *tag) : Stage(tag) {}
@@ -129,6 +130,7 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
   switch (sql->flag) {
     case SCF_SELECT: { // select
       RC rc = do_select(current_db, sql, exe_event->sql_event()->session_event());
+      
       if (rc != RC::SUCCESS) {
         char response[256];
         snprintf(response, sizeof(response), "%s\n", "FAILURE");
@@ -345,7 +347,7 @@ RC check_attr_in_table(std::vector<Table *> tables, const RelAttr &attr, AttrTyp
 }
 
 // select命令的元数据校验
-RC check_meta_select(const char *db, const Selects &selects) {
+RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSet> &sub_tuple_sets) {
   std::vector<Table *> tables;
 
   // table校验，检查from后面的table是否在db中
@@ -369,6 +371,7 @@ RC check_meta_select(const char *db, const Selects &selects) {
   }
 
   // condition校验，检查where后面的condition中的attr是否在from后面的table中
+  int sub_num = 0;
   for (int i = 0; i < selects.condition_num; i++) {
     const Condition &condition = selects.conditions[i];
     AttrType left_type = condition.left_value.type;
@@ -379,6 +382,25 @@ RC check_meta_select(const char *db, const Selects &selects) {
         return rc;
       }
     }
+
+    // 如果是子查询条件, 需要检查字段是否唯一且类型是否一致
+    if (condition.sub_selects != nullptr) {
+      if (sub_num + 1 > sub_tuple_sets.size()) {
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+      TupleSet &tuple_set = sub_tuple_sets[sub_num];
+      if (tuple_set.get_schema().fields().size() != 1) {
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+      const TupleField &field = tuple_set.get_schema().fields()[0];
+      right_type = field.type();
+      if (left_type != right_type && ((left_type != INTS && left_type != FLOATS) || (right_type != INTS && right_type != FLOATS))) {
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+      sub_num ++;
+      continue;
+    }
+
     if (condition.right_is_attr) {
       RC rc = check_attr_in_table(tables, condition.right_attr, right_type);
       if (rc != RC::SUCCESS) {
@@ -395,17 +417,31 @@ RC check_meta_select(const char *db, const Selects &selects) {
   return RC::SUCCESS;
 }
 
-// TODO 这里没有对输入的某些信息做合法性校验，比如查询的列名、where条件中的列名等，没有做必要的合法性校验
-// 需要补充上这一部分. 校验部分也可以放在resolve，不过跟execution放一起也没有关系
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
   RC rc = RC::SUCCESS;
   Session *session = session_event->get_client()->session;
   Trx *trx = session->current_trx();
   const Selects &selects = sql->sstr.selection;
 
+  // 如果有子查询, 先执行子查询
+  std::vector<TupleSet> sub_tuple_sets;
+  for (int i = 0; i < selects.condition_num; i++) {
+    const Condition &condition = selects.conditions[i];
+    if (condition.sub_selects != nullptr) {
+      TupleSet tuple_set;
+      rc = do_sub_select(db, *condition.sub_selects, session_event, tuple_set);
+      if (rc != RC::SUCCESS) {
+        end_trx_if_need(session, trx, false);
+        return rc;
+      }
+      sub_tuple_sets.push_back(std::move(tuple_set));
+    }
+  }
+
   // 元数据校验
-  rc = check_meta_select(db, selects);
+  rc = check_meta_select(db, selects, sub_tuple_sets);
   if (rc != RC::SUCCESS) {
+    end_trx_if_need(session, trx, false);
     return rc;
   }
 
@@ -415,7 +451,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   for (int i = selects.relation_num - 1; i >= 0; i--) {
     const char *table_name = selects.relations[i];
     SelectExeNode *select_node = new SelectExeNode;
-    rc = create_selection_executor(trx, selects, db, table_name, *select_node);
+    rc = create_selection_executor(trx, selects, db, table_name, sub_tuple_sets, *select_node);
     if (rc != RC::SUCCESS) {
       for (SelectExeNode *& tmp_node: select_nodes) {
         delete tmp_node;
@@ -472,6 +508,70 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   return rc;
 }
 
+RC do_sub_select(const char *db, const Selects &selects, SessionEvent *session_event, TupleSet &tuple_set) {
+  RC rc = RC::SUCCESS;
+  Session *session = session_event->get_client()->session;
+  Trx *trx = session->current_trx();
+
+  // 目前子查询只支持单字段单表
+  if (selects.relation_num != 1 || selects.attr_num != 1) {
+    LOG_ERROR("select fail: subquery has more than one attribute/relation or the attribute is \"*\"");
+    printf("select fail: subquery has more than one attribute/relation or the attribute is \"*\"\n");
+    return RC::SCHEMA_FIELD_NOT_SUPPORT;
+  }
+
+  // 如果有子查询, 先执行子查询
+  std::vector<TupleSet> sub_tuple_sets;
+  for (int i = 0; i < selects.condition_num; i++) {
+    const Condition &condition = selects.conditions[i];
+    if (condition.sub_selects != nullptr) {
+      TupleSet tuple_set;
+      rc = do_sub_select(db, *condition.sub_selects, session_event, tuple_set);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      sub_tuple_sets.push_back(std::move(tuple_set));
+    }
+  }
+
+  // 元数据校验
+  rc = check_meta_select(db, selects, sub_tuple_sets);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  // 把和某张表关联的condition都拿出来，生成该表最底层的select 执行节点, 一个执行节点包括需要返回的列、条件
+  // 数组是用来存放不同表的select 执行节点
+  std::vector<SelectExeNode *> select_nodes;
+  for (int i = selects.relation_num - 1; i >= 0; i--) {
+    const char *table_name = selects.relations[i];
+    SelectExeNode *select_node = new SelectExeNode;
+    rc = create_selection_executor(trx, selects, db, table_name, sub_tuple_sets, *select_node);
+    if (rc != RC::SUCCESS) {
+      for (SelectExeNode *& tmp_node: select_nodes) {
+        delete tmp_node;
+      }
+      return rc;
+    }
+    select_nodes.push_back(select_node);
+  }
+
+  if (select_nodes.empty()) {
+    LOG_ERROR("No table given");
+    return RC::SQL_SYNTAX;
+  }
+
+  SelectExeNode * node = select_nodes[0];
+  rc = node->execute(tuple_set);
+  if (rc != RC::SUCCESS) {
+    delete node;
+    return rc;
+  }
+
+  delete node;
+  return rc;
+}
+
 bool match_table(const Selects &selects, const char *table_name_in_condition, const char *table_name_to_match) {
   if (table_name_in_condition != nullptr) {
     return 0 == strcmp(table_name_in_condition, table_name_to_match);
@@ -516,7 +616,7 @@ static RC schema_add_field_agg(Table *table, AggType atype, const char *field_na
 }
 
 // 把和某张表关联的condition都拿出来，生成该表最底层的select 执行节点, 一个执行节点包括需要返回的列、条件
-RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node) {
+RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, std::vector<TupleSet> &sub_tuple_sets, SelectExeNode &select_node) {
   // 列出跟这张表关联的Attr
   TupleSchema schema;
   Table * table = DefaultHandler::get_default().find_table(db, table_name);
@@ -567,25 +667,37 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
 
   // 找出仅与此表相关的过滤条件, 或者都是值的过滤条件
   std::vector<DefaultConditionFilter *> condition_filters;
+  int sub_idx = 0;
   for (int i = 0; i < selects.condition_num; i++) {
+    RC rc = RC::SUCCESS;
     const Condition &condition = selects.conditions[i];
-    if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
+    DefaultConditionFilter *condition_filter = new DefaultConditionFilter();
+    // 如果是子查询条件
+    if (condition.sub_selects != nullptr) {
+      rc = condition_filter->init(*table, condition, &sub_tuple_sets[sub_idx]);
+      sub_idx ++;
+    }
+    // TODO 这里需要支持多表操作, 如 t1.id == t2.id
+    else if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
         (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_name)) ||  // 左边是属性右边是值
         (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_name)) ||  // 左边是值，右边是属性名
         (condition.left_is_attr == 1 && condition.right_is_attr == 1 &&
             match_table(selects, condition.left_attr.relation_name, table_name) && match_table(selects, condition.right_attr.relation_name, table_name)) // 左右都是属性名，并且表名都符合
         ) {
-      DefaultConditionFilter *condition_filter = new DefaultConditionFilter();
-      RC rc = condition_filter->init(*table, condition);
-      if (rc == RC::SCHEMA_CONDITION_INVALID) {
-        delete condition_filter;
-        continue;
-      } else if (rc != RC::SUCCESS) {
-        delete condition_filter; // free space
-        return rc;
-      }
-      condition_filters.push_back(condition_filter);
+      rc = condition_filter->init(*table, condition, NULL);
     }
+    else {
+      continue;
+    }
+
+    if (rc == RC::SCHEMA_CONDITION_INVALID) {
+      delete condition_filter;
+      continue;
+    } else if (rc != RC::SUCCESS) {
+      delete condition_filter; // free space
+      return rc;
+    }
+    condition_filters.push_back(condition_filter);
   }
 
   return select_node.init(trx, table, std::move(schema), std::move(condition_filters));

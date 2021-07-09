@@ -52,6 +52,7 @@ public:
 
   const IndexMeta * index(const char *name) const;
   const IndexMeta * find_index_by_field(const char *field) const;
+  const IndexMeta * find_index_by_field(std::vector<const char *> & field_names) const;
   const IndexMeta * index(int i) const;
   int index_num() const;
 

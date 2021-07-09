@@ -416,8 +416,10 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   if (limit < 0) {
     limit = INT_MAX;
   }
-
-  IndexScanner *index_scanner = find_index_for_scan(filter);
+  IndexScanner *index_scanner = find_muti_index_for_scan(filter);
+  if(index_scanner == nullptr){
+    find_index_for_scan(filter);
+  }
   if (index_scanner != nullptr) {
     return scan_record_by_index(trx, index_scanner, filter, limit, context, record_reader);
   }
@@ -507,23 +509,35 @@ static RC insert_index_record_reader_adapter(Record *record, void *context) {
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_name, bool unique) {
+RC Table::create_index(Trx *trx, const char *index_name, const char ** attribute_names, int attribute_num, bool unique) {
   if (index_name == nullptr || common::is_blank(index_name) ||
-      attribute_name == nullptr || common::is_blank(attribute_name)) {
+      attribute_num == 0 || attribute_names == nullptr) {
     return RC::INVALID_ARGUMENT;
   }
-  if (table_meta_.index(index_name) != nullptr ||
-      table_meta_.find_index_by_field((attribute_name))) {
+  for(int i = 0; i < attribute_num; ++i){
+    if(common::is_blank(attribute_names[i])){
+      return RC::INVALID_ARGUMENT;
+    }
+  }
+  if (table_meta_.index(index_name) != nullptr) {
+    return RC::SCHEMA_INDEX_EXIST;
+  }
+  if(table_meta_.find_index_by_field(attribute_names[i])->field_num() == attribute_num){
     return RC::SCHEMA_INDEX_EXIST;
   }
 
-  const FieldMeta *field_meta = table_meta_.field(attribute_name);
-  if (!field_meta) {
-    return RC::SCHEMA_FIELD_MISSING;
+  std::vector<const FieldMeta *>field_metas;
+  const FieldMeta *field_meta;
+  for(int i = 0; i < attribute_num; ++i){
+    field_meta = table_meta_.field(attribute_names[i]);
+    if(!field_meta){
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    field_metas.push_back(field_meta);
   }
 
   IndexMeta new_index_meta;
-  RC rc = new_index_meta.init(index_name, *field_meta, unique);
+  RC rc = new_index_meta.init(index_name, field_metas, unique, field_metas.size());
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -531,7 +545,7 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   // 创建索引相关数据
   BplusTreeIndex *index = new BplusTreeIndex();
   std::string index_file = index_data_file(base_dir_.c_str(), name(), index_name);
-  rc = index->create(index_file.c_str(), new_index_meta, *field_meta, unique);
+  rc = index->create(index_file.c_str(), new_index_meta, field_metas, unique);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
@@ -821,6 +835,76 @@ Index *Table::find_index(const char *index_name) const {
   return nullptr;
 }
 
+IndexScanner *Table::find_muti_index_for_scan(const ConditionFilter *filter) {
+  if (nullptr == filter) {
+    return nullptr;
+  }
+  //TODO只有一个查询条件时？
+  const CompositeConditionFilter *composite_condition_filter = dynamic_cast<const CompositeConditionFilter *>(filter);
+  if (composite_condition_filter != nullptr) {
+    int filter_num = composite_condition_filter->filter_num();
+    int max_equal_fnum = 0;
+    for (int i = 0; i < filter_num; i++) {
+      const DefaultConditionFilter  dc = (composite_condition_filter->filter(i));
+      if(dc.comp_op() != EQUAL_TO){
+        if(i > 0){
+          IndexScanner *scanner= find_muti_index_for_scan((const DefaultConditionFilter *)(composite_condition_filter->filter()), i);
+          if (scanner != nullptr) {
+            return scanner; // TODO 可以找到一个最优的，比如比较符号是=
+          }
+        }
+        break;
+      }
+    }
+  }
+  return nullptr;
+}
+
+IndexScanner *Table::find_muti_index_for_scan(const DefaultConditionFilter * filters, int num){
+  std::vector<const char *> field_meta_names;
+  std::vector<const char *> value_cond_descs;
+  std::vector<AttrType> value_types;
+  for(int i = 0; i < num; ++i){
+    const DefaultConditionFilter filter = filters[i];
+    const ConDesc *field_cond_desc = nullptr;
+    const ConDesc *value_cond_desc = nullptr;
+    AttrType value_type = UNDEFINED;
+    if (filter.left().is_attr && !filter.right().is_attr) {
+      field_cond_desc = &filter.left();
+      value_cond_desc = &filter.right();
+      value_type = filter.right_type();
+    } else if (filter.right().is_attr && !filter.left().is_attr) {
+      field_cond_desc = &filter.right();
+      value_cond_desc = &filter.left();
+      value_type = filter.left_type();
+    }
+    if (field_cond_desc == nullptr || value_cond_desc == nullptr) {
+      return nullptr;
+    }
+    const FieldMeta *field_meta = table_meta_.find_field_by_offset(field_cond_desc->attr_offset);
+    if (nullptr == field_meta) {
+      LOG_PANIC("Cannot find field by offset %d. table=%d, condition filter=%s",
+                field_cond_desc->attr_offset, name(), ""); // TODO condition filter to string
+      return nullptr;
+    }
+    field_meta_names.push_back(field_meta->name());
+    value_cond_descs.push_back((const char*)(value_cond_desc->value));
+    value_types.push_back(value_type);
+  }
+
+  const IndexMeta *index_meta = table_meta_.find_index_by_field(field_meta_names);
+  if (nullptr == index_meta) {
+    return nullptr;
+  }
+
+  Index *index = find_index(index_meta->name());
+  if (nullptr == index) {
+    return nullptr;
+  }
+
+  return index->create_scanner(EQUAL_TO, value_cond_descs, value_types);
+}
+
 IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
   const ConDesc *field_cond_desc = nullptr;
   const ConDesc *value_cond_desc = nullptr;
@@ -876,8 +960,11 @@ IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
   if (nullptr == index) {
     return nullptr;
   }
-
-  return index->create_scanner(op, (const char *)value_cond_desc->value, value_type);
+  std::vector<const char*> values;
+  values.push_back((const char *)(value_cond_desc->value));
+  std::vector<AttrType> types;
+  types.push_back(value_type);
+  return index->create_scanner(op, values, types);
 }
 
 IndexScanner *Table::find_index_for_scan(const ConditionFilter *filter) {

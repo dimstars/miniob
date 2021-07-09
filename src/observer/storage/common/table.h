@@ -67,7 +67,7 @@ public:
 
   RC scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, void (*record_reader)(const char *data, void *context));
 
-  RC create_index(Trx *trx, const char *index_name, const char *attribute_name, bool unique = false);
+  RC create_index(Trx *trx, const char *index_name, const char ** attribute_names, int attribute_num, bool unique = false) ;
 
 public:
   const char *name() const;
@@ -87,6 +87,8 @@ private:
   RC scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter *filter, int limit, void *context, RC (*record_reader)(Record *record, void *context));
   IndexScanner *find_index_for_scan(const ConditionFilter *filter);
   IndexScanner *find_index_for_scan(const DefaultConditionFilter &filter);
+  IndexScanner *find_muti_index_for_scan(const ConditionFilter *filter);
+  IndexScanner *find_muti_index_for_scan(const DefaultConditionFilter * filters, int num);
 
   RC insert_record(Trx *trx, Record *record);
   RC update_record(Trx *trx, Record *record);

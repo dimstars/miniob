@@ -23,7 +23,8 @@
 #include "record_manager.h"
 #include "storage/default/disk_buffer_pool.h"
 #include "sql/parser/parse_defs.h"
-
+#include "storage/common/field_meta.h"
+#define BITMAP_SIZE 4
 struct Attr{
   int length;
   int offset; //record中的offset
@@ -31,14 +32,16 @@ struct Attr{
 };
 
 struct IndexFileHeader {
-//  int attr_length;
+  int attr_length;
   int key_length;
- // AttrType attr_type;
+  
   PageNum root_page; // 初始时，root_page一定是1
   int node_num;
   int order;
-  int attr_num;
-  Attr *attrs;
+  int field_num;
+  AttrType *attr_types;
+  int *field_len;
+ // Attr *attrs;
 };
 
 struct IndexNode {
@@ -94,26 +97,27 @@ public:
    * 参数pData指向要插入的属性值，参数rid标识该索引项对应的元组，
    * 即向索引中插入一个值为（*pData，rid）的键值对
    */
-  RC insert_entry(const char *pkey, const RID *rid);
+  RC insert_entry(std::vector<const char *> & pkey, const RID *rid);
 
   /**
    * 从IndexHandle句柄对应的索引中删除一个值为（*pData，rid）的索引项
    * @return RECORD_INVALID_KEY 指定值不存在
    */
-  RC delete_entry(const char *pkey, const RID *rid);
+  RC delete_entry(std::vector<const char *> & pkey, const RID *rid);
 
   /**
    * 获取指定值的record
    * @param rid  返回值，记录记录所在的页面号和slot
    */
-  RC get_entry(const char *pkey, RID *rid);
+  RC get_entry(std::vector<const char *> & pkey, RID *rid);
 
   RC sync();
 public:
   RC print();
   RC print_tree();
 protected:
-  RC find_leaf(const char *pkey, AttrType ktype, PageNum *leaf_page);
+//  RC find_leaf(const char *pkey, AttrType ktype, PageNum *leaf_page);
+  RC find_leaf(const char *pkey, const AttrType *ktype, PageNum *leaf_page);
   RC insert_into_leaf(PageNum leaf_page, const char *pkey, const RID *rid);
   RC insert_into_leaf_after_split(PageNum leaf_page, const char *pkey, const RID *rid);
   RC insert_into_parent(PageNum parent_page, PageNum leaf_page, const char *pkey, PageNum right_page);
@@ -126,7 +130,8 @@ protected:
   RC coalesce_node(PageNum leaf_page, PageNum right_page);
   RC redistribute_nodes(PageNum left_page, PageNum right_page);
 
-  RC find_first_index_satisfied(CompOp comp_op, const char *pkey, AttrType ktype, PageNum *page_num, int *rididx);
+  RC find_first_index_satisfied(CompOp compop, const char *key,const AttrType* ktype, PageNum *page_num, int *rididx);
+  //RC find_first_index_satisfied(CompOp comp_op, const char *pkey, AttrType ktype, PageNum *page_num, int *rididx);
   RC get_first_leaf_page(PageNum *leaf_page);
 
 private:
@@ -152,8 +157,8 @@ public:
    * compOp和*value指定比较符和比较值，indexScan为初始化后的索引扫描结构指针
    * TODO 没有带两个边界的范围扫描
    */
-  RC open(CompOp comp_op, const char *value, AttrType type);
-
+  //RC open(CompOp comp_op, const char *value, AttrType type);
+  RC open(CompOp comp_op, std::vector<const char *> & values, std::vector<AttrType> & type);
   /**
    * 用于继续索引扫描，获得下一个满足条件的索引项，
    * 并返回该索引项对应的记录的ID
@@ -180,8 +185,9 @@ private:
   BplusTreeHandler   & index_handler_;
   bool opened_ = false;
   CompOp comp_op_;                              // 用于比较的操作符
-  AttrType  type_;                              // value_的type，用于比较时判断类型
+  const AttrType *type_;                              // value_的type，用于比较时判断类型
   const char *value_ = nullptr;		              // 与属性行比较的值
+  //std::vector<const char *>values_;
   int num_fixed_pages_;	                        // 固定在缓冲区中的页，与指定的页面固定策略有关
   int pinned_page_count_ = 0;                   // 实际固定在缓冲区的页面数
   BPPageHandle page_handles_[BP_BUFFER_SIZE];   // 固定在缓冲区页面所对应的页面操作列表

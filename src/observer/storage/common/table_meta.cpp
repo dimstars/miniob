@@ -155,11 +155,30 @@ const IndexMeta * TableMeta::index(const char *name) const {
 
 const IndexMeta * TableMeta::find_index_by_field(const char *field) const {
   for (const IndexMeta &index : indexes_) {
-    if (0 == strcmp(index.field(), field)) {
+    if (1 == index.field_num() &&0 == strcmp(index.field(0), field)) {
       return &index;
     }
   }
   return nullptr;
+}
+
+const IndexMeta * TableMeta::find_index_by_field(std::vector<const char *> & field_names) const {
+  int max_prefix = 0;
+  const IndexMeta *idx = nullptr;
+  for (const IndexMeta &index : indexes_){
+    int prefix = index.field_num() < field_names.size() ? index.field_num():field_names.size();
+    for(int i = 0; i < prefix; ++i){
+      if (0 != strcmp(index.field(i), field_names[i])) {
+        prefix = i;
+      }
+    }
+    //找最合适的索引，前缀匹配长度最大
+    if(max_prefix < prefix){
+      max_prefix = prefix;
+      idx = &index;
+    }
+  }
+  return idx;
 }
 
 const IndexMeta * TableMeta::index(int i ) const {

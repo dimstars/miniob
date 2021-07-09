@@ -107,7 +107,7 @@ public:
    * @param attrName
    * @return
    */
-  RC create_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name, const char *attribute_name);
+  RC create_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name, const char **attribute_names, int attribute_num) ;
 
     /**
    * 该函数在关系relName的属性attrName上创建名为indexName的索引。
@@ -121,7 +121,7 @@ public:
    * @param attrName
    * @return
    */
-  RC create_unique_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name, const char *attribute_name);
+  RC create_unique_index(Trx *trx, const char *dbname, const char *relation_name, const char *index_name, const char **attribute_names, int attribute_num) ;
 
   /**
    * 该函数用来删除名为indexName的索引。

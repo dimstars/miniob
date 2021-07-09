@@ -134,6 +134,9 @@ public:
   const ConditionFilter &filter(int index) const {
     return *filters_[index];
   }
+  const ConditionFilter* filter() const {
+    return *filters_;
+  }
 
 private:
   RC init(const ConditionFilter *filters[], int filter_num, bool own_memory);

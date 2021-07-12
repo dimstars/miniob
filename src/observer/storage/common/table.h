@@ -24,10 +24,12 @@
 
 class DiskBufferPool;
 class RecordFileHandler;
+class OverflowFileHandler;
 class ConditionFilter;
 class DefaultConditionFilter;
 struct Record;
 struct RID;
+struct OID;
 class Index;
 class IndexScanner;
 class RecordDeleter;
@@ -65,6 +67,10 @@ public:
   RC update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num, const Condition conditions[], int *updated_count);
   RC delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count);
 
+  RC get_record(const OID *oid, char *data);
+  RC delete_record(const OID *oid);
+  RC update_record(const char *data, int data_len, const OID *old_oid, OID *new_oid);
+  
   RC scan_record(Trx *trx, ConditionFilter *filter, int limit, void *context, void (*record_reader)(const char *data, void *context));
 
   RC create_index(Trx *trx, const char *index_name, const char * const * attribute_names, int attribute_num, bool unique = false) ;
@@ -89,7 +95,7 @@ private:
   IndexScanner *find_index_for_scan(const DefaultConditionFilter &filter);
   IndexScanner *find_muti_index_for_scan(const ConditionFilter *filter);
 
-  RC insert_record(Trx *trx, Record *record);
+  RC insert_record(Trx *trx, Record *record, int value_num, const Value *values);
   RC update_record(Trx *trx, Record *record);
   RC delete_record(Trx *trx, Record *record);
 
@@ -102,7 +108,7 @@ private:
 private:
   RC init_record_handler(const char *base_dir);
   RC make_record(int value_num, const Value *values, char * &record_out);
-
+  RC insert_record(int value_num, const Value *values, char * record_in);  // 为了将overflow page的insert处理在事务启动后，额外封装一个函数
 private:
   Index *find_index(const char *index_name) const;
   Index *find_index_by_field(const char *field_name) const;
@@ -113,7 +119,9 @@ private:
   TableMeta               table_meta_;
   DiskBufferPool *        data_buffer_pool_; /// 数据文件关联的buffer pool
   int                     file_id_;
+  int                     of_file_id_;
   RecordFileHandler *     record_handler_;   /// 记录操作
+  OverflowFileHandler *   overflow_handler_; 
   std::vector<Index *>    indexes_;
 };
 

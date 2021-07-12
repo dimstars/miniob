@@ -27,6 +27,7 @@
 #include "sql/executor/value.h"
 
 class Table;
+struct OID;
 
 // 为了进行聚合运算所维护的统计变量
 typedef struct _MaxStat {

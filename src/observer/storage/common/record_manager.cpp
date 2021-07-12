@@ -24,12 +24,19 @@
 
 using namespace common;
 
+// 除第一页外的普通页
+// 包含pagenum+pageheader+bitmap+ records
 struct PageHeader {
   int record_num;  // 当前页面记录的个数
   int record_capacity; // 最大记录个数
   int record_real_size; // 每条记录的实际大小
   int record_size; // 每条记录占用实际空间大小(可能对齐)
   int first_record_offset; // 第一条记录的偏移量
+};
+
+// overflow file page header
+struct OFPageHeader {
+  PageNum next_page_num;  // 如果next_page_num = 0表示这是text的最后一页
 };
 
 int align8(int size) {
@@ -193,6 +200,7 @@ RC RecordPageHandler::delete_record(const RID *rid) {
       DiskBufferPool *disk_buffer_pool = disk_buffer_pool_;
       int file_id = file_id_;
       PageNum page_num = get_page_num();
+      if(page_num == 0) return ret;
       deinit();
       disk_buffer_pool->dispose_page(file_id, page_num);
     }
@@ -260,7 +268,110 @@ bool RecordPageHandler::is_full() const {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+OverflowPageHandler::OverflowPageHandler() : 
+    disk_buffer_pool_(nullptr),
+    file_id_(-1),
+    page_header_(nullptr) {
+}
 
+OverflowPageHandler::~OverflowPageHandler() {
+  deinit();
+}
+
+RC OverflowPageHandler::init(DiskBufferPool &buffer_pool, int file_id, PageNum page_num) {
+  if (disk_buffer_pool_ != nullptr) {
+    return RC::RECORD_OPENNED;
+  }
+
+  RC ret = RC::SUCCESS;
+  if ((ret = buffer_pool.get_this_page(file_id, page_num, &page_handle_)) != RC::SUCCESS) {
+    LOG_ERROR("Failed to get page handle from disk buffer pool. ret=%d:%s", ret, strrc(ret));
+    return ret;
+  }
+
+  char *data;
+  ret = buffer_pool.get_data(&page_handle_, &data);
+  if (ret != RC::SUCCESS) {
+    LOG_ERROR("Failed to get page data. ret=%d:%s", ret, strrc(ret));
+    return ret;
+  }
+
+  disk_buffer_pool_ = &buffer_pool;
+  file_id_ = file_id;
+
+  page_header_ = (OFPageHeader*)(data);
+  
+  // 初始化就需要设置为dirty，因为page初始化就需要写入数据
+  disk_buffer_pool_->mark_dirty(&page_handle_);
+
+  return ret;
+}
+
+RC OverflowPageHandler::deinit() {
+  if (disk_buffer_pool_ != nullptr) {
+    disk_buffer_pool_->unpin_page(&page_handle_);
+    disk_buffer_pool_ = nullptr;
+  }
+  if (page_header_ != nullptr) {
+    page_header_ = nullptr;
+  }
+  return RC::SUCCESS;
+}
+
+RC OverflowPageHandler::insert_record(const char *data, int data_len, PageNum next_page_num) {
+  page_header_->next_page_num = next_page_num;
+
+  // assert index < page_header_->record_capacity
+  char *record_data = page_handle_.frame->page.data + sizeof(page_header_);
+  memcpy(record_data, data, data_len);
+
+  disk_buffer_pool_->mark_dirty(&page_handle_);
+
+  LOG_TRACE("Insert text. rid page_num=%d", get_page_num());
+  return RC::SUCCESS;
+}
+
+RC OverflowPageHandler::update_record() {
+  RC ret = RC::SUCCESS;
+
+  return ret;
+}
+
+RC OverflowPageHandler::delete_record() {
+  RC ret = RC::SUCCESS;
+
+  DiskBufferPool *disk_buffer_pool = disk_buffer_pool_;
+  int file_id = file_id_;
+  PageNum page_num = get_page_num();
+  if(page_num == 0) return ret;
+  deinit();
+  disk_buffer_pool->dispose_page(file_id, page_num);
+
+  return ret;
+}
+
+RC OverflowPageHandler::get_record(char * &data) {
+  char *page_data = page_handle_.frame->page.data + sizeof(page_header_);
+
+  data = page_data;
+
+  return RC::SUCCESS;
+}
+
+PageNum OverflowPageHandler::get_page_num() const {
+  if (nullptr == page_header_) {
+    return (PageNum)(-1);
+  }
+  return page_handle_.frame->page.page_num;
+}
+
+PageNum OverflowPageHandler::get_next_page_num() const {
+  if (nullptr == page_header_) {
+    return (PageNum)(-1);
+  }
+  return page_header_->next_page_num;
+}
+////////////////////////////////////////////////////////////////////////////////
 RecordFileHandler::RecordFileHandler() :
     disk_buffer_pool_(nullptr),
     file_id_(-1) {
@@ -393,7 +504,146 @@ RC RecordFileHandler::get_record(const RID *rid, Record *rec) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+OverflowFileHandler::OverflowFileHandler() :
+    disk_buffer_pool_(nullptr),
+    file_id_(-1) {
+}
 
+RC OverflowFileHandler::init(DiskBufferPool &buffer_pool, int file_id) {
+
+  RC ret = RC::SUCCESS;
+
+  if (disk_buffer_pool_ != nullptr) {
+    return RC::RECORD_OPENNED;
+  }
+
+  disk_buffer_pool_ = &buffer_pool;
+  file_id_ = file_id;
+
+  return ret;
+}
+
+void OverflowFileHandler::close() {
+  if (disk_buffer_pool_ != nullptr) {
+    disk_buffer_pool_ = nullptr;
+  }
+}
+
+RC OverflowFileHandler::insert_record(const char *data, int data_len, OID *oid) {
+  RC ret = RC::SUCCESS;
+  
+  int size = (data_len + OF_PAGE_DATA_SIZE - 1) / OF_PAGE_DATA_SIZE;
+  PageNum *page_nums = new PageNum [size];
+  OverflowPageHandler *overflow_page_handle = new OverflowPageHandler [size];
+
+  for(int i = 0; i < size; i++) {
+    BPPageHandle page_handle;
+    if ((ret = disk_buffer_pool_->allocate_page(file_id_, &page_handle)) != RC::SUCCESS) {
+      LOG_ERROR("Failed to allocate page while inserting record. ret=%d", ret);
+      return ret;
+    }
+    page_nums[i] = page_handle.frame->page.page_num;
+    overflow_page_handle[i].init(*disk_buffer_pool_, file_id_, page_nums[i]);
+  }
+
+  int offset = 0, cpy_len;
+  for(int i = 0; i < size; i++) {
+    cpy_len = (data_len - offset) >= OF_PAGE_DATA_SIZE ? OF_PAGE_DATA_SIZE : data_len - offset;
+    char *page = new char [OF_PAGE_DATA_SIZE];
+    memcpy(page, data+offset, cpy_len);
+    ret = overflow_page_handle[i].insert_record(page, cpy_len, i == size-1 ? 0 : page_nums[i+1]);
+    offset += cpy_len;
+  }
+  assert(offset == data_len);
+
+  if(oid) {
+    oid->first_page_num = page_nums[0];
+    oid->len = data_len;
+  }
+
+  // 释放空间
+  delete[] page_nums;
+  delete[] overflow_page_handle;
+
+  return ret;
+}
+
+RC OverflowFileHandler::update_record(const char *data, int data_len, const OID *old_oid, OID *new_oid) {
+
+  RC ret = RC::SUCCESS;
+
+  if((ret = insert_record(data, data_len, new_oid)) != RC::SUCCESS) {
+    LOG_ERROR("Failed to insert new record while updating record. ret=%d", ret);
+    return ret;
+  }
+
+  if((ret = delete_record(old_oid)) != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete old record while updating record. ret=%d", ret);
+    return ret;
+  }
+
+  return ret;
+}
+
+RC OverflowFileHandler::delete_record(const OID *oid) {
+  RC ret = RC::SUCCESS;
+  
+  int size = (oid->len + OF_PAGE_DATA_SIZE - 1) / OF_PAGE_DATA_SIZE;
+  PageNum *page_nums = new PageNum [size];
+  OverflowPageHandler *overflow_page_handle = new OverflowPageHandler [size];
+
+  for(int i = 0; i < size; i++) {
+    if(i == 0) page_nums[i] = oid->first_page_num;
+    else page_nums[i] = overflow_page_handle[i-1].get_next_page_num();
+    overflow_page_handle[i].init(*disk_buffer_pool_, file_id_, page_nums[i]);
+  }
+
+  for(int i = 0; i < size; i++) {
+    ret = overflow_page_handle[i].delete_record();
+  }
+
+  // 释放空间
+  delete[] page_nums;
+  delete[] overflow_page_handle;
+
+  return ret;
+}
+
+RC OverflowFileHandler::get_record(const OID *oid, char *data) {
+  //TODO lock?
+  RC ret = RC::SUCCESS;
+  if (nullptr == oid || nullptr == data) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  int size = (oid->len + OF_PAGE_DATA_SIZE - 1) / OF_PAGE_DATA_SIZE;
+  PageNum *page_nums = new PageNum [size];
+  OverflowPageHandler *overflow_page_handle = new OverflowPageHandler [size];
+
+  for(int i = 0; i < size; i++) {
+    if(i == 0) page_nums[i] = oid->first_page_num;
+    else page_nums[i] = overflow_page_handle[i-1].get_next_page_num();
+    overflow_page_handle[i].init(*disk_buffer_pool_, file_id_, page_nums[i]);
+  }
+
+  int offset = 0, cpy_len;
+  for(int i = 0; i < size; i++) {
+    cpy_len = (oid->len - offset) >= OF_PAGE_DATA_SIZE ? OF_PAGE_DATA_SIZE : oid->len - offset;
+    char *page;
+    overflow_page_handle[i].get_record(page);
+    memcpy(data+offset, page, cpy_len);
+    offset += cpy_len;
+  }
+  assert(offset == oid->len);
+
+  // 释放空间
+  delete[] page_nums;
+  delete[] overflow_page_handle;
+
+  return ret;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 RecordFileScanner::RecordFileScanner() : 
     disk_buffer_pool_(nullptr),
     file_id_(-1),

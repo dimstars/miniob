@@ -40,15 +40,20 @@ using namespace common;
 Table::Table() : 
     data_buffer_pool_(nullptr),
     file_id_(-1),
-    record_handler_(nullptr) {
+    of_file_id_(-1),
+    record_handler_(nullptr),
+    overflow_handler_(nullptr) {
 }
 
 Table::~Table() {
   delete record_handler_;
   record_handler_ = nullptr;
+  if(overflow_handler_) delete overflow_handler_;
+  overflow_handler_ = nullptr;
 
-  if (data_buffer_pool_ != nullptr && file_id_ >= 0) {
-    data_buffer_pool_->close_file(file_id_);
+  if (data_buffer_pool_ != nullptr) {
+    if(file_id_ >= 0) data_buffer_pool_->close_file(file_id_);
+    if(of_file_id_ >= 0) data_buffer_pool_->close_file(of_file_id_);
     data_buffer_pool_ = nullptr;
   }
 
@@ -110,6 +115,15 @@ RC Table::create(const char *path, const char *name, const char *base_dir, int a
     return rc;
   }
 
+  if(table_meta_.overflow_exist()) {
+    std::string of_file = table_overflow_file(base_dir, name);
+    rc = data_buffer_pool_->create_file(of_file.c_str());
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create disk buffer pool of overflow file. file name=%s", of_file.c_str());
+      return rc;
+    }
+  }
+
   rc = init_record_handler(base_dir);
 
   base_dir_ = base_dir;
@@ -142,6 +156,15 @@ RC Table::drop() {
   if (remove(data_file.c_str()) != 0) {
     LOG_ERROR("Failed to remove data file. file name = %s, errmsg = %s", data_file.c_str(), strerror(errno));
     return RC::IOERR;
+  }
+
+  if(table_meta_.overflow_exist()) {
+    // 删除overflow文件
+    std::string of_file = base_dir_ + "/" + std::string(table_meta_.name()) + TABLE_OVERFLOW_SUFFIX;
+    if (access(of_file.c_str(), F_OK) != -1 && remove(of_file.c_str()) != 0) {
+      LOG_ERROR("Failed to remove overflow file. file name = %s, errmsg = %s", of_file.c_str(), strerror(errno));
+      return RC::IOERR;
+    }
   }
 
   return RC::SUCCESS;
@@ -224,12 +247,19 @@ RC Table::rollback_insert(Trx *trx, const RID &rid) {
   return rc;
 }
 
-RC Table::insert_record(Trx *trx, Record *record) {
+RC Table::insert_record(Trx *trx, Record *record, int value_num, const Value *values) {
   RC rc = RC::SUCCESS;
 
   if (trx != nullptr) {
     trx->init_trx_info(this, *record);
   }
+
+  rc = insert_record(value_num, values, record->data);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Insert overflow entry failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
+    return rc;
+  }
+
   rc = record_handler_->insert_record(record->data, table_meta_.record_size(), &record->rid);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Insert record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
@@ -283,7 +313,7 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values) {
   Record record;
   record.data = record_data;
   // record.valid = true;
-  rc = insert_record(trx, &record);
+  rc = insert_record(trx, &record, value_num, values);
   delete record_data;
   return rc;
 }
@@ -320,7 +350,8 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
     const Value &value = values[i];
     if ((field->type() == INTS && value.type == FLOATS) 
           || (field->type() == INTS && value.type == FLOATS)
-          || (field->nullable() && value.type == NULLS)) {
+          || (field->nullable() && value.type == NULLS)
+          || (field->type() == TEXTS && value.type == CHARS)) {
       // do nothing
     } else if(!field->nullable() && value.type == NULLS) {
       LOG_ERROR("Null not support. field name=%s", field->name());
@@ -359,6 +390,9 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
       value_destroy(&v);
     } else if(value.type == NULLS) {
       bitmap.set_bit(field->index());
+    } else if(field->type() == TEXTS) {
+      // 这里填充的值并没有什么作用
+      memcpy(record + field->offset(), &(value.data), sizeof(char*));
     } else {
       memcpy(record + field->offset(), value.data, field->len());
     }
@@ -368,10 +402,54 @@ RC Table::make_record(int value_num, const Value *values, char * &record_out) {
   return RC::SUCCESS;
 }
 
+RC Table::insert_record(int value_num, const Value *values, char * record_in) {
+  RC rc = RC::SUCCESS;
+
+  const int normal_field_start_index = table_meta_.sys_field_num();
+  Bitmap bitmap(record_in, RECORD_BITMAP_BITS);
+
+  for (int i = 0; i < value_num; i++) {
+    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
+    const Value &value = values[i];
+    if(value.type == NULLS) continue;
+    if(field->type() == TEXTS) {
+      OID oid;
+      rc = overflow_handler_->insert_record((char*)value.data, strlen((char*)value.data), &oid);
+      if (rc != RC::SUCCESS) {
+        LOG_ERROR("Insert text field data failed. field name=%s, rc=%d:%s", field->name(), rc, strrc(rc));
+        return rc;
+      }
+      memcpy(record_in + field->offset(), &(oid), sizeof(oid));
+    } 
+  }
+
+  return rc;
+}
+
 RC Table::init_record_handler(const char *base_dir) {
   std::string data_file = std::string(base_dir) + "/" + table_meta_.name() + TABLE_DATA_SUFFIX;
   if (nullptr == data_buffer_pool_) {
     data_buffer_pool_ = theGlobalDiskBufferPool();
+  }
+
+  if(table_meta_.overflow_exist()) {
+    std::string overflow_file = table_overflow_file(base_dir, table_meta_.name());
+
+    int overflow_file_id;
+    RC rc = data_buffer_pool_->open_file(overflow_file.c_str(), &overflow_file_id);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to open overflow file. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+
+    overflow_handler_ = new OverflowFileHandler();
+    rc = overflow_handler_->init(*data_buffer_pool_, overflow_file_id);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to init overflow handler. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+
+    of_file_id_ = overflow_file_id;
   }
 
   int data_buffer_pool_file_id;
@@ -716,11 +794,32 @@ public:
       rc = table_.record_handler_->get_record(&rids_[i],&record);
       Bitmap bitmap(record.data, RECORD_BITMAP_BITS);
       if(value_.type == NULLS) {
+        if(!bitmap.get_bit(field->index()) && field->type() == TEXTS) {
+          OID oid = *(OID*)(record.data + field->offset());
+          table_.delete_record(&oid);
+        }
         bitmap.set_bit(field->index());
-        // record内的原数据没有清除
+        // record内的原数据value没有清除
       } else {
-        memcpy(record.data + field->offset(), (char*)value_.data, field->len());
-        if(bitmap.get_bit(field->index())) bitmap.clear_bit(field->index());
+        if(!bitmap.get_bit(field->index())) {
+          if(field->type() == TEXTS) {
+            OID old_oid = *(OID*)(record.data + field->offset());
+            OID new_oid;
+            table_.update_record((char*)value_.data, strlen((char*)value_.data), &old_oid, &new_oid);
+            memcpy(record.data + field->offset(), &new_oid, field->len());
+          } else {
+            memcpy(record.data + field->offset(), (char*)value_.data, field->len());
+          }
+        } else {
+          if(field->type() == TEXTS) {
+            OID new_oid;
+            table_.update_record((char*)value_.data, strlen((char*)value_.data), nullptr, &new_oid);
+            memcpy(record.data + field->offset(), &new_oid, field->len());
+          } else {
+            memcpy(record.data + field->offset(), (char*)value_.data, field->len());
+          }
+          bitmap.clear_bit(field->index());
+        }
       }
       rc = table_.update_record(trx_, &record);
       if (rc == RC::SUCCESS) {
@@ -823,10 +922,47 @@ RC Table::delete_record(Trx *trx, Record *record) {
       LOG_ERROR("Failed to delete indexes of record (rid=%d.%d). rc=%d:%s",
                 record->rid.page_num, record->rid.slot_num, rc, strrc(rc));
     } else {
+      Bitmap bitmap(record->data, RECORD_BITMAP_BITS);
+      for(int i = 0; i < table_meta_.field_num(); i++) {
+        if(table_meta_.field(i)->type() == TEXTS && !bitmap.get_bit(i)) {
+          OID oid = *(OID*)(record->data+table_meta_.field(i)->offset());
+          rc = overflow_handler_->delete_record(&oid);
+        } 
+      }
       rc = record_handler_->delete_record(&record->rid);
     }
   }
   return rc;
+}
+
+RC Table::get_record(const OID *oid, char *data) {
+  if(overflow_handler_ == nullptr) {
+    LOG_ERROR("overflow file handler is nullptr");
+    return RC::GENERIC_ERROR;
+  }
+  overflow_handler_->get_record(oid, data);
+  return RC::SUCCESS;
+}
+
+RC Table::delete_record(const OID *oid) {
+  if(overflow_handler_ == nullptr) {
+    LOG_ERROR("overflow file handler is nullptr");
+    return RC::GENERIC_ERROR;
+  }
+  overflow_handler_->delete_record(oid);
+  return RC::SUCCESS;
+}
+
+RC Table::update_record(const char *data, int data_len, const OID *old_oid, OID *new_oid) {
+  if(overflow_handler_ == nullptr) {
+    LOG_ERROR("overflow file handler is nullptr");
+    return RC::GENERIC_ERROR;
+  }
+
+  if(old_oid) overflow_handler_->update_record(data, data_len, old_oid, new_oid);
+  else overflow_handler_->insert_record(data, data_len, new_oid);
+
+  return RC::SUCCESS;
 }
 
 RC Table::commit_delete(Trx *trx, const RID &rid) {
@@ -840,6 +976,15 @@ RC Table::commit_delete(Trx *trx, const RID &rid) {
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to delete indexes of record(rid=%d.%d). rc=%d:%s",
               rid.page_num, rid.slot_num, rc, strrc(rc));// TODO panic?
+  }
+
+  Bitmap bitmap(record.data, RECORD_BITMAP_BITS);
+  for(int i = 0; i < table_meta_.field_num(); i++) {
+    if(table_meta_.field(i)->type() == TEXTS && !bitmap.get_bit(i)) {
+      LOG_WARN("delete overflow page");
+      OID oid = *(OID*)(record.data+table_meta_.field(i)->offset());
+      rc = overflow_handler_->delete_record(&oid);
+    } 
   }
 
   rc = record_handler_->delete_record(&rid);

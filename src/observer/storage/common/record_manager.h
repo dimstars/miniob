@@ -23,7 +23,14 @@
 
 typedef int SlotNum;
 struct PageHeader;
+struct OFPageHeader;
 class ConditionFilter;
+
+// text类型在record的存放内容
+struct OID{
+  int len;
+  PageNum first_page_num;
+};
 
 struct RID 
 {
@@ -88,7 +95,32 @@ private:
   int              file_id_;
   BPPageHandle     page_handle_;
   PageHeader    *  page_header_;
-  char *           bitmap_;
+  char *           bitmap_;       // 每个普通page内的bitmap
+};
+
+class OverflowPageHandler {
+public:
+  OverflowPageHandler();
+  ~OverflowPageHandler();
+
+  RC init(DiskBufferPool &buffer_pool, int file_id, PageNum page_num);
+  RC deinit();
+
+  RC insert_record(const char *data, int data_len, PageNum next_page_num);
+  RC update_record();
+
+  RC delete_record();
+
+  RC get_record(char * &data);
+
+  PageNum get_page_num() const;
+  PageNum get_next_page_num() const;
+
+private:
+  DiskBufferPool * disk_buffer_pool_;
+  int              file_id_;
+  BPPageHandle     page_handle_;    
+  OFPageHeader   * page_header_;
 };
 
 class RecordFileHandler {
@@ -145,6 +177,49 @@ private:
   int                 file_id_;                    // 参考DiskBufferPool中的fileId
 
   RecordPageHandler   record_page_handler_;        // 目前只有insert record使用
+};
+
+class OverflowFileHandler {
+public:
+  OverflowFileHandler();
+  RC init(DiskBufferPool &buffer_pool, int file_id);
+  void close();
+
+  /**
+   * 更新指定文件中的记录，rec指向的记录结构中的rid字段为要更新的记录的标识符，
+   * pData字段指向新的记录内容
+   * @param rec
+   * @return
+   */
+  RC update_record(const char *data, int data_len, const OID *old_oid, OID *new_oid);
+
+  /**
+   * 从指定文件中删除标识符为rid的记录
+   * @param rid
+   * @return
+   */
+  RC delete_record(const OID *rid);
+
+  /**
+   * 插入一个新的记录到指定文件中，pData为指向新纪录内容的指针，返回该记录的标识符rid
+   * @param data
+   * @param rid
+   * @return
+   */
+  RC insert_record(const char *data, int data_len, OID *oid);
+
+  /**
+   * 获取指定文件中标识符为rid的记录内容到rec指向的记录结构中
+   * @param rid
+   * @param rec
+   * @return
+   */
+  RC get_record(const OID *oid, char *data);
+
+
+private:
+  DiskBufferPool  *   disk_buffer_pool_;
+  int                 file_id_;                    // 参考DiskBufferPool中的fileId
 };
 
 class RecordFileScanner 

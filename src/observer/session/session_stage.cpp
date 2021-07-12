@@ -111,7 +111,7 @@ void SessionStage::callback_event(StageEvent *event, CallbackContext *context) {
   LOG_TRACE("Enter\n");
 
   SessionEvent *sev = dynamic_cast<SessionEvent *>(event);
-
+  // TODO 优化超长字段的返回
   const char *response = sev->get_response();
   int len = sev->get_response_len();
   if (len <= 0) {

@@ -68,6 +68,7 @@ public:
   int index_num() const;
 
   int record_size() const;
+  bool overflow_exist() const;
 
 public:
   int  serialize(std::ostream &os) const override;
@@ -84,6 +85,7 @@ private:
   std::vector<IndexMeta>  indexes_;
 
   int  record_size_ = 0;
+  bool  overflow_exist_ = 0;
 
   static std::vector<FieldMeta> sys_fields_;
 };

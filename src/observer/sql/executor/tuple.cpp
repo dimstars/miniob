@@ -18,6 +18,7 @@
 //
 
 #include "sql/executor/tuple.h"
+#include "storage/common/record_manager.h"
 #include "storage/common/table.h"
 #include "common/log/log.h"
 #include "common/lang/bitmap.h"
@@ -424,7 +425,7 @@ const std::vector<Tuple> &TupleSet::tuples() const {
 
 /////////////////////////////////////////////////////////////////////////////
 // 非聚合运算
-static bool normal_tuple_add(const FieldMeta *field_meta, Tuple &tuple, const char *record) {
+static bool normal_tuple_add(const FieldMeta *field_meta, Tuple &tuple, const char *record, Table *table) {
   Bitmap bitmap(const_cast<char*>(record), RECORD_BITMAP_BITS);
   // assert(field_meta != nullptr);
   switch (field_meta->type()) {
@@ -465,6 +466,18 @@ static bool normal_tuple_add(const FieldMeta *field_meta, Tuple &tuple, const ch
       } else {
         unsigned int value = *(unsigned int*)(record + field_meta->offset()); 
         tuple.add(value, DATES);
+      }
+    }
+    break;
+    case TEXTS: {
+      if(bitmap.get_bit(field_meta->index())) {
+        const char *s = "null";
+        tuple.add(s, strlen(s), NULLS);
+      } else {
+        OID oid = *(OID*)(record + field_meta->offset());
+        char *s = new char [oid.len];
+        table->get_record(&oid, s);
+        tuple.add(s, oid.len, CHARS);
       }
     }
     break;
@@ -720,7 +733,7 @@ void TupleRecordConverter::add_record(const char *record) {
       break;
       case NOTHING_A: {
         const FieldMeta *field_meta = table_meta.field(field.field_name());
-        rc = normal_tuple_add(field_meta, tuple, record);
+        rc = normal_tuple_add(field_meta, tuple, record, table_);
       }
       break;
     }

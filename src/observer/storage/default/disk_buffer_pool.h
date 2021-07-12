@@ -37,6 +37,7 @@ typedef int PageNum;
 #define BP_INVALID_PAGE_NUM (-1)
 #define BP_PAGE_SIZE (1 << 12)
 #define BP_PAGE_DATA_SIZE (BP_PAGE_SIZE - sizeof(PageNum))
+#define OF_PAGE_DATA_SIZE (BP_PAGE_DATA_SIZE - sizeof(PageNum)) // page可写数据部分需要减去OFPageHeader(一个page num大小)
 #define BP_FILE_SUB_HDR_SIZE (sizeof(BPFileSubHeader))
 #define BP_BUFFER_SIZE 50
 #define MAX_OPEN_FILE 50
@@ -48,6 +49,8 @@ typedef struct {
 } Page;
 // sizeof(Page) should be equal to BP_PAGE_SIZE
 
+// 第一页是特殊页
+// 包括BPFileSubHeader+Page，Page包括PageNum+一个bitmap
 typedef struct {
   PageNum page_count;
   int allocated_pages;
@@ -78,7 +81,7 @@ public:
   int file_desc;
   Frame *hdr_frame;
   Page *hdr_page;
-  char *bitmap;
+  char *bitmap;   // 第一个page的bitmap作为所有page的bitmap // 每个page的bitmap作为record的bitmap
   BPFileSubHeader *file_sub_header;
 } ;
 

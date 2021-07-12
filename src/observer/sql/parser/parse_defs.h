@@ -44,6 +44,13 @@ typedef enum {
   NO_OP
 } CompOp;
 
+typedef enum {
+  ADD,
+  SUB,
+  MUL,
+  DIV,
+} CalOp;
+
 //属性值类型
 typedef enum { 
   UNDEFINED,
@@ -82,16 +89,27 @@ typedef enum {
   IS_NORMAL
 } NullOp;
 
+typedef struct _CalExp {
+   int       is_attr;
+   RelAttr   attr;
+   Value     value;
+   struct _CalExp *left_exp;
+   struct _CalExp *right_exp;
+   CalOp        com_op;
+} CalExp;
+
 typedef struct _Condition {
   int     left_is_attr;  // TRUE if left-hand side is an attribute
                          // 1时，操作符左边是属性名，0时，是属性值
   Value   left_value;    // left-hand side value if left_is_attr = FALSE
   RelAttr left_attr;     // left-hand side attribute
+  CalExp *left_exp;
   CompOp  comp;          // comparison operator
   int     right_is_attr; // TRUE if right-hand side is an attribute
                          // 1时，操作符右边是属性名，0时，是属性值
   RelAttr right_attr;    // right-hand side attribute if right_is_attr = TRUE 右边的属性
   Value   right_value;   // right-hand side value if right_is_attr = FALSE
+  CalExp *right_exp;
   struct Selects *sub_selects;  // subquery if not null
 } Condition;
 

@@ -304,16 +304,16 @@ RC create_join_condition_filter(const char * db, const Selects &selects, std::ve
   return RC::SUCCESS;
 }
 
-RC check_attr_in_table(std::vector<Table *> tables, const RelAttr &attr, AttrType &type) {
+RC check_attr_in_table(std::vector<Table *> *tables, const RelAttr &attr, AttrType &type) {
   // 无表名，要么是“*”，要么是单表查询
   if (attr.relation_name == nullptr) {
     if (0 == strcmp(attr.attribute_name, "*")) {
       return RC::SUCCESS;
     }
-    if (tables.size() > 1) {
+    if (tables->size() > 1) {
       return RC::SCHEMA_FIELD_NAME_ILLEGAL;
     }
-    const FieldMeta * field =tables[0]->table_meta().field(attr.attribute_name);
+    const FieldMeta * field =tables->at(0)->table_meta().field(attr.attribute_name);
     if (nullptr == field) {
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
@@ -322,13 +322,13 @@ RC check_attr_in_table(std::vector<Table *> tables, const RelAttr &attr, AttrTyp
   // 有表名，表名必须出现在from后面的table列表中
   else {
     int exist = false;
-    for (int j = 0; j < tables.size(); j++) {
-      if (0 == strcmp(tables[j]->name(), attr.relation_name)) {
+    for (int j = 0; j < tables->size(); j++) {
+      if (0 == strcmp(tables->at(j)->name(), attr.relation_name)) {
         if (0 == strcmp(attr.attribute_name, "*")) {
           // 
           return RC::SCHEMA_FIELD_REDUNDAN;
         }
-        const FieldMeta * field = tables[j]->table_meta().field(attr.attribute_name);
+        const FieldMeta * field = tables->at(j)->table_meta().field(attr.attribute_name);
         if (nullptr == field) {
           // 属性不存在
           return RC::SCHEMA_FIELD_NOT_EXIST;
@@ -344,6 +344,33 @@ RC check_attr_in_table(std::vector<Table *> tables, const RelAttr &attr, AttrTyp
     }
   }
   return RC::SUCCESS;
+}
+
+
+//select condition中表达式的元数据校验
+RC check_meta_select_expr(std::vector<Table *> *tables, CalExp *exp){
+  RC rc = RC::SUCCESS;
+  if(!exp)
+    return rc;
+  if(exp->right_exp){
+    rc = check_meta_select_expr(tables, exp->left_exp);
+    if(RC::SUCCESS == rc){
+      rc = check_meta_select_expr(tables, exp->right_exp);
+    }
+  }else if(!exp->left_exp && !exp->right_exp){
+    if(exp->is_attr){
+      AttrType type;
+      rc = check_attr_in_table(tables, exp->attr, type);
+      if(RC::SUCCESS == rc){
+        if(type != INTS && type != FLOATS){
+          rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        }
+      }
+    }
+  }else{
+    rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
+  return rc;
 }
 
 // select命令的元数据校验
@@ -364,7 +391,7 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
   for (int i = 0; i < selects.attr_num; i++) {
     const RelAttr &attr = selects.attributes[i];
     AttrType type;
-    RC rc = check_attr_in_table(tables, attr, type);
+    RC rc = check_attr_in_table(&tables, attr, type);
     if (rc != RC::SCHEMA_FIELD_REDUNDAN && rc != RC::SUCCESS) {
       return rc;
     }
@@ -376,8 +403,15 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
     const Condition &condition = selects.conditions[i];
     AttrType left_type = condition.left_value.type;
     AttrType right_type = condition.right_value.type;
-    if (condition.left_is_attr) {
-      RC rc = check_attr_in_table(tables, condition.left_attr, left_type);
+    if (condition.left_exp){
+      RC rc = check_meta_select_expr(&tables,condition.left_exp);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      left_type = FLOATS;
+    }
+    else if (condition.left_is_attr) {
+      RC rc = check_attr_in_table(&tables, condition.left_attr, left_type);
       if (rc != RC::SUCCESS) {
         return rc;
       }
@@ -401,8 +435,14 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
       continue;
     }
 
-    if (condition.right_is_attr) {
-      RC rc = check_attr_in_table(tables, condition.right_attr, right_type);
+    if (condition.right_exp) {
+      RC rc = check_meta_select_expr(&tables,condition.right_exp);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
+      right_type = FLOATS;
+    }else if (condition.right_is_attr) {
+      RC rc = check_attr_in_table(&tables, condition.right_attr, right_type);
       if (rc != RC::SUCCESS) {
         return rc;
       }

@@ -208,7 +208,7 @@ RC DiskBufferPool::get_this_page(int file_id, PageNum page_num, BPPageHandle *pa
   page_handle->frame = f;
   page_handle->frame->dirty = false;
   page_handle->frame->file_desc = file_handle->file_desc;
-  page_handle->frame->pin_count = 0;
+  page_handle->frame->pin_count = 1;
   page_handle->frame->acc_time = current_time();
   if ((tmp = load_page(page_num, file_handle, page_handle->frame)) !=
       RC::SUCCESS) {

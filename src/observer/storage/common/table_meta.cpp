@@ -129,6 +129,18 @@ const FieldMeta * TableMeta::field(const char *name) const {
   return nullptr;
 }
 
+const FieldMeta * TableMeta::field(const char *name, int len) const {
+  if (nullptr == name) {
+    return nullptr;
+  }
+  for (const FieldMeta &field : fields_) {
+    if (0 == strncmp(field.name(), name, len)) {
+      return &field;
+    }
+  }
+  return nullptr;
+}
+
 const FieldMeta * TableMeta::find_field_by_offset(int offset) const {
   for (const FieldMeta &field : fields_) {
     if (field.offset() == offset) {
@@ -156,11 +168,76 @@ const IndexMeta * TableMeta::index(const char *name) const {
 
 const IndexMeta * TableMeta::find_index_by_field(const char *field) const {
   for (const IndexMeta &index : indexes_) {
-    if (0 == strcmp(index.field(), field)) {
+    if (1 == index.field_num() &&0 == strcmp(index.field(0), field)) {
       return &index;
     }
   }
   return nullptr;
+}
+bool TableMeta::check_index_existance(const char * const *field_names, int field_num){
+  bool flag = false;
+  if(field_names == nullptr || field_num == 0)
+    return false;
+  for (int i = 0; i < indexes_.size() && !flag; ++i){
+    const IndexMeta * index = &indexes_[i];
+    flag = true;
+    if(index->field_num() != field_num){
+      flag = false;
+    }else{
+      for(int index_field = 0; index_field < field_num; ++index_field){
+        if (0 != strcmp(index->field(index_field), field_names[index_field])) {
+          flag = false;
+          break;
+        }
+      }
+    }
+  }
+  return flag;
+}
+
+const IndexMeta * TableMeta::find_index_by_field(std::vector<const char *> *prefix_field_names,std::vector<const char *> *last_field_name) const {
+  int max_prefix = 0;
+  const IndexMeta *idx = nullptr;
+  int prefix = 0;
+  if(prefix_field_names == nullptr)
+    return nullptr;
+  if(prefix_field_names->empty())
+    return nullptr;
+  //TODO：使用哈希表优化匹配
+  for (int i = 0; i < indexes_.size(); ++i){
+    const IndexMeta * index = &indexes_[i];
+    bool flag = false;
+    prefix = index->field_num();
+    for(int index_field = 0; index_field < index->field_num(); ++index_field){
+      flag = false;
+      for(int fname = 0; fname < prefix_field_names->size(); ++fname){
+        if (0 == strcmp(index->field(index_field), prefix_field_names->at(fname))) {
+          flag = true;
+          break;
+        }
+      }
+      if(false == flag){
+        prefix = index_field;
+        if(last_field_name){
+          for(int fname = 0; fname < last_field_name->size(); ++fname){
+            if (0 == strcmp(index->field(index_field), last_field_name->at(fname))) {
+              prefix++;
+              break;
+            }
+          }
+        }
+        break;
+      }
+    }
+    if(prefix > 0){
+      if(max_prefix < prefix || (max_prefix == prefix && idx->field_num() > index->field_num())){
+      //找前缀匹配最长，且key包含的列最少的index
+        idx = index;
+        max_prefix = prefix;
+      }
+    }
+  }
+  return idx;
 }
 
 const IndexMeta * TableMeta::index(int i ) const {

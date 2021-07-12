@@ -170,17 +170,20 @@ RC Table::open(const char *meta_file, const char *base_dir) {
   const int index_num = table_meta_.index_num();
   for (int i = 0; i < index_num; i++) {
     const IndexMeta *index_meta = table_meta_.index(i);
-    const FieldMeta *field_meta = table_meta_.field(index_meta->field());
-    if (field_meta == nullptr) {
-      LOG_PANIC("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
-                name(), index_meta->name(), index_meta->field());
-      return RC::GENERIC_ERROR;
+    std::vector<const FieldMeta *> field_metas;
+    for(int i = 0; i < index_meta->field_num(); ++i){
+      const FieldMeta *field_meta = table_meta_.field(index_meta->field(i));
+      if (field_meta == nullptr) {
+        LOG_PANIC("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
+                  name(), index_meta->name(), index_meta->field(i));
+        return RC::GENERIC_ERROR;
+      }
+      field_metas.push_back(field_meta);
     }
-
     BplusTreeIndex *index = new BplusTreeIndex();
     std::string index_file = index_data_file(base_dir, name(), index_meta->name());
     bool unique = strstr(index_meta->extended_attr(),"unique") != nullptr;
-    rc = index->open(index_file.c_str(), *index_meta, *field_meta, unique);
+    rc = index->open(index_file.c_str(), *index_meta, &field_metas, unique);
     if (rc != RC::SUCCESS) {
       delete index;
       LOG_ERROR("Failed to open index. table=%s, index=%s, file=%s, rc=%d:%s",
@@ -429,11 +432,12 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
     limit = INT_MAX;
   }
 
-  IndexScanner *index_scanner = find_index_for_scan(filter);
+  IndexScanner *index_scanner = find_muti_index_for_scan(filter);
+
   if (index_scanner != nullptr) {
     return scan_record_by_index(trx, index_scanner, filter, limit, context, record_reader);
   }
-
+  LOG_INFO("index not found");
   RC rc = RC::SUCCESS;
   RecordFileScanner scanner;
   rc = scanner.open_scan(*data_buffer_pool_, file_id_, filter);
@@ -486,7 +490,7 @@ RC Table::scan_record_by_index(Trx *trx, IndexScanner *scanner, ConditionFilter 
       LOG_ERROR("Failed to fetch record of rid=%d:%d, rc=%d:%s", rid.page_num, rid.slot_num, rc, strrc(rc));
       break;
     }
-
+    
     if ((trx == nullptr || trx->is_visible(this, &record)) && (filter == nullptr || filter->filter(record))) {
       rc = record_reader(&record, context);
       if (rc != RC::SUCCESS) {
@@ -519,37 +523,47 @@ static RC insert_index_record_reader_adapter(Record *record, void *context) {
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_name, bool unique) {
+RC Table::create_index(Trx *trx, const char *index_name, const char * const *attribute_names, int attribute_num, bool unique) {
   if (index_name == nullptr || common::is_blank(index_name) ||
-      attribute_name == nullptr || common::is_blank(attribute_name)) {
+      attribute_num == 0 || attribute_names == nullptr) {
     return RC::INVALID_ARGUMENT;
   }
-  if (table_meta_.index(index_name) != nullptr ||
-      table_meta_.find_index_by_field((attribute_name))) {
+  for(int i = 0; i < attribute_num; ++i){
+    if(attribute_names[i] == nullptr || common::is_blank(attribute_names[i])){
+      return RC::INVALID_ARGUMENT;
+    }
+  }
+  if (table_meta_.index(index_name) != nullptr) {
     return RC::SCHEMA_INDEX_EXIST;
   }
-
-  const FieldMeta *field_meta = table_meta_.field(attribute_name);
-  if (!field_meta) {
-    return RC::SCHEMA_FIELD_MISSING;
+  bool exist = table_meta_.check_index_existance(attribute_names,attribute_num);
+  if(exist){
+    return RC::SCHEMA_INDEX_EXIST;
   }
-
+  
+  std::vector<const FieldMeta *>field_metas;
+  const FieldMeta *field_meta;
+  for(int i = 0; i < attribute_num; ++i){
+    field_meta = table_meta_.field(attribute_names[i]);
+    if(!field_meta){
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    field_metas.push_back(field_meta);
+  }
   IndexMeta new_index_meta;
-  RC rc = new_index_meta.init(index_name, *field_meta, unique);
+  RC rc = new_index_meta.init(index_name, field_metas, unique, field_metas.size());
   if (rc != RC::SUCCESS) {
     return rc;
   }
-
   // 创建索引相关数据
   BplusTreeIndex *index = new BplusTreeIndex();
   std::string index_file = index_data_file(base_dir_.c_str(), name(), index_name);
-  rc = index->create(index_file.c_str(), new_index_meta, *field_meta, unique);
+  rc = index->create(index_file.c_str(), new_index_meta, &field_metas, unique);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
     return rc;
   }
-
   // 遍历当前的所有数据，插入这个索引
   IndexInserter index_inserter(index);
   rc = scan_record(trx, nullptr, -1, &index_inserter, insert_index_record_reader_adapter);
@@ -557,15 +571,16 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
     // TODO rollback
     delete index;
     LOG_ERROR("Failed to insert index to all records. table=%s, rc=%d:%s", name(), rc, strrc(rc));
+     remove(index_file.c_str());
     return rc;
   }
   indexes_.push_back(index);
-
   TableMeta new_table_meta(table_meta_);
   rc = new_table_meta.add_index(new_index_meta);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to add index (%s) on table (%s). error=%d:%s", index_name, name(), rc, strrc(rc));
-    return rc;
+    remove(index_file.c_str());
+    return rc;;
   }
   // 创建元数据临时文件
   std::string tmp_file = table_meta_file(base_dir_.c_str(), name()) + ".tmp";
@@ -573,10 +588,12 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   fs.open(tmp_file, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
   if (!fs.is_open()) {
     LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", tmp_file.c_str(), strerror(errno));
+    remove(index_file.c_str());
     return RC::IOERR; // TODO 创建索引中途出错，要做还原操作
   }
   if (new_table_meta.serialize(fs) < 0) {
     LOG_ERROR("Failed to dump new table meta to file: %s. sys err=%d:%s", tmp_file.c_str(), errno, strerror(errno));
+    remove(index_file.c_str());
     return RC::IOERR;
   }
   fs.close();
@@ -601,7 +618,7 @@ class RecordUpdater {
 public:
   RecordUpdater(Table &table, Trx *trx, const char *attribute_name, const Value *value) : 
     table_(table), trx_(trx), attribute_name_(attribute_name){
-      index_ = table_.find_index_by_field(attribute_name);
+      table_.find_index_contain_field(attribute_name,index_);
       const FieldMeta *field = table_.table_meta_.field(attribute_name_);
       if(field->type() == INTS && value->type == FLOATS) {
         int data = (int)*(float*)value->data;
@@ -613,7 +630,8 @@ public:
         value_init_null(&value_);
       } else {
         value_.type = value->type;
-        value_.data = strdup((char*)value->data);
+        value_.data = (char*)malloc(field->len());
+        memcpy(value_.data,value->data,field->len());
       }
   }
   ~RecordUpdater(){
@@ -635,28 +653,67 @@ public:
   RC update_record() {
     RC rc = RC::SUCCESS;
     const FieldMeta *field = table_.table_meta_.field(attribute_name_);
-    
-    if(index_){
-      //update有唯一索引的列时，不能超过1个
-      if(strstr(index_->index_meta().extended_attr(),"unique") != nullptr && rids_.size() > 2)
-        return RC::RECORD_DUPLICATE_KEY;
-    }
     Record record;
+    char *record_new = (char*)malloc(sizeof(char) * table_.table_meta().record_size());
+    //更新索引
     for(int i = 0; i < rids_.size(); ++i){
       rc = table_.record_handler_->get_record(&rids_[i],&record);
       if(RC::SUCCESS != rc){
         return rc;
       }
-      //update index
-      if(index_){
-        rc = index_->insert_key((char*)value_.data, &record.rid);
+      memcpy(record_new, record.data, table_.table_meta().record_size());
+      Bitmap bitmap(record_new, RECORD_BITMAP_BITS);
+      if(value_.type == NULLS) {
+        bitmap.set_bit(field->index());
+        // record内的原数据没有清除
+      } else {
+        memcpy(record_new + field->offset(), (char*)value_.data, field->len());
+        if(bitmap.get_bit(field->index())) bitmap.clear_bit(field->index());
+      }
+      for(int j = 0; j < index_.size(); ++j){
+        rc = index_[j]->insert_entry(record_new, &record.rid);
         if(RC::SUCCESS != rc){
-          //update唯一索引的列时，value_和其他记录冲突会报错
+          break;
+        }
+        index_[j]->delete_entry(record.data,&record.rid);
+      }
+      if(RC::SUCCESS != rc)
+        break;
+    }
+    if(RC::SUCCESS != rc){
+      //回滚
+      RC rollback_rc;
+      for(int i = 0; i < rids_.size(); ++i){
+        rollback_rc = table_.record_handler_->get_record(&rids_[i],&record);
+        if(RC::SUCCESS != rollback_rc){
+          LOG_ERROR("fail to rollback update operation");
+          free(record_new);
           return rc;
         }
-        index_->delete_entry(record.data,&record.rid);
+        memcpy(record_new, record.data, table_.table_meta().record_size());
+        Bitmap bitmap(record_new, RECORD_BITMAP_BITS);
+        if(value_.type == NULLS) {
+          bitmap.set_bit(field->index());
+          // record内的原数据没有清除
+        } else {
+          memcpy(record_new + field->offset(), (char*)value_.data, field->len());
+          if(bitmap.get_bit(field->index())) bitmap.clear_bit(field->index());
+        }
+        for(int j = 0; j < index_.size(); ++j){
+          rollback_rc = index_[j]->delete_entry(record_new,&record.rid);
+          if(RC::SUCCESS != rollback_rc){
+             free(record_new);
+            return rc;
+          }
+          index_[j]->insert_entry(record.data, &record.rid);
+        }
       }
+      free(record_new);
+      return rc;
+    }
+    for(int i = 0; i < rids_.size(); ++i){
       //update data
+      rc = table_.record_handler_->get_record(&rids_[i],&record);
       Bitmap bitmap(record.data, RECORD_BITMAP_BITS);
       if(value_.type == NULLS) {
         bitmap.set_bit(field->index());
@@ -665,14 +722,13 @@ public:
         memcpy(record.data + field->offset(), (char*)value_.data, field->len());
         if(bitmap.get_bit(field->index())) bitmap.clear_bit(field->index());
       }
-      
       rc = table_.update_record(trx_, &record);
       if (rc == RC::SUCCESS) {
         updated_count_++;
       }
     }
-
-    
+    free(record_new);
+    record_new = nullptr;
     return rc;
   }
 
@@ -686,7 +742,7 @@ private:
   const char *attribute_name_;
   Value value_;
   int updated_count_ = 0;
-  Index *index_;
+  std::vector<Index *>index_;
   std::vector<RID> rids_;
 };
 
@@ -829,13 +885,30 @@ RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error
   return rc;
 }
 
-Index *Table::find_index_by_field(const char *field_name) const {
+void Table::find_index_contain_field(const char *field_name, std::vector<Index*> & indexes) const {
   for (Index *index: indexes_) {
-    if (0 == strcmp(index->index_meta().field(), field_name)) {
-      return index;
+    int num = index->index_meta().field_num();
+    for(int i = 0; i < num; ++ i){
+      if (0 == strcmp(index->index_meta().field(i), field_name)) {
+        indexes.push_back(index);
+        break;
+      }
     }
   }
-  return nullptr;
+}
+
+Index *Table::find_index_by_field(const char *field_name) const {
+  Index * idx = nullptr;
+  for (Index *index: indexes_) {
+    if (0 == strcmp(index->index_meta().field(0), field_name)) {
+      if(!idx)
+        idx = index;
+      else if(index->index_meta().field_num() < idx->index_meta().field_num()){
+        idx = index;
+      }
+    }
+  }
+  return idx;
 }
 
 Index *Table::find_index(const char *index_name) const {
@@ -845,6 +918,102 @@ Index *Table::find_index(const char *index_name) const {
     }
   }
   return nullptr;
+}
+
+IndexScanner *Table::find_muti_index_for_scan(const ConditionFilter *continditionfilter){
+  std::vector<const char *> prefix_meta_names;//equal_to
+  std::vector<const char *> prefix_value_cond_descs;
+  std::vector<AttrType> prefix_value_types;
+  std::vector<const char *> last_meta_names; //greater_than greater_equal
+  std::vector<const char *> last_value_cond_descs;
+  std::vector<AttrType> last_value_types;
+  std::vector<CompOp> last_ops;
+  std::vector<const char *> value_cond_descs;
+  std::vector<AttrType> value_types;
+  const CompositeConditionFilter *composite_condition_filter = dynamic_cast<const CompositeConditionFilter *>(continditionfilter);
+  if (composite_condition_filter == nullptr) {
+    return nullptr;
+  }
+  CompOp op;
+  std::vector<DefaultConditionFilter> filters;
+  for(int i = 0; i < composite_condition_filter->filter_num(); ++i){
+    const DefaultConditionFilter * f = dynamic_cast<const DefaultConditionFilter *>(&composite_condition_filter->filter(i));
+    if(f == nullptr){
+      continue;
+    }
+    op = f->comp_op();
+    if(op == NO_OP || op == LESS_EQUAL ||op == LESS_THAN){
+      continue;
+    }
+    filters.push_back(*f);
+    const DefaultConditionFilter & filter = filters.back();
+    const ConDesc *field_cond_desc = nullptr;
+    const ConDesc *value_cond_desc = nullptr;
+    AttrType value_type = UNDEFINED;
+    if (filter.left().is_attr && !filter.right().is_attr) {
+      field_cond_desc = &filter.left();
+      value_cond_desc = &filter.right();
+      value_type = filter.right_type();
+    } else if (filter.right().is_attr && !filter.left().is_attr) {
+      field_cond_desc = &filter.right();
+      value_cond_desc = &filter.left();
+      value_type = filter.left_type();
+    }
+    if (field_cond_desc == nullptr || value_cond_desc == nullptr) {
+      return nullptr;
+    }
+    const FieldMeta *field_meta = table_meta_.find_field_by_offset(field_cond_desc->attr_offset);
+    if (nullptr == field_meta) {
+      LOG_PANIC("Cannot find field by offset %d. table=%d, condition filter=%s",
+                field_cond_desc->attr_offset, name(), ""); // TODO condition filter to string
+      return nullptr;
+    }
+    if(op == EQUAL_TO){
+      prefix_meta_names.push_back(field_meta->name());
+      prefix_value_cond_descs.push_back((const char*)(value_cond_desc->value));
+      prefix_value_types.push_back(value_type);
+    }else if(op == GREAT_THAN || op == GREAT_EQUAL){
+      last_meta_names.push_back(field_meta->name());
+      last_value_cond_descs.push_back((const char*)(value_cond_desc->value));
+      last_value_types.push_back(value_type);
+      last_ops.push_back(op);
+    }
+  }
+
+  const IndexMeta *index_meta = table_meta_.find_index_by_field(&prefix_meta_names,&last_meta_names);
+  if (nullptr == index_meta) {
+    return find_index_for_scan(continditionfilter);
+  }
+
+  Index *index = find_index(index_meta->name());
+  if (nullptr == index) {
+    return nullptr;
+  }
+  LOG_INFO("use index : %s", index->index_meta().name());
+  op = EQUAL_TO;
+  for(int i = 0 ; i < index_meta->field_num(); ++i){
+    bool flag = false;
+    for(int p = 0; p < prefix_meta_names.size(); ++p){
+      if(0 == strcmp(prefix_meta_names[p],index_meta->field(i))){
+        value_cond_descs.push_back(prefix_value_cond_descs[p]);
+        value_types.push_back(prefix_value_types[p]);
+        flag = true;
+        break;
+      }
+    }
+    if(!flag){
+      for(int l = 0; l < last_meta_names.size(); ++l){
+        if(0 == strcmp(last_meta_names[l],index_meta->field(i))){
+          value_cond_descs.push_back(last_value_cond_descs[l]);
+          value_types.push_back(last_value_types[l]);
+          op = last_ops[l];
+          break;
+        }
+      }
+      break;
+    }
+  }
+  return index->create_scanner(op, &value_cond_descs, &value_types);
 }
 
 IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
@@ -879,6 +1048,8 @@ IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
       case EQUAL_TO:
       case NOT_EQUAL:
         op = filter.comp_op();
+      default:
+        return nullptr;
       break;
     }
   }
@@ -902,8 +1073,12 @@ IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
   if (nullptr == index) {
     return nullptr;
   }
-
-  return index->create_scanner(op, (const char *)value_cond_desc->value, value_type);
+  LOG_INFO("use index : %s", index->index_meta().name());
+  std::vector<const char*> values;
+  values.push_back((const char *)(value_cond_desc->value));
+  std::vector<AttrType> types;
+  types.push_back(value_type);
+  return index->create_scanner(op, &values, &types);
 }
 
 IndexScanner *Table::find_index_for_scan(const ConditionFilter *filter) {

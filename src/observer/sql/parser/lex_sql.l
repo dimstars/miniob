@@ -36,8 +36,8 @@ QUOTE   [\'\"]
 {WS}                    /* ignore whitespace */;
 \n																						 ;			
 
-[\-]?{DIGIT}+                            { yylval->number=atoi(yytext); position=strdup(yytext); RETURN_TOKEN(NUMBER);}
-[\-]?{DIGIT}+{DOT}{DIGIT}+               { yylval->floats=(float)(atof(yytext)); position=strdup(yytext); RETURN_TOKEN(FLOAT);}
+{DIGIT}+                                 { yylval->number=atoi(yytext); position=strdup(yytext); RETURN_TOKEN(NUMBER);}
+{DIGIT}+{DOT}{DIGIT}+                    { yylval->floats=(float)(atof(yytext)); position=strdup(yytext); RETURN_TOKEN(FLOAT);}
 
 ";"                                      RETURN_TOKEN(SEMICOLON);
 {DOT}                                    RETURN_TOKEN(DOT);
@@ -97,6 +97,9 @@ QUOTE   [\'\"]
 "<"                                      position=strdup(yytext);RETURN_TOKEN(LT);
 ">="                                     position=strdup(yytext);RETURN_TOKEN(GE);
 ">"                                      position=strdup(yytext);RETURN_TOKEN(GT);
+"+"                                      position=strdup(yytext);RETURN_TOKEN(PLUS_S);
+"-"                                      position=strdup(yytext);RETURN_TOKEN(MINUS_S);
+"/"                                      position=strdup(yytext);RETURN_TOKEN(SLASH);
 
 {QUOTE}[\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\-][\40\42\47 0-1][\40\42\47 0-9][\-][\40\42\47 0-3][\40\42\47 0-9]{QUOTE} {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(DATE);}
 {QUOTE}[\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\-][\40\42\47 0-9][\-][\40\42\47 0-3][\40\42\47 0-9]{QUOTE} {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(DATE);}

@@ -47,10 +47,11 @@ typedef enum {
 } CompOp;
 
 typedef enum {
-  ADD,
-  SUB,
-  MUL,
+  PLUS,
+  MINUS,
+  MULT,
   DIV,
+  NO_CAL_OP
 } CalOp;
 
 //属性值类型
@@ -85,13 +86,13 @@ typedef struct _Value {
   void *   data;    // value
 } Value;
 
-typedef struct _CalExp {
-   int       is_attr;
-   RelAttr   attr;
-   Value     value;
-   struct _CalExp *left_exp;
-   struct _CalExp *right_exp;
-   CalOp        com_op;
+typedef struct CalExp {
+  int            is_attr;
+  RelAttr        attr;
+  Value          value;
+  struct CalExp *left_exp;
+  struct CalExp *right_exp;
+  CalOp          cal_op;
 } CalExp;
 
 typedef struct _Condition {
@@ -253,6 +254,8 @@ void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr
                     int right_is_attr, RelAttr *right_attr, Value *right_value);
 void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects);
 void condition_destroy(Condition *condition);
+void expression_condition_init(Condition *condition, CompOp comp, CalExp *left_exp, CalExp *right_exp);
+CalExp * expression_create(RelAttr *attr, Value *value, CalExp *left_exp, CalExp *right_exp, CalOp cal_op);
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, int length, int nullable);
 void attr_info_destroy(AttrInfo *attr_info);

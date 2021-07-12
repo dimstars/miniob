@@ -268,6 +268,31 @@ void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *
   condition->sub_selects = selects;
 }
 
+void expression_condition_init(Condition *condition, CompOp comp, CalExp *left_exp, CalExp *right_exp) {
+  condition->comp = comp;
+  condition->left_exp = left_exp;
+  condition->right_exp = right_exp;
+  condition->sub_selects = nullptr;
+}
+
+CalExp * expression_create(RelAttr *attr, Value *value, CalExp *left_exp, CalExp *right_exp, CalOp cal_op) {
+  CalExp *exp = (CalExp *)malloc(sizeof(CalExp));
+  memset(exp, 0, sizeof(CalExp));
+  if (attr != nullptr) {
+    exp->is_attr = 1;
+    exp->attr = *attr;
+  }
+  else if (value != nullptr) {
+    exp->value = *value;
+  }
+  else {
+    exp->left_exp = left_exp;
+    exp->right_exp = right_exp;
+    exp->cal_op = cal_op;
+  }
+  return exp;
+}
+
 void condition_destroy(Condition *condition) {
   if (condition->left_is_attr) {
     relation_attr_destroy(&condition->left_attr);

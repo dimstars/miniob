@@ -19,8 +19,10 @@
 
 #include "storage/common/index.h"
 
-RC Index::init(const IndexMeta &index_meta, const FieldMeta &field_meta) {
+RC Index::init(const IndexMeta &index_meta, const std::vector<const FieldMeta*> *field_meta) {
   index_meta_ = index_meta;
-  field_meta_ = field_meta;
+  for(int i = 0; i < field_meta->size(); ++i){
+    field_meta_.push_back(*(*field_meta)[i]);
+  }
   return RC::SUCCESS;
 }

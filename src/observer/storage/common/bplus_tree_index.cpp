@@ -19,12 +19,13 @@
 
 #include "storage/common/bplus_tree_index.h"
 #include "common/log/log.h"
+#include "common/lang/bitmap.h"
 
 BplusTreeIndex::~BplusTreeIndex() noexcept {
   close();
 }
 
-RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique) {
+RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta*> *field_meta, bool unique) {
   if (inited_) {
     return RC::RECORD_OPENNED;
   }
@@ -34,14 +35,14 @@ RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, co
     return rc;
   }
 
-  rc = index_handler_.create(file_name, field_meta.type(), field_meta.len(), unique);
+  rc = index_handler_.create(file_name, field_meta, unique);
   if (RC::SUCCESS == rc) {
     inited_ = true;
   }
   return rc;
 }
 
-RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique) {
+RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta *> *field_meta, bool unique) {
   if (inited_) {
     return RC::RECORD_OPENNED;
   }
@@ -66,18 +67,36 @@ RC BplusTreeIndex::close() {
 }
 
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid) {
-  return index_handler_.insert_entry(record + field_meta_.offset(), rid);
-}
-
-RC BplusTreeIndex::insert_key(const char *pkey, const RID *rid) {
-  return index_handler_.insert_entry(pkey, rid);
+  std::vector<const char *> values;
+  char bitmap_copy[RECORD_BITMAP];
+  memcpy(bitmap_copy,record,RECORD_BITMAP);
+  common::Bitmap bitmap(bitmap_copy,RECORD_BITMAP_BITS);
+  for(int i = 0; i < field_meta_.size(); ++i){
+    if(bitmap.get_bit(field_meta_[i].index())){
+      values.push_back(nullptr);
+    }else{
+      values.push_back(record + field_meta_[i].offset());
+    }
+  }
+  return index_handler_.insert_entry(&values, rid);
 }
 
 RC BplusTreeIndex::delete_entry(const char *record, const RID *rid) {
-  return index_handler_.delete_entry(record + field_meta_.offset(), rid);
+  std::vector<const char *> values;
+  char bitmap_copy[RECORD_BITMAP];
+  memcpy(bitmap_copy,record,RECORD_BITMAP);
+  common::Bitmap bitmap(bitmap_copy,RECORD_BITMAP_BITS);
+  for(int i = 0; i < field_meta_.size(); ++i){
+    if(bitmap.get_bit(field_meta_[i].index())){
+      values.push_back(nullptr);
+    }else{
+      values.push_back(record + field_meta_[i].offset());
+    }
+  }
+  return index_handler_.delete_entry(&values, rid);
 }
 
-IndexScanner *BplusTreeIndex::create_scanner(CompOp comp_op, const char *value, AttrType type) {
+IndexScanner *BplusTreeIndex::create_scanner(CompOp comp_op, std::vector<const char *> *value, std::vector<AttrType> *type) {
   BplusTreeScanner *bplus_tree_scanner = new BplusTreeScanner(index_handler_);
   RC rc = bplus_tree_scanner->open(comp_op, value, type);
   if (rc != RC::SUCCESS) {

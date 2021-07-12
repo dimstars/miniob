@@ -28,18 +28,17 @@ public:
   BplusTreeIndex() = default;
   virtual ~BplusTreeIndex() noexcept;
 
-  RC create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique = false);
-  RC open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta, bool unique = false);
+  RC create(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta*> *field_meta, bool unique = false);
+  RC open(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta*> *field_meta, bool unique = false);
   RC close();
 
   RC insert_entry(const char *record, const RID *rid) override;
-  RC insert_key(const char *pkey, const RID *rid) override;
   RC delete_entry(const char *record, const RID *rid) override;
 
-  IndexScanner *create_scanner(CompOp comp_op, const char *value, AttrType type) override;
+  IndexScanner *create_scanner(CompOp comp_op, std::vector<const char *> *value, std::vector<AttrType> *type) override;
 
   RC sync() override;
-
+  RC insert_entry_empty(int len,const char *record);
 private:
   bool inited_ = false;
   BplusTreeHandler index_handler_;

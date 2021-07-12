@@ -33,7 +33,8 @@
 
 Db::~Db() {
   for (auto &iter : opened_tables_) {
-    delete iter.second;
+    if(iter.second)
+      delete iter.second;
   }
   LOG_INFO("Db has been closed: %s", name_.c_str());
 }

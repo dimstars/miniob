@@ -259,6 +259,14 @@ void condition_init(Condition *condition, CompOp comp,
     condition->right_value = *right_value;
   }
 }
+
+void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects) {
+  condition->left_is_attr = true;
+  condition->left_attr = *left_attr;
+  condition->comp = WHERE_IN;
+  condition->sub_selects = selects;
+}
+
 void condition_destroy(Condition *condition) {
   if (condition->left_is_attr) {
     relation_attr_destroy(&condition->left_attr);

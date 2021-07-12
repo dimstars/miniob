@@ -35,7 +35,7 @@ DefaultConditionFilter::~DefaultConditionFilter() {
   //TODO 释放ConDesc里的value.data空间
 }
 
-RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op) {
+RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op, TupleSet *tuple_set) {
   // 左边一定是非NULL
   if (type_left < CHARS || type_left > DATES) {
     LOG_ERROR("Invalid condition with unsupported left attribute type: %d", type_left);
@@ -56,10 +56,11 @@ RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrT
   type_left_ = type_left;
   type_right_ = type_right;
   comp_op_ = comp_op;
+  tuple_set_ = tuple_set;
   return RC::SUCCESS;
 }
 
-RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
+RC DefaultConditionFilter::init(Table &table, const Condition &condition, TupleSet *tuple_set) {
   const TableMeta &table_meta = table.table_meta();
   ConDesc left;
   ConDesc right;
@@ -131,7 +132,8 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
   //   return RC::SCHEMA_CONDITION_FILTER_ALL;
   // } 
 
-  if(left.is_attr && !left.nullable && condition.comp == NOT_EQUAL && !right.is_attr && type_right == NULLS) {
+  if (condition.sub_selects != nullptr) {
+  } else if(left.is_attr && !left.nullable && condition.comp == NOT_EQUAL && !right.is_attr && type_right == NULLS) {
     LOG_WARN("Field left is not nullable. so filter nothing");
     return RC::SCHEMA_CONDITION_INVALID;
   } else if((type_left == FLOATS && type_right == INTS) 
@@ -145,7 +147,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition) {
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 
-  return init(left, right, type_left, type_right, condition.comp);
+  return init(left, right, type_left, type_right, condition.comp, tuple_set);
 }
 
 bool DefaultConditionFilter::filter(const Record &rec) const {
@@ -153,6 +155,41 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
   char *right_value = nullptr;
 
   Bitmap bitmap(rec.data, RECORD_BITMAP_BITS);
+
+  // 如果是子查询条件
+  if (comp_op_ == WHERE_IN) {
+    if (tuple_set_->size() == 0) {
+      return false;
+    }
+    left_value = (char *)(rec.data + left_.attr_offset);
+    TupleValue *left_tuple_value;
+    switch (type_left_) {
+      case CHARS:
+        left_tuple_value = new StringValue(left_value, type_left_);
+        break;
+      case INTS:
+        left_tuple_value = new IntValue(*(int*)left_value, type_left_);
+        break;
+      case FLOATS:
+        left_tuple_value = new FloatValue(*(float*)left_value, type_left_);
+        break;
+      case DATES:
+        left_tuple_value = new DateValue(*(unsigned int*)left_value, type_left_);
+        break;
+      case NULLS:
+        left_tuple_value = new StringValue(left_value, type_left_);
+        break;
+      default:
+        return false;
+    }
+    for (int i = 0; i < tuple_set_->size(); i++) {
+      const TupleValue &tuple_value = tuple_set_->tuples()[i].get(0);
+      if (type_left_ == tuple_value.get_type() && left_tuple_value->compare(tuple_value) == 0) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // 首先处理任何出现null的情况
   if (left_.is_attr && !right_.is_attr && type_right_ == NULLS) { // WARN 一般是不会出现左右都是属性的情况
@@ -170,6 +207,7 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
       case LESS_THAN:
       case GREAT_EQUAL:
       case GREAT_THAN:
+      case WHERE_IN:
       case NO_OP:
         LOG_PANIC("Never should print this.");
     }
@@ -488,7 +526,7 @@ RC CompositeConditionFilter::init(Table &table, const Condition *conditions, int
   ConditionFilter **condition_filters = new ConditionFilter *[condition_num];
   for (int i = 0; i < condition_num; i++) {
     DefaultConditionFilter *default_condition_filter = new DefaultConditionFilter();
-    rc = default_condition_filter->init(table, conditions[i]);
+    rc = default_condition_filter->init(table, conditions[i], NULL);
     if (rc != RC::SUCCESS) {
       delete default_condition_filter;
       for (int j = i - 1; j >= 0; j--) {

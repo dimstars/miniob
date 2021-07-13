@@ -97,6 +97,7 @@ public:
   virtual bool filter(const Record &rec) const;
   bool filter(TupleSchema &schema, const Tuple &tuple) const;
 
+  double CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple) const;
 public:
   const ConDesc &left() const {
     return left_;
@@ -119,6 +120,8 @@ private:
   std::string table_right_;
   std::string field_left_;
   std::string field_right_;
+  CalExp      *left_exp_;
+  CalExp      *right_exp_;
   CompOp      comp_op_;
 };
 

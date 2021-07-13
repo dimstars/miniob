@@ -166,26 +166,18 @@ int CompareKey(const char *pdata, const char *pkey, AttrType data_type, AttrType
   int i1,i2;
   float f1,f2;
   const char *s1,*s2;
+  unsigned int d1,d2;
+  int cmp = 0;
   switch(data_type){
     case INTS: {
       if(key_type == INTS) {
         i1 = *(int *) pdata;
         i2 = *(int *) pkey;
-        if (i1 > i2)
-          return 1;
-        if (i1 < i2)
-          return -1;
-        if (i1 == i2)
-          return 0;
+        cmp = i1 - i2;
       } else {
         f1 = (float)*(int *) pdata;
         f2 = *(float *) pkey;
-        if (f1 > f2)
-          return 1;
-        if (f1 < f2)
-          return -1;
-        if (f1 == f2)
-          return 0;
+        cmp = f1 - f2;
       }
     }
       break;
@@ -193,35 +185,37 @@ int CompareKey(const char *pdata, const char *pkey, AttrType data_type, AttrType
       if(key_type == FLOATS) {
         f1 = *(float *) pdata;
         f2 = *(float *) pkey;
-        if (f1 > f2)
-          return 1;
-        if (f1 < f2)
-          return -1;
-        if (f1 == f2)
-          return 0;
+        cmp = f1 - f2;
       } else {
         f1 = *(float *) pdata;
         f2 = (float)*(int *) pkey;
-        if (f1 > f2)
-          return 1;
-        if (f1 < f2)
-          return -1;
-        if (f1 == f2)
-          return 0;
+        cmp = f1 - f2;
       }
     }
       break;
     case CHARS: {
       s1 = pdata;
       s2 = pkey;
-      return strncmp(s1, s2, attr_length);
+      cmp = strncmp(s1, s2, attr_length);
+    }
+      break;
+    case DATES: {
+      d1 = *(unsigned int*)pdata;
+      d2 = *(unsigned int*)pkey;
+      cmp = d1 - d2;
     }
       break;
     default:{
       LOG_PANIC("Unknown attr type: %d", data_type);
+      return -2;//This means error happens
     }
   }
-  return -2;//This means error happens
+  if(cmp > 0)
+    return 1;
+  else if(cmp == 0)
+    return 0;
+  else
+    return -1;
 }
 
 int CompareMutiKey(const AttrType *data_type, const AttrType *key_type, const int *field_len, int field_num, const char *pdata, const char *pkey){
@@ -1928,6 +1922,7 @@ RC BplusTreeScanner::get_next_idx_in_memory(RID *rid) {
 bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
   int i1=0,i2=0;
   float f1=0,f2=0;
+  unsigned int d1=0,d2=0;
   const char *s1=nullptr,*s2=nullptr;
 
   if(comp_op_ == NO_OP){
@@ -1946,57 +1941,54 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     const char *ptmp_value = value_ + offset;
     if(i == attr_num_ - 1)
       op = comp_op_;
+    int cmp = 0;
+    int attr_length = index_handler_.file_header_.field_len[i];
     switch(attr_type){
       case INTS:
         if(type == INTS) {
           i1=*(int *)ptmp_key;
           i2=*(int *)ptmp_value;
+          cmp = i1 - i2;
         } else {
           f1=(float)*(int *)ptmp_key;
           f2=*(float *)ptmp_value;
+          cmp = f1 - f2;
         }
         break;
       case FLOATS:
         if(type == FLOATS) {
           f1=*(float *)ptmp_key;
           f2=*(float *)ptmp_value;
+          cmp = f1 - f2;
         } else {
           f1=*(int *)ptmp_key;
           f2=(float)*(int *)ptmp_value;
+          cmp = f1 - f2;
         }
         break;
       case CHARS:
         s1=ptmp_key;
         s2=ptmp_value;
+        cmp = strncmp(s1,s2,attr_length);
+        break;
+      case DATES:
+        d1=*(unsigned int*)ptmp_key;
+        d2=*(unsigned int*)ptmp_value;
+        cmp = d1 - d2;
         break;
       default:
         LOG_PANIC("Unknown attr type: %d", attr_type);
+        return false;
     }
     bool flag = false;
-    int attr_length = index_handler_.file_header_.field_len[i];
     switch(op){
       case EQUAL_TO:
-        if((mask & key_map) != (mask & val_map)){
+        if((mask & key_map) == 0){
+          flag = ((mask & val_map) == 0) ? true:false;
+        }else if((mask & val_map) == 0){
           flag = false;
-        }else if((mask & key_map) == 0){
-          flag = true;
         }else{
-          switch(attr_type){
-            case INTS:
-              if(type == INTS)
-                flag=(i1==i2);
-              else 
-                flag=(f1==f2);
-              break;
-            case FLOATS:
-              flag=(f1==f2);
-              break;
-            case CHARS:
-              flag=(strncmp(s1,s2,attr_length)==0);
-              break;
-            default:
-              LOG_PANIC("Unknown attr type: %d", attr_type);
-          }
+          flag = (cmp == 0);
         }
         break;
       case LESS_THAN:
@@ -2005,22 +1997,7 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
         }else if(((mask & key_map)) == 0){
           flag = false;
         }else{
-          switch(attr_type){
-            case INTS:
-              if(type == INTS)
-                flag=(i1<i2);
-              else 
-                flag=(f1<f2);
-              break;
-            case FLOATS:
-              flag=(f1<f2);
-              break;
-            case CHARS:
-              flag=(strncmp(s1,s2,attr_length)<0);
-              break;
-            default:
-              LOG_PANIC("Unknown attr type: %d", attr_type);
-          }
+          flag = (cmp < 0);
         }
         break;
       case GREAT_THAN:
@@ -2029,22 +2006,7 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
         }else if((mask & key_map) == 0){
           flag = false;
         }else{
-          switch(attr_type){
-            case INTS:
-              if(type == INTS)
-                flag=(i1>i2);
-              else 
-                flag=(f1>f2);
-              break;
-            case FLOATS:
-              flag=(f1>f2);
-              break;
-            case CHARS:
-              flag=(strncmp(s1,s2,attr_length)>0);
-              break;
-            default:
-              LOG_PANIC("Unknown attr type: %d", attr_type);
-          }
+          flag = (cmp > 0);
         }
         break;
       case LESS_EQUAL:
@@ -2053,22 +2015,7 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
         }else if((mask & key_map) == 0){
           flag = true;
         }else{
-          switch(attr_type){
-            case INTS:
-              if(type == INTS)
-                flag=(i1<=i2);
-              else 
-                flag=(f1<=f2);
-              break;
-            case FLOATS:
-              flag=(f1<=f2);
-              break;
-            case CHARS:
-              flag=(strncmp(s1,s2,attr_length)<=0);
-              break;
-            default:
-              LOG_PANIC("Unknown attr type: %d", attr_type);
-          }
+          flag = cmp <= 0;
         }
         break;
       case GREAT_EQUAL:
@@ -2077,22 +2024,7 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
         }else if((mask & key_map) == 0){
           flag = true;
         }else{
-          switch(attr_type){
-            case INTS:
-              if(type == INTS)
-                flag=(i1>=i2);
-              else 
-                flag=(f1>=f2);
-              break;
-            case FLOATS:
-              flag=(f1>=f2);
-              break;
-            case CHARS:
-              flag=(strncmp(s1,s2,attr_length)>=0);
-              break;
-            default:
-              LOG_PANIC("Unknown attr type: %d", attr_type);
-          }
+          flag = cmp >= 0;
         }
         break;
       case NOT_EQUAL:
@@ -2101,26 +2033,12 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
         }else if((mask & key_map) == 0){
           flag = false;
         }else{
-          switch(attr_type){
-            case INTS:
-              if(type == INTS)
-                flag=(i1!=i2);
-              else 
-                flag=(f1!=f2);
-              break;
-            case FLOATS:
-              flag=(f1!=f2);
-              break;
-            case CHARS:
-              flag=(strncmp(s1,s2,attr_length)!=0);
-              break;
-            default:
-              LOG_PANIC("Unknown attr type: %d", attr_type);
-          }
+          flag = cmp != 0;
         }
         break;
       default:
         LOG_PANIC("Unknown comp op: %d", comp_op_);
+        return false;
     }
     result = result & flag;
     if(!result){

@@ -258,6 +258,7 @@ void condition_init(Condition *condition, CompOp comp,
   } else {
     condition->right_value = *right_value;
   }
+  condition->sub_selects = nullptr;
 }
 
 void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects) {

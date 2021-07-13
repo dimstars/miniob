@@ -275,7 +275,7 @@ attr_def:
     ID_get type lbrace number rbrace 
 		{
 			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, $4, 1);
+			attr_info_init(&attribute, CONTEXT->id, $2, $4, 0);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name =(char*)malloc(sizeof(char)); // TODO FATAL
 			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
@@ -301,7 +301,7 @@ attr_def:
 		{
 			AttrInfo attribute;
 			// text : 4B len + 4B page num or 8B ptr
-			attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 8 : 4, 1);
+			attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 8 : 4, 0);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
 			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
@@ -412,6 +412,9 @@ value:
 			$1 = substr($1,1,strlen($1)-2);
 			value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
+	|NULL_T {
+			value_init_null(&CONTEXT->values[CONTEXT->value_length++]);
+		}
     ;
     
 delete:		/*  delete 语句的语法解析树*/
@@ -433,16 +436,6 @@ update:			/*  update 语句的语法解析树*/
 					CONTEXT->conditions, CONTEXT->condition_length);
 			CONTEXT->condition_length = 0;
 		}
-	| UPDATE ID SET ID EQ NULL_T where SEMICOLON
-		{
-			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
-			Value *value = &CONTEXT->null_value;
-			value_init_null(value);
-			updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
-					CONTEXT->conditions, CONTEXT->condition_length);
-			CONTEXT->condition_length = 0;
-		}
-    ;
 select:				/*  select 语句的语法解析树*/
     SELECT select_attr FROM ID rel_list where SEMICOLON {
 		CONTEXT->ssql->sstr.selection = CONTEXT->selects[CONTEXT->selects_num];
@@ -790,7 +783,32 @@ condition:
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;
-    }
+       }
+	/* value IS value 会允许 1 is 1, 这是不允许的 */
+	|value IS NULL_T  
+		{
+			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
+			Value *right_value = &CONTEXT->null_value;
+			value_init_null(right_value);
+
+			Condition condition;
+			condition_init(&condition, IS_NULL, 0, NULL, left_value, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
+		}
+	|value IS NOT NULL_T
+		{
+			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
+			Value *right_value = &CONTEXT->null_value;
+			value_init_null(right_value);
+
+			Condition condition;
+			condition_init(&condition, IS_NOT_NULL, 0, NULL, left_value, 0, NULL, right_value);
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
+		}
 	|ID IS NULL_T
 		{
 			RelAttr left_attr;
@@ -800,8 +818,10 @@ condition:
 			value_init_null(right_value);
 
 			Condition condition;
-			condition_init(&condition, EQUAL_TO, 1, &left_attr, NULL, 0, NULL, right_value);
+			condition_init(&condition, IS_NULL, 1, &left_attr, NULL, 0, NULL, right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
 		}
 	|ID DOT ID IS NULL_T
 		{
@@ -812,8 +832,10 @@ condition:
 			value_init_null(right_value);
 
 			Condition condition;
-			condition_init(&condition, EQUAL_TO, 1, &left_attr, NULL, 0, NULL, right_value);
+			condition_init(&condition, IS_NULL, 1, &left_attr, NULL, 0, NULL, right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
 		}
 	|ID IS NOT NULL_T
 		{
@@ -824,8 +846,10 @@ condition:
 			value_init_null(right_value);
 
 			Condition condition;
-			condition_init(&condition, NOT_EQUAL, 1, &left_attr, NULL, 0, NULL, right_value);
+			condition_init(&condition, IS_NOT_NULL, 1, &left_attr, NULL, 0, NULL, right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
 		}
 	|ID DOT ID IS NOT NULL_T
 		{
@@ -836,8 +860,10 @@ condition:
 			value_init_null(right_value);
 
 			Condition condition;
-			condition_init(&condition, NOT_EQUAL, 1, &left_attr, NULL, 0, NULL, right_value);
+			condition_init(&condition, IS_NOT_NULL, 1, &left_attr, NULL, 0, NULL, right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
 		}
 	| sub_select_condition {}
     ;

@@ -448,7 +448,7 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
       }
     }
 
-    if (right_type != NULLS && left_type != right_type && ((left_type != INTS && left_type != FLOATS) || (right_type != INTS && right_type != FLOATS))) {
+    if (right_type != NULLS && left_type != NULLS && left_type != right_type && ((left_type != INTS && left_type != FLOATS) || (right_type != INTS && right_type != FLOATS))) {
       // 条件表达式两边类型不匹配，并且其中一个不是int或float类型，不能转换类型
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
@@ -556,7 +556,6 @@ RC do_sub_select(const char *db, const Selects &selects, SessionEvent *session_e
   // 目前子查询只支持单字段单表
   if (selects.relation_num != 1 || selects.attr_num != 1) {
     LOG_ERROR("select fail: subquery has more than one attribute/relation or the attribute is \"*\"");
-    printf("select fail: subquery has more than one attribute/relation or the attribute is \"*\"\n");
     return RC::SCHEMA_FIELD_NOT_SUPPORT;
   }
 
@@ -717,7 +716,6 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
       rc = condition_filter->init(*table, condition, &sub_tuple_sets[sub_idx]);
       sub_idx ++;
     }
-    // TODO 这里需要支持多表操作, 如 t1.id == t2.id
     else if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
         (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_name)) ||  // 左边是属性右边是值
         (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_name)) ||  // 左边是值，右边是属性名

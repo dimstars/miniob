@@ -1087,6 +1087,8 @@ IndexScanner *Table::find_muti_index_for_scan(const ConditionFilter *continditio
       continue;
     }
     op = f->comp_op();
+    if(op == IS_NULL) op = EQUAL_TO;
+    else if(op == IS_NOT_NULL) return nullptr;
     if(op == NO_OP || op == LESS_EQUAL ||op == LESS_THAN){
       continue;
     }
@@ -1171,6 +1173,8 @@ IndexScanner *Table::find_index_for_scan(const DefaultConditionFilter &filter) {
     value_cond_desc = &filter.right();
     value_type = filter.right_type();
     op = filter.comp_op();
+    if(op == IS_NULL) op = EQUAL_TO;
+    else if(op == IS_NOT_NULL) return nullptr;
   } else if (filter.right().is_attr && !filter.left().is_attr) {
     field_cond_desc = &filter.right();
     value_cond_desc = &filter.left();

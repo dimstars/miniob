@@ -36,12 +36,11 @@ DefaultConditionFilter::~DefaultConditionFilter() {
 }
 
 RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op, TupleSet *tuple_set) {
-  // 左边一定是非NULL
-  if (type_left < CHARS || type_left > DATES) {
+  if (type_left < CHARS || type_left > NULLS) {
     LOG_ERROR("Invalid condition with unsupported left attribute type: %d", type_left);
     return RC::INVALID_ARGUMENT;
   }
-  if (type_left < CHARS || type_left > NULLS) {
+  if (type_right < CHARS || type_right > NULLS) {
     LOG_ERROR("Invalid condition with unsupported right attribute type: %d", type_right);
     return RC::INVALID_ARGUMENT;
   }
@@ -118,27 +117,20 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition, TupleS
     type_right = condition.right_value.type;
   }
 
-  // 校验和转换
-//  if (!field_type_compare_compatible_table[type_left][type_right]) {
-//    // TODO 不能比较的两个字段， 要把信息传给客户端
-//    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-//  }
-  // NOTE：这里没有实现不同类型的数据比较，比如整数跟浮点数之间的对比
-  // 但是选手们还是要实现。这个功能在预选赛中会出现
-
   // TODO 优化过滤
   // if(left.is_attr && !left.nullable && condition.comp == EQUAL_TO && !right.is_attr && type_right == NULLS) {
   //   LOG_WARN("Field left is not nullable. so filter all");
   //   return RC::SCHEMA_CONDITION_FILTER_ALL;
   // } 
-
+  LOG_ERROR("left type %d, right type %d, op %d", type_left, type_right, condition.comp);
   if (condition.sub_selects != nullptr) {
+
   } else if(left.is_attr && !left.nullable && condition.comp == NOT_EQUAL && !right.is_attr && type_right == NULLS) {
-    LOG_WARN("Field left is not nullable. so filter nothing");
+    LOG_ERROR("Field left is not nullable. so filter nothing");
     return RC::SCHEMA_CONDITION_INVALID;
   } else if((type_left == FLOATS && type_right == INTS) 
     || (type_left == INTS && type_right == FLOATS)
-    || type_right == NULLS
+    || type_right == NULLS || type_left == NULLS
     || (type_left == TEXTS && type_right == CHARS)
     || (type_left == CHARS && type_right == TEXTS)) {
     // do nothing
@@ -195,32 +187,41 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
 
   // 首先处理任何出现null的情况
   if (left_.is_attr && !right_.is_attr && type_right_ == NULLS) { // WARN 一般是不会出现左右都是属性的情况
-    // 说明是null运算
+    // id is / is not null or id op null
+    LOG_ERROR("comp op = %d", comp_op_);
     switch(comp_op_) {
-      case EQUAL_TO: {
+      case IS_NULL: {
         return bitmap.get_bit(left_.attr_index);
       }
       break;
-      case NOT_EQUAL: {
+      case IS_NOT_NULL: {
         return !bitmap.get_bit(left_.attr_index);
       }
       break;
-      case LESS_EQUAL:
-      case LESS_THAN:
-      case GREAT_EQUAL:
-      case GREAT_THAN:
-      case WHERE_IN:
-      case NO_OP:
+      case NO_OP: {
         LOG_PANIC("Never should print this.");
+      }
+      break;
+      default:
+        return false;
     }
   } 
   if (left_.is_attr && bitmap.get_bit(left_.attr_index) && !right_.is_attr && type_right_ != NULLS) {
     // 左边是属性，并且取出来的record是null，而右边不是null
+    // id op value
     return false;
   }
-  if (right_.is_attr && bitmap.get_bit(right_.attr_index)) { 
-    // 右边是属性，说明是比较运算，只要record对应值为null就返回false
-    return false;
+
+  if (!left_.is_attr && type_left_ == NULLS) {
+    if(type_right_ == NULLS && comp_op_ == IS_NULL) return true; // null is null
+    else return false; // null is not null or null op value or null op id
+  }
+
+  if(right_.is_attr && bitmap.get_bit(right_.attr_index)) return false; // value op id 
+
+  if(!right_.is_attr && type_right_ == NULLS) {
+    if(comp_op_ == IS_NOT_NULL) return true; // value is not null
+    else return false;  // value is null or value op null
   }
 
   // 以下左右都不为null

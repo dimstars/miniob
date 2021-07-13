@@ -133,7 +133,7 @@ void ExecuteStage::handle_request(common::StageEvent *event) {
       if (rc != RC::SUCCESS) {
         char response[256];
         snprintf(response, sizeof(response), "%s\n", "FAILURE");
-        session_event->set_response(response);
+        session_event->set_response(strrc(rc));
       }
       exe_event->done_immediate();
     }
@@ -434,6 +434,9 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
       if (tuple_set.get_schema().fields().size() != 1) {
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
+      if (condition.comp >= EQUAL_TO && condition.comp <= GREAT_THAN && condition.sub_selects->aggr_num != 1) {
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
       const TupleField &field = tuple_set.get_schema().fields()[0];
       right_type = field.type();
       if (left_type != right_type && ((left_type != INTS && left_type != FLOATS) || (right_type != INTS && right_type != FLOATS))) {
@@ -562,7 +565,7 @@ RC do_sub_select(const char *db, const Selects &selects, SessionEvent *session_e
   Trx *trx = session->current_trx();
 
   // 目前子查询只支持单字段单表
-  if (selects.relation_num != 1 || selects.attr_num != 1) {
+  if (selects.relation_num != 1 || selects.attr_num + selects.aggr_num != 1) {
     LOG_ERROR("select fail: subquery has more than one attribute/relation or the attribute is \"*\"");
     return RC::SCHEMA_FIELD_NOT_SUPPORT;
   }

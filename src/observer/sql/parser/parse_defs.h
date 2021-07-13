@@ -41,6 +41,8 @@ typedef enum {
   GREAT_EQUAL, //">="                 4
   GREAT_THAN, //">"                   5
   WHERE_IN, //"in"                    6
+  IS_NULL,
+  IS_NOT_NULL,
   NO_OP
 } CompOp;
 
@@ -82,13 +84,6 @@ typedef struct _Value {
   AttrType type;    // type of value
   void *   data;    // value
 } Value;
-
-// null条件 // TODO del
-typedef enum {
-  IS_NULL,
-  IS_NOT_NULL,
-  IS_NORMAL
-} NullOp;
 
 typedef struct _CalExp {
    int       is_attr;

@@ -29,7 +29,7 @@ using namespace common;
 ConditionFilter::~ConditionFilter() {
 }
 
-DefaultConditionFilter::DefaultConditionFilter() {
+DefaultConditionFilter::DefaultConditionFilter(Table &table): table_(table) {
 }
 DefaultConditionFilter::~DefaultConditionFilter() {
   //TODO 释放ConDesc里的value.data空间
@@ -138,7 +138,9 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition, TupleS
     return RC::SCHEMA_CONDITION_INVALID;
   } else if((type_left == FLOATS && type_right == INTS) 
     || (type_left == INTS && type_right == FLOATS)
-    || type_right == NULLS) {
+    || type_right == NULLS
+    || (type_left == TEXTS && type_right == CHARS)
+    || (type_left == CHARS && type_right == TEXTS)) {
     // do nothing
     // 在filter里进行转换比较
     LOG_WARN("Field type mismatch. left = %d, right = %d", type_left, type_right);
@@ -212,19 +214,38 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
         LOG_PANIC("Never should print this.");
     }
   } 
-  if (right_.is_attr && bitmap.get_bit(right_.attr_index)) { // 右边是属性，说明是比较运算，只要record对应值为null就返回false
+  if (left_.is_attr && bitmap.get_bit(left_.attr_index) && !right_.is_attr && type_right_ != NULLS) {
+    // 左边是属性，并且取出来的record是null，而右边不是null
+    return false;
+  }
+  if (right_.is_attr && bitmap.get_bit(right_.attr_index)) { 
+    // 右边是属性，说明是比较运算，只要record对应值为null就返回false
     return false;
   }
 
-
+  // 以下左右都不为null
   if (left_.is_attr) { // value
-    left_value = (char *)(rec.data + left_.attr_offset);
+    if(type_left_ == TEXTS) {
+      OID oid = *(OID*)(rec.data + left_.attr_offset);
+      char *data = new char [oid.len];
+      table_.get_record(&oid, data);
+      left_value = data;
+    } else {
+      left_value = (char *)(rec.data + left_.attr_offset);
+    }
   } else {
     left_value = (char *)left_.value;
   }
 
   if (right_.is_attr) {
-    right_value = (char *)(rec.data + right_.attr_offset);
+    if(type_right_ == TEXTS) {
+      OID oid = *(OID*)(rec.data + right_.attr_offset);
+      char *data = new char [oid.len];
+      table_.get_record(&oid, data);
+      right_value = data;
+    } else {
+      right_value = (char *)(rec.data + right_.attr_offset);
+    }
   } else {
     right_value = (char *)right_.value;
   }
@@ -292,6 +313,13 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
     case DATES: {
       cmp_result = cmp_date(left_value, right_value);
     }
+    break;
+    case TEXTS: {
+      cmp_result = strcmp(left_value, right_value);
+      if (left_.is_attr && type_left_ == TEXTS) delete left_value;
+      if (right_.is_attr && type_right_ == TEXTS) delete right_value;
+    }
+    break;
     default: {
       // TODO
     }
@@ -525,7 +553,7 @@ RC CompositeConditionFilter::init(Table &table, const Condition *conditions, int
   RC rc = RC::SUCCESS;
   ConditionFilter **condition_filters = new ConditionFilter *[condition_num];
   for (int i = 0; i < condition_num; i++) {
-    DefaultConditionFilter *default_condition_filter = new DefaultConditionFilter();
+    DefaultConditionFilter *default_condition_filter = new DefaultConditionFilter(table);
     rc = default_condition_filter->init(table, conditions[i], NULL);
     if (rc != RC::SUCCESS) {
       delete default_condition_filter;

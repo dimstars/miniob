@@ -77,6 +77,7 @@ QUOTE   [\'\"]
 [Rr][Oo][Ll][Ll][Bb][Aa][Cc][Kk]         { position=strdup(yytext); RETURN_TOKEN(TRX_ROLLBACK);}
 [Ii][Nn][Tt]                             { position=strdup(yytext);RETURN_TOKEN(INT_T);}
 [Cc][Hh][Aa][Rr]                         { position=strdup(yytext);RETURN_TOKEN(STRING_T);}
+[Tt][Ee][Xx][Tt]                         { position=strdup(yytext);RETURN_TOKEN(TEXT_T);}
 [Ff][Ll][Oo][Aa][Tt]                     { position=strdup(yytext);RETURN_TOKEN(FLOAT_T);}
 [Dd][Aa][Tt][Ee]                         { position=strdup(yytext);RETURN_TOKEN(DATE_T);}
 [Ll][Oo][Aa][Dd]                         { position=strdup(yytext);RETURN_TOKEN(LOAD);}
@@ -98,6 +99,10 @@ QUOTE   [\'\"]
 ">"                                      position=strdup(yytext);RETURN_TOKEN(GT);
 
 {QUOTE}[\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\-][\40\42\47 0-1][\40\42\47 0-9][\-][\40\42\47 0-3][\40\42\47 0-9]{QUOTE} {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(DATE);}
+{QUOTE}[\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\-][\40\42\47 0-9][\-][\40\42\47 0-3][\40\42\47 0-9]{QUOTE} {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(DATE);}
+{QUOTE}[\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\-][\40\42\47 0-1][\40\42\47 0-9][\-][\40\42\47 0-9]{QUOTE} {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(DATE);}
+{QUOTE}[\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\40\42\47 0-9][\-][\40\42\47 0-9][\-][\40\42\47 0-9]{QUOTE} {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(DATE);}
+
 {QUOTE}[\40\42\47A-Za-z0-9_/\.\-]*{QUOTE}	     {yylval->string=strdup(yytext);position = strdup(yytext);RETURN_TOKEN(SSS);}
 
 .						                 { printf("Unknown character [%c]\n",yytext[0]);  return yytext[0];    }

@@ -95,6 +95,7 @@ ParserContext *get_context(yyscan_t scanner) {
         TRX_ROLLBACK
         INT_T
         STRING_T
+		TEXT_T
         FLOAT_T
 		DATE_T
         HELP
@@ -299,8 +300,8 @@ attr_def:
     |ID_get type
 		{
 			AttrInfo attribute;
-			// TODO 如果支持NULL，需要考虑如何用4字节表示或其他方式
-			attr_info_init(&attribute, CONTEXT->id, $2, 4, 1);
+			// text : 4B len + 4B page num or 8B ptr
+			attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 8 : 4, 1);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			// CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name=(char*)malloc(sizeof(char));
 			// strcpy(CONTEXT->ssql->sstr.create_table.attributes[CONTEXT->value_length].name, CONTEXT->id); 
@@ -311,14 +312,14 @@ attr_def:
 	|ID_get type NOT NULL_T
 		{
 			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, 4, 0);
+			attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 8 : 4, 0);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			CONTEXT->value_length++;
 		}
 	|ID_get type NULLABLE
 		{
 			AttrInfo attribute;
-			attr_info_init(&attribute, CONTEXT->id, $2, 4, 1);
+			attr_info_init(&attribute, CONTEXT->id, $2, $2 == TEXTS ? 8 : 4, 1);
 			create_table_append_attribute(&CONTEXT->ssql->sstr.create_table, &attribute);
 			CONTEXT->value_length++;
 		}
@@ -341,6 +342,7 @@ type:
        | STRING_T { $$=CHARS; }
        | FLOAT_T { $$=FLOATS; }
 	   | DATE_T { $$=DATES; }
+	   | TEXT_T { $$=TEXTS; }
        ;
 ID_get:
 	ID 

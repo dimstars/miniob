@@ -671,7 +671,7 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
   for (int i = 0; i < selects.condition_num; i++) {
     RC rc = RC::SUCCESS;
     const Condition &condition = selects.conditions[i];
-    DefaultConditionFilter *condition_filter = new DefaultConditionFilter();
+    DefaultConditionFilter *condition_filter = new DefaultConditionFilter(*table);
     // 如果是子查询条件
     if (condition.sub_selects != nullptr) {
       rc = condition_filter->init(*table, condition, &sub_tuple_sets[sub_idx]);

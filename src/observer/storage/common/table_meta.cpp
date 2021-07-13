@@ -27,6 +27,7 @@
 static const Json::StaticString FIELD_TABLE_NAME("table_name");
 static const Json::StaticString FIELD_FIELDS("fields");
 static const Json::StaticString FIELD_INDEXES("indexes");
+static const Json::StaticString FIELD_OVERFLOW("overflow");
 
 std::vector<FieldMeta> TableMeta::sys_fields_;
 
@@ -34,7 +35,8 @@ TableMeta::TableMeta(const TableMeta &other) :
         name_(other.name_),
         fields_(other.fields_),
         indexes_(other.indexes_),
-        record_size_(other.record_size_){
+        record_size_(other.record_size_),
+        overflow_exist_(other.overflow_exist_){
 }
 
 void TableMeta::swap(TableMeta &other) noexcept{
@@ -42,6 +44,7 @@ void TableMeta::swap(TableMeta &other) noexcept{
   fields_.swap(other.fields_);
   indexes_.swap(other.indexes_);
   std::swap(record_size_, other.record_size_);
+  std::swap(overflow_exist_, other.overflow_exist_);
 }
 
 RC TableMeta::init_sys_fields() {
@@ -85,6 +88,7 @@ RC TableMeta::init(const char *name, int field_num, const AttrInfo attributes[])
 
   for (int i = 0; i < field_num; i++) {
     const AttrInfo &attr_info = attributes[i];
+    if(overflow_exist_ == 0 && attributes[i].type == TEXTS) overflow_exist_ = 1;
     rc = fields_[i + sys_fields_.size()].init(attr_info.name, attr_info.type, field_offset, attr_info.length, i + sys_fields_.size(), true, attr_info.nullable);
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name);
@@ -252,10 +256,16 @@ int TableMeta::record_size() const {
   return record_size_;
 }
 
+bool TableMeta::overflow_exist() const {
+  return overflow_exist_;
+}
+
 int TableMeta::serialize(std::ostream &ss) const {
 
   Json::Value table_value;
   table_value[FIELD_TABLE_NAME] = name_;
+
+  table_value[FIELD_OVERFLOW] = overflow_exist_;
 
   Json::Value fields_value;
   for (const FieldMeta & field : fields_) {
@@ -305,6 +315,14 @@ int TableMeta::deserialize(std::istream &is) {
   }
 
   std::string table_name = table_name_value.asString();
+
+  const Json::Value &overflow_exist_value = table_value[FIELD_OVERFLOW];
+  if (!overflow_exist_value.isBool()) {
+    LOG_ERROR("Invalid overflow exist. json value=%s", overflow_exist_value.toStyledString().c_str());
+    return -1;
+  }
+
+  overflow_exist_ = overflow_exist_value.asBool();
 
   const Json::Value &fields_value = table_value[FIELD_FIELDS];
   if (!fields_value.isArray() || fields_value.size() <= 0) {

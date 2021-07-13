@@ -50,6 +50,7 @@ typedef enum {
   CHARS, 
   INTS, 
   FLOATS,
+  TEXTS,
   DATES, // 0x(yyyyyyyyyyyyyymmmmmdddddd) // 14bit|5bit|6bit // 9999-19-39
   NULLS
 } AttrType;

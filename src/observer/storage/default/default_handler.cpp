@@ -287,7 +287,8 @@ RC DefaultHandler::update_record(Trx *trx, const char *dbname, const char *relat
   // TODO int<->float
   if ((field_meta->type() == INTS && value->type == FLOATS) 
       || (field_meta->type() == INTS && value->type == FLOATS)
-      || (field_meta->nullable() && value->type == NULLS)) {
+      || (field_meta->nullable() && value->type == NULLS)
+      || (field_meta->type() == TEXTS && value->type == CHARS)) {
       // do nothing
   } else if(!field_meta->nullable() && value->type == NULLS) {
     LOG_ERROR("Null not support. field name=%s", field_meta->name());

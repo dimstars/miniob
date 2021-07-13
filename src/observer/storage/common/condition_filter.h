@@ -46,7 +46,7 @@ public:
 
 class DefaultConditionFilter : public ConditionFilter {
 public:
-  DefaultConditionFilter();
+  DefaultConditionFilter(Table &table);
   virtual ~DefaultConditionFilter();
 
   RC init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right, CompOp comp_op, TupleSet *tuple_set);
@@ -82,6 +82,7 @@ private:
   AttrType type_right_;
   CompOp   comp_op_;
   TupleSet *tuple_set_;
+  Table   &table_;    // 用于取text数据
 };
 
 class JoinConditionFilter : public ConditionFilter {

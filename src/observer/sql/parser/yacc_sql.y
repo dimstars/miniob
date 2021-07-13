@@ -108,35 +108,38 @@ ParserContext *get_context(yyscan_t scanner) {
         AND
         SET
         ON
-				LOAD
-				DATA
-				INFILE
+        LOAD
+        DATA
+        INFILE
         EQ
         LT
         GT
         LE
         GE
         NE
-		MAX
-		MIN
-		COUNT
-		AVG
-		INNER
-		JOIN
-		IS
-		NOT
-		NULL_T
-		NULLABLE
-		IN
+        MAX
+        MIN
+        COUNT
+        AVG
+        INNER
+        JOIN
+        IS
+        NOT
+        NULL_T
+        NULLABLE
+        IN
+        PLUS_S
+        MINUS_S
+        SLASH
 
 %union {
     struct _Attr *attr;
-	  struct _Condition *condition1;
-  	struct _Value *value1;
+    struct _Condition *condition1;
+    struct _Value *value1;
     char *string;
-  //  char *ssss;
     int number;
     float floats;
+    struct CalExp *exp;
 }
 
 %token <number> NUMBER
@@ -153,6 +156,11 @@ ParserContext *get_context(yyscan_t scanner) {
 %type <condition1> condition;
 %type <value1> value;
 %type <number> number;
+%type <floats> float;
+%type <exp>    expr;
+%type <exp>    term;
+%type <exp>    factor;
+%type <exp>    base_value;
 
 %%
 
@@ -236,14 +244,14 @@ desc_table:
     ;
 
 create_index:		/*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE index_attr_def index_attr_def_list RBRACE SEMICOLON 
+    CREATE INDEX ID ON ID lbrace index_attr_def index_attr_def_list rbrace SEMICOLON 
 		{
 			CONTEXT->ssql->flag = SCF_CREATE_INDEX;//"create_index";
 			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5);
 		}
     ;
 create_unique_index:
-	CREATE UNIQUE INDEX ID ON ID LBRACE index_attr_def index_attr_def_list RBRACE SEMICOLON 
+	CREATE UNIQUE INDEX ID ON ID lbrace index_attr_def index_attr_def_list rbrace SEMICOLON 
 		{
 			CONTEXT->ssql->flag = SCF_CREATE_UNIQUE_INDEX;//"create_unique_index";
 			create_index_init(&CONTEXT->ssql->sstr.create_index, $4, $6);
@@ -335,8 +343,13 @@ index_attr_def:
 			CONTEXT->value_length++;
 		}
 number:
-		NUMBER {$$ = $1;}
-		;
+	NUMBER {$$ = $1;}
+	| MINUS_S NUMBER {$$ = -$2;}
+	;
+float:
+	FLOAT {$$ = $1;}
+	| MINUS_S FLOAT {$$ = -$2;}
+	;
 type:
 	INT_T { $$=INTS; }
        | STRING_T { $$=CHARS; }
@@ -378,10 +391,10 @@ value_list:
 	  	}
     ;
 tuple_value:
-    NUMBER {
+    number {
   			value_init_integer(&CONTEXT->tuples[CONTEXT->tuple_num][CONTEXT->tuple_length[CONTEXT->tuple_num]++], $1);
 		}
-    |FLOAT {
+    | float {
   			value_init_float(&CONTEXT->tuples[CONTEXT->tuple_num][CONTEXT->tuple_length[CONTEXT->tuple_num]++], $1);
 		}
     |SSS {
@@ -398,10 +411,10 @@ tuple_value:
     ;
 
 value:
-    NUMBER{	
+    number{	
   		value_init_integer(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
-    |FLOAT{
+    | float {
   		value_init_float(&CONTEXT->values[CONTEXT->value_length++], $1);
 		}
     |SSS {
@@ -585,7 +598,7 @@ select_attr:
 			aggregation_init_string(&agg, $3, $5, COUNT_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| COUNT lbrace NUMBER rbrace attr_list {  //  TODO optimize count(n)
+	| COUNT lbrace number rbrace attr_list {  //  TODO optimize count(n)
 			AggOp agg;
 			aggregation_init_integer(&agg, NULL, $3, COUNT_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
@@ -662,7 +675,7 @@ attr_list:
 			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, &agg);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| COMMA COUNT lbrace NUMBER rbrace attr_list {  //  TODO optimize count(n) // conut(n) 不忽略null记录
+	| COMMA COUNT lbrace number rbrace attr_list {  //  TODO optimize count(n) // conut(n) 不忽略null记录
 			AggOp agg;
 			aggregation_init_integer(&agg, NULL, $4, COUNT_A);
 			selects_append_aggregation(&CONTEXT->ssql->sstr.selection, &agg);
@@ -866,7 +879,83 @@ condition:
 			selects->conditions[selects->condition_num++] = condition;
 		}
 	| sub_select_condition {}
+	| expr comOp expr {
+			Condition condition;
+			expression_condition_init(&condition, CONTEXT->comp, $1, $3);
+			if (condition.right_exp != NULL && condition.left_exp->is_attr && condition.right_exp->is_attr) {
+				condition.left_is_attr = 1;
+				condition.left_attr = condition.left_exp->attr;
+				free(condition.left_exp);
+				condition.left_exp = NULL;
+				condition.right_is_attr = 1;
+				condition.right_attr = condition.right_exp->attr;
+				free(condition.right_exp);
+				condition.right_exp = NULL;
+			}
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
+	}
     ;
+
+expr:
+	expr PLUS_S term {
+		$$ = expression_create(NULL, NULL, $1, $3, PLUS);
+	}
+	| expr MINUS_S term {
+		$$ = expression_create(NULL, NULL, $1, $3, MINUS);
+	}
+	| term {
+		$$ = $1;
+	}
+	;
+
+term:
+	term STAR factor {
+		$$ = expression_create(NULL, NULL, $1, $3, MULT);
+	}
+	| term SLASH factor {
+		$$ = expression_create(NULL, NULL, $1, $3, DIV);
+	}
+	| factor {
+		$$ = $1;
+	}
+	;
+
+factor:
+	lbrace expr rbrace {
+		$$ = $2;
+	}
+	| MINUS_S factor {
+		$$ = expression_create(NULL, NULL, NULL, $2, MINUS);
+	}
+	| base_value {
+		$$ = $1;
+	}
+	;
+
+base_value:
+	NUMBER {
+		Value value;
+  		value_init_integer(&value, $1);
+		$$ = expression_create(NULL, &value, NULL, NULL, NO_CAL_OP);
+	}
+	| FLOAT {
+		Value value;
+  		value_init_float(&value, $1);
+		$$ = expression_create(NULL, &value, NULL, NULL, NO_CAL_OP);
+	}
+	| ID {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		$$ = expression_create(&attr, NULL, NULL, NULL, NO_CAL_OP);
+	}
+	| ID DOT ID {
+		RelAttr attr;
+		relation_attr_init(&attr, $1, $3);
+		$$ = expression_create(&attr, NULL, NULL, NULL, NO_CAL_OP);
+	}
+	;
 
 sub_select_condition:
 	ID IN sub_select {

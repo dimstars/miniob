@@ -358,7 +358,11 @@ RC JoinConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType
                              const char * table_left, const char * table_right, const char * field_left, const char * field_right, CompOp comp_op) {
   // 只需要判断一个，因为不相等的情况一定是int/float
   if (type_left < CHARS || type_left > DATES) {
-    LOG_ERROR("Invalid condition with unsupported attribute type: %d", type_left);
+    LOG_ERROR("Invalid condition with unsupported left attribute type: %d", type_left);
+    return RC::INVALID_ARGUMENT;
+  }
+  if (type_right < CHARS || type_right > NULLS) {
+    LOG_ERROR("Invalid condition with unsupported right attribute type: %d", type_right);
     return RC::INVALID_ARGUMENT;
   }
 
@@ -379,40 +383,40 @@ RC JoinConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType
   return RC::SUCCESS;
 }
 
-RC JoinConditionFilter::init(Table &table_left, Table &table_right, const Condition &condition) {
-  const TableMeta &table_meta_left = table_left.table_meta();
-  const TableMeta &table_meta_right = table_right.table_meta();
+RC JoinConditionFilter::init(Table *table_left, Table *table_right, const Condition &condition) {
+  if (condition.left_exp && condition.right_exp) {
+    left_exp_ = condition.left_exp;
+    right_exp_ = condition.right_exp;
+    comp_op_ = condition.comp;
+    return RC::SUCCESS;
+  }
+
   ConDesc left;
   ConDesc right;
-
   AttrType type_left = UNDEFINED;
   AttrType type_right = UNDEFINED;
-  if(condition.left_exp){
-    left_exp_ = condition.left_exp;
-  }else{
-    left.is_attr = true;
-    const FieldMeta *field_left = table_meta_left.field(condition.left_attr.attribute_name);
-    if (nullptr == field_left) {
-      LOG_WARN("No such field in condition. %s.%s", table_left.name(), condition.left_attr.attribute_name);
-      return RC::SCHEMA_FIELD_MISSING;
-    }
-    left.attr_length = field_left->len();
-    left.attr_offset = field_left->offset();
-    type_left = field_left->type();
+  const TableMeta &table_meta_left = table_left->table_meta();
+  const TableMeta &table_meta_right = table_right->table_meta();
+
+  left.is_attr = true;
+  const FieldMeta *field_left = table_meta_left.field(condition.left_attr.attribute_name);
+  if (nullptr == field_left) {
+    LOG_WARN("No such field in condition. %s.%s", table_left->name(), condition.left_attr.attribute_name);
+    return RC::SCHEMA_FIELD_MISSING;
   }
-  if(condition.right_exp){
-    right_exp_ = condition.right_exp;
-  }else{
-    right.is_attr = true;
-    const FieldMeta *field_right = table_meta_right.field(condition.right_attr.attribute_name);
-    if (nullptr == field_right) {
-      LOG_WARN("No such field in condition. %s.%s", table_right.name(), condition.right_attr.attribute_name);
-      return RC::SCHEMA_FIELD_MISSING;
-    }
-    right.attr_length = field_right->len();
-    right.attr_offset = field_right->offset();
-    type_right = field_right->type();
+  left.attr_length = field_left->len();
+  left.attr_offset = field_left->offset();
+  type_left = field_left->type();
+
+  right.is_attr = true;
+  const FieldMeta *field_right = table_meta_right.field(condition.right_attr.attribute_name);
+  if (nullptr == field_right) {
+    LOG_WARN("No such field in condition. %s.%s", table_right->name(), condition.right_attr.attribute_name);
+    return RC::SCHEMA_FIELD_MISSING;
   }
+  right.attr_length = field_right->len();
+  right.attr_offset = field_right->offset();
+  type_right = field_right->type();
 
   // 校验和转换
   if((type_left == FLOATS && type_right == INTS) || (type_left == INTS && type_right == FLOATS)) {
@@ -423,8 +427,8 @@ RC JoinConditionFilter::init(Table &table_left, Table &table_right, const Condit
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 
-  const char * table_name_left  = table_left.name();
-  const char * table_name_right = table_right.name();
+  const char * table_name_left  = table_left->name();
+  const char * table_name_right = table_right->name();
   const char * field_name_left  = condition.left_attr.attribute_name;
   const char * field_name_right = condition.right_attr.attribute_name;
 
@@ -554,18 +558,18 @@ double JoinConditionFilter::CalculateExp(const CalExp *exp, const TupleSchema &s
         res = (double)*(float*)exp->value.data;
       }
     }
-  }else if(exp->left_exp != nullptr && exp->right_exp != nullptr){
-    //exp
+  }
+  else {
     double left = CalculateExp(exp->left_exp,schema,tuple);
     double right = CalculateExp(exp->right_exp,schema,tuple);
-    switch (exp->com_op){
-      case ADD:
+    switch (exp->cal_op){
+      case PLUS:
         res = left + right;
         break;
-      case SUB:
+      case MINUS:
         res = left - right;
         break;
-      case MUL:
+      case MULT:
         res = left * right;
         break;
       case DIV:
@@ -575,8 +579,6 @@ double JoinConditionFilter::CalculateExp(const CalExp *exp, const TupleSchema &s
         //格式错误
         break;
     }
-  }else{
-    //格式错误
   }
   return res;
 }

@@ -92,7 +92,7 @@ public:
 
   RC init(const ConDesc &left, const ConDesc &right, AttrType type_left, AttrType type_right,
           const char * table_left, const char * table_right, const char * field_left, const char * field_right, CompOp comp_op);
-  RC init(Table &table_left, Table &table_right, const Condition &condition);
+  RC init(Table *table_left, Table *table_right, const Condition &condition);
 
   virtual bool filter(const Record &rec) const;
   bool filter(TupleSchema &schema, const Tuple &tuple) const;

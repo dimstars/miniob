@@ -293,7 +293,16 @@ RC create_join_condition_filter(const char * db, const Selects &selects, std::ve
         return RC::SCHEMA_TABLE_NOT_EXIST;
       }
       JoinConditionFilter *join_condition_filter = new JoinConditionFilter();
-      RC rc = join_condition_filter->init(*left_table, *right_table, condition);
+      RC rc = join_condition_filter->init(left_table, right_table, condition);
+      if (rc != RC::SUCCESS) {
+        delete join_condition_filter;
+        return rc;
+      }
+      join_condition_filters.push_back(join_condition_filter);
+    }
+    else if (condition.right_exp != nullptr) {
+      JoinConditionFilter *join_condition_filter = new JoinConditionFilter();
+      RC rc = join_condition_filter->init(nullptr, nullptr, condition);
       if (rc != RC::SUCCESS) {
         delete join_condition_filter;
         return rc;

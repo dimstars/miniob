@@ -568,6 +568,11 @@ select_attr:
 			aggregation_init_string(&agg, NULL, $3, MAX_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
+	| MAX lbrace STAR rbrace attr_list {
+			AggOp agg;
+			aggregation_init_string(&agg, NULL, "*", MAX_A);
+			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
+		}
 	| MAX lbrace ID DOT ID rbrace attr_list {
 			AggOp agg;
 			aggregation_init_string(&agg, $3, $5, MAX_A);
@@ -576,6 +581,11 @@ select_attr:
 	| MIN lbrace ID rbrace attr_list {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, $3, MIN_A);
+			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
+		}
+	| MIN lbrace STAR rbrace attr_list {
+			AggOp agg;
+			aggregation_init_string(&agg, NULL, "*", MIN_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
 	| MIN lbrace ID DOT ID rbrace attr_list {
@@ -606,6 +616,11 @@ select_attr:
 	| AVG lbrace ID rbrace attr_list {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, $3, AVG_A);
+			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
+		}
+	| AVG lbrace STAR rbrace attr_list {
+			AggOp agg;
+			aggregation_init_string(&agg, NULL, "*", AVG_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
 	| AVG lbrace ID DOT ID rbrace attr_list {

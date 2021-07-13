@@ -215,7 +215,12 @@ void value_init_float(Value *value, float v) {
 }
 void value_init_string(Value *value, const char *v) {
   value->type = CHARS;
-  value->data = strdup(v);
+  if(strlen(v) > 4096) {
+    value->data = malloc(4097);
+    memcpy(value->data, v, 4096);
+  } else {
+    value->data = strdup(v);
+  }
 }
 void value_init_date(Value *value, const char *v) {
   value->type = DATES;

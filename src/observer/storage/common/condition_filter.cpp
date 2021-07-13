@@ -390,6 +390,8 @@ RC JoinConditionFilter::init(Table *table_left, Table *table_right, const Condit
     comp_op_ = condition.comp;
     return RC::SUCCESS;
   }
+  left_exp_ = nullptr;
+  right_exp_ = nullptr;
 
   ConDesc left;
   ConDesc right;
@@ -445,9 +447,11 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
   std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter;
   TupleValue *left_date = nullptr;
   TupleValue *right_date = nullptr;
-  if(left_exp_){
+
+  if (left_exp_) {
     left = CalculateExp(left_exp_, schema, tuple);
-  }else{
+  }
+  else {
     field_iter = schema.fields().begin();
     value_iter = tuple.values().begin();
     TupleValue * tuple_value = nullptr;
@@ -471,9 +475,10 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
     }
   }
 
-  if(right_exp_){
+  if (right_exp_) {
     right = CalculateExp(right_exp_, schema, tuple);
-  }else{
+  }
+  else {
     field_iter = schema.fields().begin();
     value_iter = tuple.values().begin();
     TupleValue * tuple_value = nullptr;

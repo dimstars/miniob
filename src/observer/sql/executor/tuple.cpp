@@ -22,6 +22,7 @@
 #include "storage/common/table.h"
 #include "common/log/log.h"
 #include "common/lang/bitmap.h"
+#include "time.h"
 
 using namespace common;
 
@@ -690,8 +691,32 @@ static bool avg_tuple_add(TupleSet &tuple_set, const TupleField &field, \
       }
     }
     break;
+    case DATES: {
+      unsigned int data = *(unsigned int*)(record + field_meta->offset());
+      struct tm p;
+      p.tm_year = data >> 11;
+      p.tm_mon = (data & 0x7c0) >> 6;
+      p.tm_mday = data & 0x3f;
+      p.tm_hour = 0;
+      p.tm_min = 0;
+      p.tm_sec = 0;
+      time_t t = mktime(&p);
+      if(tuple_set.is_empty()) {
+        field.stat()->stat.avgs.count = 1;
+        field.stat()->stat.avgs.sum = t;
+        tuple.add(data, DATES);
+        return true;
+      } else {
+        ++field.stat()->stat.avgs.count;
+        field.stat()->stat.avgs.sum += t;
+        t = field.stat()->stat.avgs.sum/field.stat()->stat.avgs.count;
+        p = *localtime(&t);
+        data = p.tm_year<<11 | p.tm_mon<<6 | p.tm_mday;
+        tuple_set.reset(data, index);
+      }
+    }
+    break;
     case CHARS: 
-    case DATES: 
     default: {
       LOG_PANIC("Unsupported field type. type=%d", field_meta->type());
     }

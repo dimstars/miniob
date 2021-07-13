@@ -259,6 +259,8 @@ void condition_init(Condition *condition, CompOp comp,
     condition->right_value = *right_value;
   }
   condition->sub_selects = nullptr;
+  condition->left_exp = nullptr;
+  condition->right_exp = nullptr;
 }
 
 void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects) {
@@ -266,6 +268,8 @@ void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *
   condition->left_attr = *left_attr;
   condition->comp = WHERE_IN;
   condition->sub_selects = selects;
+  condition->left_exp = nullptr;
+  condition->right_exp = nullptr;
 }
 
 void expression_condition_init(Condition *condition, CompOp comp, CalExp *left_exp, CalExp *right_exp) {

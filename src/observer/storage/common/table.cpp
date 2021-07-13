@@ -414,6 +414,7 @@ RC Table::insert_record(int value_num, const Value *values, char * record_in) {
     if(value.type == NULLS) continue;
     if(field->type() == TEXTS) {
       OID oid;
+      // TODO 可能需要strlen+1
       rc = overflow_handler_->insert_record((char*)value.data, strlen((char*)value.data), &oid);
       if (rc != RC::SUCCESS) {
         LOG_ERROR("Insert text field data failed. field name=%s, rc=%d:%s", field->name(), rc, strrc(rc));
@@ -706,6 +707,10 @@ public:
         value_init_float(&value_, data);
       } else if(value->type == NULLS) {
         value_init_null(&value_);
+      } else if(field->type() == TEXTS) {
+        value_.type = value->type;
+        value_.data = (char*)malloc(strlen((char*)value->data)+1);
+        memcpy(value_.data,value->data,strlen((char*)value->data)+1);
       } else {
         value_.type = value->type;
         value_.data = (char*)malloc(field->len());

@@ -645,7 +645,7 @@ static RC schema_add_field_agg(Table *table, AggType atype, const char *field_na
       return RC::SCHEMA_FIELD_MISSING;
     }
     
-    if(atype == AVG_A && (field_meta->type() < INTS || field_meta->type() > FLOATS)) {
+    if(atype == AVG_A && (field_meta->type() != INTS && field_meta->type() != FLOATS && field_meta->type() != DATES)) {
       LOG_WARN("Field can not calculate AVG. %s.%s", table->name(), field_name);
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }

@@ -470,14 +470,17 @@ bool JoinConditionFilter::filter(const Record &rec) const {
 }
 
 bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const {
-  double left,right;
+  double left = 0, right = 0;
   std::vector<const TupleField>::const_iterator field_iter;
   std::vector<const std::shared_ptr<TupleValue> >::const_iterator value_iter;
   TupleValue *left_date = nullptr;
   TupleValue *right_date = nullptr;
-
+  LOG_INFO("join:::");
   if (left_exp_) {
-    left = CalculateExp(left_exp_, schema, tuple);
+    RC rc = CalculateExp(left_exp_, schema, tuple, left);
+    if(RC::SUCCESS != rc)
+      return false;
+    LOG_INFO("calculate left = %f",left);
   }
   else {
     field_iter = schema.fields().begin();
@@ -504,7 +507,10 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
   }
 
   if (right_exp_) {
-    right = CalculateExp(right_exp_, schema, tuple);
+    RC rc = CalculateExp(right_exp_, schema, tuple, right);
+    if(RC::SUCCESS != rc)
+      return false;    
+    LOG_INFO("calculate right = %f",right);
   }
   else {
     field_iter = schema.fields().begin();
@@ -530,7 +536,7 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
     }
   }
 
-  int cmp_result = 0;
+  double cmp_result = 0;
   if(right_date && left_date)
     cmp_result = left_date->compare(*right_date);
   else{
@@ -555,46 +561,67 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
   default:
     break;
   }
-
+  cmp_result = 0;
   LOG_PANIC("Never should print this.");
   return cmp_result; // should not go here
 }
 
-double JoinConditionFilter::CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple) const {
-  double res = 0;
+RC JoinConditionFilter::CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple, double &res) const {
+  res = 0;
   if(!exp)
-    return res;
-  if(exp->left_exp == nullptr && exp->right_exp == nullptr){
+    return RC::SUCCESS;
+  if(exp->cal_op == NO_CAL_OP){
     //value
     if(exp->is_attr){
+      LOG_INFO("size");
+      LOG_INFO("tuple:%d schema:%d",schema.fields().size(),tuple.values().size());
+      LOG_INFO("table name: %s attr name: %s",exp->attr.relation_name,exp->attr.attribute_name);
       std::vector<const TupleField>::iterator field_iter = schema.fields().begin();
       std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter = tuple.values().begin();
       for (; field_iter != schema.fields().end(); ++field_iter, ++value_iter) {
-        if (0 == strcmp(field_iter->table_name(), exp->attr.relation_name) && 0 == strcmp(field_iter->field_name(), exp->attr.attribute_name)) {
-          TupleValue * tuple_value = value_iter->get();
-          if(tuple_value->get_type() == INTS){
-            IntValue *tmp_value = dynamic_cast<IntValue *>(tuple_value);
-            res = tmp_value->get_value();
-          }else if(tuple_value->get_type() == FLOATS){
-            FloatValue *tmp_value = dynamic_cast<FloatValue *>(tuple_value);
-            res = tmp_value->get_value();
-          }else{
-            //格式错误
+        if(exp->attr.relation_name == nullptr){
+          if (0 != strcmp(field_iter->field_name(), exp->attr.attribute_name)){
+            continue;
           }
-          break;
+        }else if (0 != strcmp(field_iter->table_name(), exp->attr.relation_name) || 0 != strcmp(field_iter->field_name(), exp->attr.attribute_name)){
+          continue;
         }
+        TupleValue * tuple_value = value_iter->get();
+        if(tuple_value->get_type() == INTS){
+          IntValue *tmp_value = dynamic_cast<IntValue *>(tuple_value);
+          res = tmp_value->get_value();
+          LOG_INFO("attr = %f",res);
+        }else if(tuple_value->get_type() == FLOATS){
+          FloatValue *tmp_value = dynamic_cast<FloatValue *>(tuple_value);
+          res = tmp_value->get_value();
+          LOG_INFO("attr = %f",res);
+        }else{
+          LOG_INFO("attr = error type");
+          return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        }
+        return RC::SUCCESS;
       }
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }else{
       if(exp->value.type == INTS){
         res = (double)*(int*)exp->value.data;
+        LOG_INFO("value = %f",res);
       }else if(exp->value.type == FLOATS){
         res = (double)*(float*)exp->value.data;
+        LOG_INFO("value = %f",res);
+      }else{
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
+      return RC::SUCCESS;
     }
-  }
-  else {
-    double left = CalculateExp(exp->left_exp,schema,tuple);
-    double right = CalculateExp(exp->right_exp,schema,tuple);
+  }else {
+    double left,right;
+    RC rc = CalculateExp(exp->left_exp,schema,tuple, left);
+    if(RC::SUCCESS != rc)
+      return rc;
+    rc = CalculateExp(exp->right_exp,schema,tuple, right);
+    if(RC::SUCCESS != rc)
+      return rc;
     switch (exp->cal_op){
       case PLUS:
         res = left + right;
@@ -609,11 +636,11 @@ double JoinConditionFilter::CalculateExp(const CalExp *exp, const TupleSchema &s
         res = left / right;
         break;
       default:
-        //格式错误
-        break;
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
+    LOG_INFO("left:%f right:%f %d,res:%f",left,right,exp->cal_op,res);
   }
-  return res;
+  return RC::SUCCESS;
 }
 
 CompositeConditionFilter::~CompositeConditionFilter() {

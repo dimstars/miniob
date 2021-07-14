@@ -410,6 +410,20 @@ tuple_value:
 		}
     ;
 
+str_value:
+	SSS {
+			$1 = substr($1,1,strlen($1)-2);
+  			value_init_string(&CONTEXT->values[CONTEXT->value_length++], $1);
+		}
+	|DATE {
+			$1 = substr($1,1,strlen($1)-2);
+			value_init_date(&CONTEXT->values[CONTEXT->value_length++], $1);
+		}
+	|NULL_T {
+			value_init_null(&CONTEXT->values[CONTEXT->value_length++]);
+		}
+    ;
+
 value:
     number{	
   		value_init_integer(&CONTEXT->values[CONTEXT->value_length++], $1);
@@ -740,20 +754,7 @@ condition_list:
     | AND condition condition_list {}
     ;
 condition:
-    ID comOp value 
-		{
-			RelAttr left_attr;
-			relation_attr_init(&left_attr, NULL, $1);
-
-			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
-
-			Condition condition;
-			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &left_attr, NULL, 0, NULL, right_value);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
-			selects->conditions[selects->condition_num++] = condition;
-		}
-	|value comOp value 
+	str_value comOp str_value 
 		{
 			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 2];
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
@@ -764,69 +765,42 @@ condition:
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;
 		}
-	|ID comOp ID 
+	|str_value comOp expr
 		{
-			RelAttr left_attr;
-			relation_attr_init(&left_attr, NULL, $1);
-			RelAttr right_attr;
-			relation_attr_init(&right_attr, NULL, $3);
-
+			CalExp *exp = $3;
+			Value *value = &CONTEXT->values[CONTEXT->value_length - 1];
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &left_attr, NULL, 1, &right_attr, NULL);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
-			selects->conditions[selects->condition_num++] = condition;
+			if(exp->cal_op == NO_CAL_OP){
+				if(exp->is_attr == 1){
+					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, value, 1, &exp->attr , NULL);
+				}else{
+					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, value, 0, NULL, &exp->value);
+				}
+				CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+				Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+				selects->conditions[selects->condition_num++] = condition;	
+			}else{
+				//错误格式
+			}
 		}
-    |value comOp ID
+	|expr comOp str_value
 		{
-			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
-			RelAttr right_attr;
-			relation_attr_init(&right_attr, NULL, $3);
-
+			CalExp *exp = $1;
+			Value *value = &CONTEXT->values[CONTEXT->value_length - 1];
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, left_value, 1, &right_attr, NULL);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
-			selects->conditions[selects->condition_num++] = condition;
+			if(exp->cal_op == NO_CAL_OP){
+				if(exp->is_attr == 1){
+					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, value, 1, &exp->attr , NULL);
+				}else{
+					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, value, 0, NULL, &exp->value);
+				}
+				CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+				Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+				selects->conditions[selects->condition_num++] = condition;	
+			}else{
+				//错误格式
+			}
 		}
-    |ID DOT ID comOp value
-		{
-			RelAttr left_attr;
-			relation_attr_init(&left_attr, $1, $3);
-			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
-
-			Condition condition;
-			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &left_attr, NULL, 0, NULL, right_value);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
-			selects->conditions[selects->condition_num++] = condition;								
-    }
-    |value comOp ID DOT ID
-		{
-			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
-
-			RelAttr right_attr;
-			relation_attr_init(&right_attr, $3, $5);
-
-			Condition condition;
-			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, left_value, 1, &right_attr, NULL);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
-			selects->conditions[selects->condition_num++] = condition;								
-    }
-    |ID DOT ID comOp ID DOT ID
-		{
-			RelAttr left_attr;
-			relation_attr_init(&left_attr, $1, $3);
-			RelAttr right_attr;
-			relation_attr_init(&right_attr, $5, $7);
-
-			Condition condition;
-			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &left_attr, NULL, 1, &right_attr, NULL);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
-			selects->conditions[selects->condition_num++] = condition;
-       }
 	/* value IS value 会允许 1 is 1, 这是不允许的 */
 	|value IS NULL_T  
 		{
@@ -912,15 +886,63 @@ condition:
 	| expr comOp expr {
 			Condition condition;
 			expression_condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], $1, $3);
-			if (condition.right_exp != NULL && condition.left_exp->is_attr && condition.right_exp->is_attr) {
-				condition.left_is_attr = 1;
-				condition.left_attr = condition.left_exp->attr;
-				free(condition.left_exp);
-				condition.left_exp = NULL;
-				condition.right_is_attr = 1;
-				condition.right_attr = condition.right_exp->attr;
-				free(condition.right_exp);
-				condition.right_exp = NULL;
+			if (condition.right_exp != NULL){
+				int right_flag = 0;
+				int left_flag = 0;
+				if(condition.right_exp->is_attr == 1){
+					right_flag = 1; //attr
+				}else if(condition.right_exp->cal_op == NO_CAL_OP){
+					right_flag = 2; //number >= 0
+				}else if(condition.right_exp->cal_op == MINUS && condition.right_exp->left_exp == NULL){
+					if(condition.right_exp->right_exp->cal_op == NO_CAL_OP && condition.right_exp->right_exp->is_attr == 0){
+						right_flag = 3; //number < 0
+					}
+				}
+				if(condition.left_exp->is_attr == 1){
+					left_flag = 1; //attr
+				}else if(condition.left_exp->cal_op == NO_CAL_OP){
+					left_flag = 2; //>0
+				}else if(condition.left_exp->cal_op == MINUS && condition.left_exp->left_exp == NULL){
+					if(condition.left_exp->right_exp->cal_op == NO_CAL_OP && condition.left_exp->right_exp->is_attr == 0){
+						left_flag = 3; //number < 0
+					}
+				}
+				if(left_flag > 0 && right_flag > 0){
+					if(left_flag == 1){
+						condition.left_is_attr = 1;
+						condition.left_attr = condition.left_exp->attr;
+					}else if(left_flag == 2){
+						condition.left_is_attr = 0;
+						condition.left_value = condition.left_exp->value;
+					}else{
+						condition.left_is_attr = 0;
+						condition.left_value = condition.left_exp->value;
+						if(condition.left_value.type == FLOATS){
+							*((float*)(condition.left_value.data)) = -*(float*)(condition.left_value.data);
+						}else{
+							*((int*)(condition.left_value.data)) = -*(int*)(condition.left_value.data);
+						}
+					}
+					if(right_flag == 1){
+						condition.right_is_attr = 1;
+						condition.right_attr = condition.right_exp->attr;
+					}else if(right_flag == 2){
+						condition.right_is_attr = 0;
+						condition.right_value = condition.right_exp->value;
+					}else{
+						condition.right_is_attr = 0;
+						condition.right_value = condition.right_exp->value;
+						if(condition.right_value.type == FLOATS){
+							*((float*)(condition.right_value.data)) = -*(float*)(condition.right_value.data);
+						}else{
+							*((int*)(condition.right_value.data)) = -*(int*)(condition.right_value.data);
+						}
+					}
+					free(condition.right_exp);
+					condition.right_exp = NULL;
+					free(condition.left_exp);
+					condition.left_exp = NULL;
+				}
 			}
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
@@ -1024,7 +1046,7 @@ sub_select_condition:
 		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 		selects->conditions[selects->condition_num++] = condition;
 	}
-	| ID comOp sub_select {
+/*	| ID comOp sub_select {
 		RelAttr left_attr;
 		relation_attr_init(&left_attr, NULL, $1);
 
@@ -1059,6 +1081,24 @@ sub_select_condition:
 		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, reverse(CONTEXT->comp[CONTEXT->selects_num]));
 		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 		selects->conditions[selects->condition_num++] = condition;
+	}*/
+	| sub_select comOp expr{
+		CalExp *exp = $3;
+		Condition condition;
+		if(exp->is_attr){
+			subquery_condition_init(&condition, &exp->attr, CONTEXT->sub_selects, reverse(CONTEXT->comp[CONTEXT->selects_num]));
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
+		}
+	}
+	| expr comOp sub_select{
+		CalExp *exp = $1;
+		Condition condition;
+		if(exp->is_attr){
+			subquery_condition_init(&condition, &exp->attr, CONTEXT->sub_selects, reverse(CONTEXT->comp[CONTEXT->selects_num]));
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
+		}
 	}
 	;
 

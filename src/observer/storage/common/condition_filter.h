@@ -97,7 +97,7 @@ public:
   virtual bool filter(const Record &rec) const;
   bool filter(TupleSchema &schema, const Tuple &tuple) const;
 
-  double CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple) const;
+  RC CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple, double &res) const;
 public:
   const ConDesc &left() const {
     return left_;

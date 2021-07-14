@@ -300,6 +300,7 @@ RC create_join_condition_filter(const char * db, const Selects &selects, std::ve
       join_condition_filters.push_back(join_condition_filter);
     }
     else if (condition.right_exp != nullptr) {
+      LOG_INFO("complex expr join filter init");
       JoinConditionFilter *join_condition_filter = new JoinConditionFilter();
       RC rc = join_condition_filter->init(nullptr, nullptr, condition);
       if (rc != RC::SUCCESS) {
@@ -536,19 +537,25 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   }
 
   std::stringstream ss;
+  TupleSet join_tuple_set;
+  std::vector<JoinConditionFilter *> join_condition_filters;
+  rc = create_join_condition_filter(db, selects, join_condition_filters);
   if (tuple_sets.size() > 1) {
     // 本次查询了多张表，需要做join操作
-    TupleSet join_tuple_set;
-    std::vector<JoinConditionFilter *> join_condition_filters;
-    rc = create_join_condition_filter(db, selects, join_condition_filters);
     if (rc != RC::SUCCESS) {
       return rc;
     }
     join_tables(tuple_sets, join_condition_filters, join_tuple_set);
     join_tuple_set.print(ss);
   } else {
-    // 当前只查询一张表，直接返回结果即可
-    tuple_sets.front().print(ss);
+    if(!join_condition_filters.empty()){
+      //存在表达式
+      join_tables(tuple_sets, join_condition_filters, join_tuple_set);
+      join_tuple_set.print(ss);
+    }else{
+      // 当前只查询一张表，直接返回结果即可
+      tuple_sets.front().print(ss);
+    }
   }
 
   for (SelectExeNode *& tmp_node: select_nodes) {
@@ -726,8 +733,9 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
     if (condition.sub_selects != nullptr) {
       rc = condition_filter->init(*table, condition, &sub_tuple_sets[sub_idx]);
       sub_idx ++;
-    }
-    else if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
+    }else if(condition.left_exp || condition.right_exp){
+      continue;
+    }else if ((condition.left_is_attr == 0 && condition.right_is_attr == 0) || // 两边都是值
         (condition.left_is_attr == 1 && condition.right_is_attr == 0 && match_table(selects, condition.left_attr.relation_name, table_name)) ||  // 左边是属性右边是值
         (condition.left_is_attr == 0 && condition.right_is_attr == 1 && match_table(selects, condition.right_attr.relation_name, table_name)) ||  // 左边是值，右边是属性名
         (condition.left_is_attr == 1 && condition.right_is_attr == 1 &&

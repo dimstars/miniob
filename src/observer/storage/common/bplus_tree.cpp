@@ -167,7 +167,7 @@ int CompareKey(const char *pdata, const char *pkey, AttrType data_type, AttrType
   float f1,f2;
   const char *s1,*s2;
   unsigned int d1,d2;
-  int cmp = 0;
+  float cmp = 0;
   switch(data_type){
     case INTS: {
       if(key_type == INTS) {
@@ -1941,7 +1941,7 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     const char *ptmp_value = value_ + offset;
     if(i == attr_num_ - 1)
       op = comp_op_;
-    int cmp = 0;
+    float cmp = 0;
     int attr_length = index_handler_.file_header_.field_len[i];
     switch(attr_type){
       case INTS:

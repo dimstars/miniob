@@ -297,8 +297,8 @@ CalExp * expression_create(RelAttr *attr, Value *value, CalExp *left_exp, CalExp
   else {
     exp->left_exp = left_exp;
     exp->right_exp = right_exp;
-    exp->cal_op = cal_op;
   }
+  exp->cal_op = cal_op;
   return exp;
 }
 

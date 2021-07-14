@@ -268,10 +268,10 @@ void condition_init(Condition *condition, CompOp comp,
   condition->right_exp = nullptr;
 }
 
-void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects) {
+void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects, CompOp com_op) {
   condition->left_is_attr = true;
   condition->left_attr = *left_attr;
-  condition->comp = WHERE_IN;
+  condition->comp = com_op;
   condition->sub_selects = selects;
   condition->left_exp = nullptr;
   condition->right_exp = nullptr;
@@ -300,6 +300,26 @@ CalExp * expression_create(RelAttr *attr, Value *value, CalExp *left_exp, CalExp
     exp->cal_op = cal_op;
   }
   return exp;
+}
+
+CompOp reverse(CompOp comp) {
+  switch (comp)
+  {
+  case EQUAL_TO:
+    return EQUAL_TO;
+  case LESS_EQUAL:
+    return GREAT_EQUAL;
+  case NOT_EQUAL:
+    return NOT_EQUAL;
+  case LESS_THAN:
+    return GREAT_THAN;
+  case GREAT_EQUAL:
+    return LESS_EQUAL;
+  case GREAT_THAN:
+    return LESS_THAN;
+  default:
+    return NO_OP;
+  }
 }
 
 void condition_destroy(Condition *condition) {

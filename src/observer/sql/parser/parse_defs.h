@@ -41,6 +41,7 @@ typedef enum {
   GREAT_EQUAL, //">="                 4
   GREAT_THAN, //">"                   5
   WHERE_IN, //"in"                    6
+  NOT_IN,
   IS_NULL,
   IS_NOT_NULL,
   NO_OP
@@ -252,10 +253,11 @@ void value_destroy(Value *value);
 
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
                     int right_is_attr, RelAttr *right_attr, Value *right_value);
-void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects);
+void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects, CompOp com_op);
 void condition_destroy(Condition *condition);
 void expression_condition_init(Condition *condition, CompOp comp, CalExp *left_exp, CalExp *right_exp);
 CalExp * expression_create(RelAttr *attr, Value *value, CalExp *left_exp, CalExp *right_exp, CalOp cal_op);
+CompOp reverse(CompOp comp);
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, int length, int nullable);
 void attr_info_destroy(AttrInfo *attr_info);

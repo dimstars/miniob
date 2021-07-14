@@ -117,14 +117,9 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition, TupleS
     type_right = condition.right_value.type;
   }
 
-  // TODO 优化过滤
-  // if(left.is_attr && !left.nullable && condition.comp == EQUAL_TO && !right.is_attr && type_right == NULLS) {
-  //   LOG_WARN("Field left is not nullable. so filter all");
-  //   return RC::SCHEMA_CONDITION_FILTER_ALL;
-  // } 
   LOG_ERROR("left type %d, right type %d, op %d", type_left, type_right, condition.comp);
   if (condition.sub_selects != nullptr) {
-
+    type_right = tuple_set->schema().fields()[0].type();
   } else if(left.is_attr && !left.nullable && condition.comp == NOT_EQUAL && !right.is_attr && type_right == NULLS) {
     LOG_ERROR("Field left is not nullable. so filter nothing");
     return RC::SCHEMA_CONDITION_INVALID;
@@ -151,9 +146,9 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
   Bitmap bitmap(rec.data, RECORD_BITMAP_BITS);
 
   // 如果是子查询条件
-  if (comp_op_ == WHERE_IN) {
+  if (tuple_set_ != nullptr) {
     if (tuple_set_->size() == 0) {
-      return false;
+      return comp_op_ == NOT_IN;
     }
     left_value = (char *)(rec.data + left_.attr_offset);
     TupleValue *left_tuple_value;
@@ -176,11 +171,44 @@ bool DefaultConditionFilter::filter(const Record &rec) const {
       default:
         return false;
     }
+    // 大小比较
+    if (comp_op_ >= EQUAL_TO && comp_op_ <= GREAT_THAN) {
+      const TupleValue &tuple_value = tuple_set_->tuples()[0].get(0);
+      if (tuple_value.get_type() == FLOATS && type_left_ == INTS) {
+        delete left_tuple_value;
+        left_tuple_value = new FloatValue((float)*(int*)left_value, FLOATS);
+      }
+      int cmp_result = 0;
+      cmp_result = left_tuple_value->compare(tuple_value);
+      switch (comp_op_)
+      {
+      case EQUAL_TO:
+        return 0 == cmp_result;
+      case LESS_EQUAL:
+        return cmp_result <= 0;
+      case NOT_EQUAL:
+        return cmp_result != 0;
+      case LESS_THAN:
+        return cmp_result < 0;
+      case GREAT_EQUAL:
+        return cmp_result >= 0;
+      case GREAT_THAN:
+        return cmp_result > 0;
+      default:
+        return false;
+      }
+    }
+    // 判断是否在子查询集合中
+    bool in = false;
     for (int i = 0; i < tuple_set_->size(); i++) {
       const TupleValue &tuple_value = tuple_set_->tuples()[i].get(0);
       if (type_left_ == tuple_value.get_type() && left_tuple_value->compare(tuple_value) == 0) {
-        return true;
+        in = true;
+        break;
       }
+    }
+    if ((comp_op_ == WHERE_IN && in) || (comp_op_ == NOT_IN && !in)) {
+      return true;
     }
     return false;
   }

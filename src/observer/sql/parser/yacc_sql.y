@@ -22,7 +22,7 @@ typedef struct ParserContext {
   Value tuples[MAX_NUM][MAX_NUM];
   Value values[MAX_NUM];
   Condition conditions[MAX_NUM];
-  CompOp comp;
+  CompOp comp[MAX_NUM];
   AggOp agg;
   char id[MAX_NUM];
   Value null_value;
@@ -452,6 +452,7 @@ update:			/*  update 语句的语法解析树*/
 select:				/*  select 语句的语法解析树*/
     SELECT select_attr FROM ID rel_list where SEMICOLON {
 		CONTEXT->ssql->sstr.selection = CONTEXT->selects[CONTEXT->selects_num];
+		memset(&CONTEXT->selects[CONTEXT->selects_num], 0, sizeof(Selects));
 		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
 		CONTEXT->ssql->flag=SCF_SELECT;//"select";
@@ -464,6 +465,7 @@ select:				/*  select 语句的语法解析树*/
 	}
 	| SELECT select_attr FROM ID join_list where SEMICOLON {
 		CONTEXT->ssql->sstr.selection = CONTEXT->selects[CONTEXT->selects_num];
+		memset(&CONTEXT->selects[CONTEXT->selects_num], 0, sizeof(Selects));
 		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
 		CONTEXT->ssql->flag=SCF_SELECT;//"select";
@@ -498,6 +500,15 @@ sub_select:
 		relation_attr_init(&left_attr, $2, $4);
 		selects_append_attribute(sub_selects, &left_attr);
 		selects_append_relation(sub_selects, $6);
+
+		CONTEXT->sub_selects = sub_selects;
+    }
+    | lbrace_select agg_attr FROM ID where rbrace {
+		Selects *sub_selects = (Selects *)malloc(sizeof(Selects));
+		*sub_selects = CONTEXT->selects[CONTEXT->selects_num + 1];
+		memset(&CONTEXT->selects[CONTEXT->selects_num + 1], 0, sizeof(Selects));
+
+		selects_append_relation(sub_selects, $4);
 
 		CONTEXT->sub_selects = sub_selects;
     }
@@ -563,67 +574,71 @@ select_attr:
 			relation_attr_init(&attr, $1, $3);
 			selects_append_attribute(&CONTEXT->selects[CONTEXT->selects_num], &attr);
 		}
-	| MAX lbrace ID rbrace attr_list {
+	| agg_attr attr_list {}
+	;
+
+agg_attr:
+	MAX lbrace ID rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, $3, MAX_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| MAX lbrace STAR rbrace attr_list {
+	| MAX lbrace STAR rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, "*", MAX_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| MAX lbrace ID DOT ID rbrace attr_list {
+	| MAX lbrace ID DOT ID rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, $3, $5, MAX_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| MIN lbrace ID rbrace attr_list {
+	| MIN lbrace ID rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, $3, MIN_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| MIN lbrace STAR rbrace attr_list {
+	| MIN lbrace STAR rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, "*", MIN_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| MIN lbrace ID DOT ID rbrace attr_list {
+	| MIN lbrace ID DOT ID rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, $3, $5, MIN_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| COUNT lbrace STAR rbrace attr_list {
+	| COUNT lbrace STAR rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, "*", COUNT_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| COUNT lbrace ID rbrace attr_list {
+	| COUNT lbrace ID rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, $3, COUNT_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| COUNT lbrace ID DOT ID rbrace attr_list {
+	| COUNT lbrace ID DOT ID rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, $3, $5, COUNT_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| COUNT lbrace number rbrace attr_list {  //  TODO optimize count(n)
+	| COUNT lbrace number rbrace {  //  TODO optimize count(n)
 			AggOp agg;
 			aggregation_init_integer(&agg, NULL, $3, COUNT_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| AVG lbrace ID rbrace attr_list {
+	| AVG lbrace ID rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, $3, AVG_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| AVG lbrace STAR rbrace attr_list {
+	| AVG lbrace STAR rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, "*", AVG_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
 		}
-	| AVG lbrace ID DOT ID rbrace attr_list {
+	| AVG lbrace ID DOT ID rbrace {
 			AggOp agg;
 			aggregation_init_string(&agg, $3, $5, AVG_A);
 			selects_append_aggregation(&CONTEXT->selects[CONTEXT->selects_num], &agg);
@@ -733,7 +748,7 @@ condition:
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
+			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &left_attr, NULL, 0, NULL, right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;
@@ -744,7 +759,7 @@ condition:
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 0, NULL, right_value);
+			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, left_value, 0, NULL, right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;
@@ -757,7 +772,7 @@ condition:
 			relation_attr_init(&right_attr, NULL, $3);
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &left_attr, NULL, 1, &right_attr, NULL);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;
@@ -769,7 +784,7 @@ condition:
 			relation_attr_init(&right_attr, NULL, $3);
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, left_value, 1, &right_attr, NULL);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;
@@ -781,7 +796,7 @@ condition:
 			Value *right_value = &CONTEXT->values[CONTEXT->value_length - 1];
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 0, NULL, right_value);
+			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &left_attr, NULL, 0, NULL, right_value);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;								
@@ -794,7 +809,7 @@ condition:
 			relation_attr_init(&right_attr, $3, $5);
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, left_value, 1, &right_attr, NULL);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;								
@@ -807,7 +822,7 @@ condition:
 			relation_attr_init(&right_attr, $5, $7);
 
 			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+			condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &left_attr, NULL, 1, &right_attr, NULL);
 			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;
@@ -896,7 +911,7 @@ condition:
 	| sub_select_condition {}
 	| expr comOp expr {
 			Condition condition;
-			expression_condition_init(&condition, CONTEXT->comp, $1, $3);
+			expression_condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], $1, $3);
 			if (condition.right_exp != NULL && condition.left_exp->is_attr && condition.right_exp->is_attr) {
 				condition.left_is_attr = 1;
 				condition.left_attr = condition.left_exp->attr;
@@ -978,7 +993,7 @@ sub_select_condition:
 		relation_attr_init(&left_attr, NULL, $1);
 
 		Condition condition;
-		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects);
+		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, WHERE_IN);
 		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 		selects->conditions[selects->condition_num++] = condition;
 	}
@@ -987,19 +1002,73 @@ sub_select_condition:
 		relation_attr_init(&left_attr, $1, $3);
 
 		Condition condition;
-		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects);
+		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, WHERE_IN);
+		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+		selects->conditions[selects->condition_num++] = condition;
+	}
+	| ID NOT IN sub_select {
+		RelAttr left_attr;
+		relation_attr_init(&left_attr, NULL, $1);
+
+		Condition condition;
+		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, NOT_IN);
+		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+		selects->conditions[selects->condition_num++] = condition;
+	}
+	| ID DOT ID NOT IN sub_select {
+		RelAttr left_attr;
+		relation_attr_init(&left_attr, $1, $3);
+
+		Condition condition;
+		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, NOT_IN);
+		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+		selects->conditions[selects->condition_num++] = condition;
+	}
+	| ID comOp sub_select {
+		RelAttr left_attr;
+		relation_attr_init(&left_attr, NULL, $1);
+
+		Condition condition;
+		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, CONTEXT->comp[CONTEXT->selects_num]);
+		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+		selects->conditions[selects->condition_num++] = condition;
+	}
+	| ID DOT ID comOp sub_select {
+		RelAttr left_attr;
+		relation_attr_init(&left_attr, $1, $3);
+
+		Condition condition;
+		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, CONTEXT->comp[CONTEXT->selects_num]);
+		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+		selects->conditions[selects->condition_num++] = condition;
+	}
+	| sub_select comOp ID {
+		RelAttr left_attr;
+		relation_attr_init(&left_attr, NULL, $3);
+
+		Condition condition;
+		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, reverse(CONTEXT->comp[CONTEXT->selects_num]));
+		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+		selects->conditions[selects->condition_num++] = condition;
+	}
+	| sub_select comOp ID DOT ID {
+		RelAttr left_attr;
+		relation_attr_init(&left_attr, $3, $5);
+
+		Condition condition;
+		subquery_condition_init(&condition, &left_attr, CONTEXT->sub_selects, reverse(CONTEXT->comp[CONTEXT->selects_num]));
 		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 		selects->conditions[selects->condition_num++] = condition;
 	}
 	;
 
 comOp:
-  	  EQ { CONTEXT->comp = EQUAL_TO; }
-    | LT { CONTEXT->comp = LESS_THAN; }
-    | GT { CONTEXT->comp = GREAT_THAN; }
-    | LE { CONTEXT->comp = LESS_EQUAL; }
-    | GE { CONTEXT->comp = GREAT_EQUAL; }
-    | NE { CONTEXT->comp = NOT_EQUAL; }
+      EQ { CONTEXT->comp[CONTEXT->selects_num] = EQUAL_TO; }
+    | LT { CONTEXT->comp[CONTEXT->selects_num] = LESS_THAN; }
+    | GT { CONTEXT->comp[CONTEXT->selects_num] = GREAT_THAN; }
+    | LE { CONTEXT->comp[CONTEXT->selects_num] = LESS_EQUAL; }
+    | GE { CONTEXT->comp[CONTEXT->selects_num] = GREAT_EQUAL; }
+    | NE { CONTEXT->comp[CONTEXT->selects_num] = NOT_EQUAL; }
     ;
 
 load_data:

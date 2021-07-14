@@ -117,7 +117,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition, TupleS
     type_right = condition.right_value.type;
   }
 
-  LOG_ERROR("left type %d, right type %d, op %d", type_left, type_right, condition.comp);
+  LOG_WARN("left type %d, right type %d, op %d", type_left, type_right, condition.comp);
   if (condition.sub_selects != nullptr) {
     type_right = tuple_set->schema().fields()[0].type();
   } else if(left.is_attr && !left.nullable && condition.comp == NOT_EQUAL && !right.is_attr && type_right == NULLS) {
@@ -471,8 +471,8 @@ bool JoinConditionFilter::filter(const Record &rec) const {
 
 bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const {
   double left,right;
-  std::vector<const TupleField>::iterator field_iter;
-  std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter;
+  std::vector<const TupleField>::const_iterator field_iter;
+  std::vector<const std::shared_ptr<TupleValue> >::const_iterator value_iter;
   TupleValue *left_date = nullptr;
   TupleValue *right_date = nullptr;
 

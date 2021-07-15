@@ -36,7 +36,7 @@ ELSE()
 ENDIF(WIN32)
 
 #SET(CMAKE_COMMON_FLAGS ${CMAKE_COMMON_FLAGS} " -Wstring-plus-int -Wsizeof-array-argument -Wunused-variable -Wmissing-braces")
-SET(CMAKE_COMMON_FLAGS ${CMAKE_COMMON_FLAGS} " -Wall ")
+SET(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -Wall ")
 IF(DEBUG)
     MESSAGE("DEBUG has been set as TRUE ${DEBUG}")
     #"${CMAKE_COMMON_FLAGS}  -O0 -g "  ${CMAKE_COMMON_FLAGS}最好在""以内，防止被cmake 增加了;

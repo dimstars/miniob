@@ -226,13 +226,6 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right) {
 }
 
 RC join_tables(std::vector<TupleSet> &tuple_sets, std::vector<JoinConditionFilter *> &join_condition_filters, TupleSet &join_tuple_set) {
-  // 若任意TupleSet为空，那么笛卡尔积为空
-  for (TupleSet &tuple_set: tuple_sets) {
-    if (tuple_set.size() == 0) {
-      return RC::SUCCESS;
-    }
-  }
-
   // 构建schema
   std::vector<int> tuple_sizes;
   TupleSchema schema;
@@ -243,6 +236,13 @@ RC join_tables(std::vector<TupleSet> &tuple_sets, std::vector<JoinConditionFilte
     schema.append(tuple_set.schema());
   }
   join_tuple_set.set_schema(schema);
+
+  // 若任意TupleSet为空，那么笛卡尔积为空
+  for (TupleSet &tuple_set: tuple_sets) {
+    if (tuple_set.size() == 0) {
+      return RC::SUCCESS;
+    }
+  }
 
   // 构建笛卡尔积
   std::vector<int> tuple_nums(tuple_sets.size(), 0);
@@ -428,6 +428,9 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
 
     // 如果是子查询条件, 需要检查字段是否唯一且类型是否一致
     if (condition.sub_selects != nullptr) {
+      if (condition.sub_selects_left != nullptr) {
+        continue;
+      }
       if (sub_num + 1 > sub_tuple_sets.size()) {
         return RC::SCHEMA_FIELD_NOT_EXIST;
       }
@@ -469,6 +472,56 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
   return RC::SUCCESS;
 }
 
+RC double_sub_selects_compare(const char *db, SessionEvent *session_event, const Condition &condition) {
+  if (condition.sub_selects_left->aggr_num != 1 || condition.sub_selects_left->attr_num != 0
+      || condition.sub_selects->aggr_num != 1 || condition.sub_selects->attr_num != 0) {
+    return RC::SCHEMA_FIELD_NOT_SUPPORT;
+  }
+  TupleSet tuple_set_left, tuple_set_right;
+  RC rc = do_sub_select(db, *condition.sub_selects_left, session_event, tuple_set_left);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  rc = do_sub_select(db, *condition.sub_selects, session_event, tuple_set_right);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  if (tuple_set_left.size() == 0 || tuple_set_right.size() == 0) {
+    return RC::SCHEMA_CONDITION_FILTER_ALL;
+  }
+  const TupleValue &value_left = tuple_set_left.tuples()[0].get(0);
+  const TupleValue &value_right = tuple_set_right.tuples()[0].get(0);
+  int cmp_result = value_left.compare(value_right);
+  bool result = false;
+  switch (condition.comp)
+  {
+    case EQUAL_TO:
+      result = 0 == cmp_result;
+      break;
+    case LESS_EQUAL:
+      result = cmp_result <= 0;
+      break;
+    case NOT_EQUAL:
+      result = cmp_result != 0;
+      break;
+    case LESS_THAN:
+      result = cmp_result < 0;
+      break;
+    case GREAT_EQUAL:
+      result = cmp_result >= 0;
+      break;
+    case GREAT_THAN:
+      result = cmp_result > 0;
+      break;
+    default:
+      result = false;
+  }
+  if (result == false) {
+    return RC::SCHEMA_CONDITION_FILTER_ALL;
+  }
+  return RC::SUCCESS;
+}
+
 RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_event) {
   RC rc = RC::SUCCESS;
   Session *session = session_event->get_client()->session;
@@ -476,10 +529,22 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   const Selects &selects = sql->sstr.selection;
 
   // 如果有子查询, 先执行子查询
+  bool filter_all = false;
   std::vector<TupleSet> sub_tuple_sets;
+  std::vector<Condition> conditions;
   for (int i = 0; i < selects.condition_num; i++) {
     const Condition &condition = selects.conditions[i];
     if (condition.sub_selects != nullptr) {
+      if (condition.sub_selects_left != nullptr) {
+        rc = double_sub_selects_compare(db, session_event, condition);
+        if (rc == RC::SCHEMA_CONDITION_FILTER_ALL) {
+          filter_all = true;
+        }
+        else if (rc != RC::SUCCESS) {
+          return rc;
+        }
+        continue;
+      }
       TupleSet tuple_set;
       rc = do_sub_select(db, *condition.sub_selects, session_event, tuple_set);
       if (rc != RC::SUCCESS) {
@@ -535,6 +600,9 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       tuple_sets.push_back(std::move(tuple_set));
     }
   }
+  if (filter_all) {
+    tuple_sets.front().clear_tuples();
+  }
 
   std::stringstream ss;
   TupleSet join_tuple_set;
@@ -578,10 +646,22 @@ RC do_sub_select(const char *db, const Selects &selects, SessionEvent *session_e
   }
 
   // 如果有子查询, 先执行子查询
+  bool filter_all = false;
   std::vector<TupleSet> sub_tuple_sets;
+  std::vector<Condition> conditions;
   for (int i = 0; i < selects.condition_num; i++) {
     const Condition &condition = selects.conditions[i];
     if (condition.sub_selects != nullptr) {
+      if (condition.sub_selects_left != nullptr) {
+        rc = double_sub_selects_compare(db, session_event, condition);
+        if (rc == RC::SCHEMA_CONDITION_FILTER_ALL) {
+          filter_all = true;
+        }
+        else if (rc != RC::SUCCESS) {
+          return rc;
+        }
+        continue;
+      }
       TupleSet tuple_set;
       rc = do_sub_select(db, *condition.sub_selects, session_event, tuple_set);
       if (rc != RC::SUCCESS) {
@@ -623,6 +703,9 @@ RC do_sub_select(const char *db, const Selects &selects, SessionEvent *session_e
   if (rc != RC::SUCCESS) {
     delete node;
     return rc;
+  }
+  if (filter_all) {
+    tuple_set.clear_tuples();
   }
 
   delete node;
@@ -731,6 +814,9 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
     DefaultConditionFilter *condition_filter = new DefaultConditionFilter(*table);
     // 如果是子查询条件
     if (condition.sub_selects != nullptr) {
+      if (condition.sub_selects_left != nullptr) {
+        continue;
+      }
       rc = condition_filter->init(*table, condition, &sub_tuple_sets[sub_idx]);
       sub_idx ++;
     }else if(condition.left_exp || condition.right_exp){

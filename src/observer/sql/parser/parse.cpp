@@ -269,15 +269,19 @@ void condition_init(Condition *condition, CompOp comp,
 }
 
 void subquery_condition_init(Condition *condition, RelAttr *left_attr, Selects *selects, CompOp com_op) {
-  condition->left_is_attr = true;
+  condition->left_is_attr = 1;
+  condition->right_is_attr = 0;
   condition->left_attr = *left_attr;
   condition->comp = com_op;
   condition->sub_selects = selects;
+  condition->sub_selects_left = nullptr;
   condition->left_exp = nullptr;
   condition->right_exp = nullptr;
 }
 
 void expression_condition_init(Condition *condition, CompOp comp, CalExp *left_exp, CalExp *right_exp) {
+  condition->left_is_attr = 0;
+  condition->right_is_attr = 0;
   condition->comp = comp;
   condition->left_exp = left_exp;
   condition->right_exp = right_exp;

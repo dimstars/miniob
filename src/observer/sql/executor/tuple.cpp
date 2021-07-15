@@ -380,6 +380,10 @@ void TupleSet::clear() {
   schema_.clear();
 }
 
+void TupleSet::clear_tuples() {
+  tuples_.clear();
+}
+
 void TupleSet::print(std::ostream &os) const {
   if (schema_.fields().empty()) {
     LOG_WARN("Got empty schema");

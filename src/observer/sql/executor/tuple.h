@@ -207,6 +207,8 @@ public:
 
   void clear();
 
+  void clear_tuples();
+
   void reset(int value, int index) {
     for(int i = 0; i < size(); i++) {
       tuples_[i].reset(value, index);

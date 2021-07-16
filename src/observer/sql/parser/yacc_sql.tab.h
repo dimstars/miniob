@@ -137,8 +137,9 @@ union YYSTYPE
     int number;
     float floats;
     struct CalExp *exp;
+    struct Selects *selects;
 
-#line 142 "yacc_sql.tab.h"
+#line 143 "yacc_sql.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

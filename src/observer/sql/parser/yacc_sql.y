@@ -140,6 +140,7 @@ ParserContext *get_context(yyscan_t scanner) {
     int number;
     float floats;
     struct CalExp *exp;
+    struct Selects *selects;
 }
 
 %token <number> NUMBER
@@ -161,12 +162,20 @@ ParserContext *get_context(yyscan_t scanner) {
 %type <exp>    term;
 %type <exp>    factor;
 %type <exp>    base_value;
+%type <selects> sub_select;
 
 %%
 
 commands:		//commands or sqls. parser starts here.
     /* empty */
-    | commands command
+    | commands command {
+        memset(CONTEXT->tuple_length, 0,  sizeof(int) * MAX_NUM);
+        memset(CONTEXT->tuples, 0,  sizeof(Value) * MAX_NUM * MAX_NUM);
+        memset(CONTEXT->values, 0,  sizeof(Value) * MAX_NUM);
+        memset(CONTEXT->conditions, 0,  sizeof(Condition) * MAX_NUM);
+        memset(CONTEXT->selects, 0,  sizeof(Selects) * MAX_NUM);
+        CONTEXT->sub_selects = NULL;
+    }
     ;
 
 command:
@@ -504,6 +513,7 @@ sub_select:
 		selects_append_relation(sub_selects, $4);
 
 		CONTEXT->sub_selects = sub_selects;
+		$$ = sub_selects;
     }
     | lbrace_select ID DOT ID FROM ID where rbrace {
 		Selects *sub_selects = (Selects *)malloc(sizeof(Selects));
@@ -516,6 +526,7 @@ sub_select:
 		selects_append_relation(sub_selects, $6);
 
 		CONTEXT->sub_selects = sub_selects;
+		$$ = sub_selects;
     }
     | lbrace_select agg_attr FROM ID where rbrace {
 		Selects *sub_selects = (Selects *)malloc(sizeof(Selects));
@@ -525,6 +536,7 @@ sub_select:
 		selects_append_relation(sub_selects, $4);
 
 		CONTEXT->sub_selects = sub_selects;
+		$$ = sub_selects;
     }
 	;
 
@@ -1095,10 +1107,22 @@ sub_select_condition:
 		CalExp *exp = $1;
 		Condition condition;
 		if(exp->is_attr){
-			subquery_condition_init(&condition, &exp->attr, CONTEXT->sub_selects, reverse(CONTEXT->comp[CONTEXT->selects_num]));
+			subquery_condition_init(&condition, &exp->attr, CONTEXT->sub_selects, CONTEXT->comp[CONTEXT->selects_num]);
 			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
 			selects->conditions[selects->condition_num++] = condition;
 		}
+	}
+	| sub_select comOp sub_select {
+		Condition condition;
+		condition.comp = CONTEXT->comp[CONTEXT->selects_num];
+		condition.left_is_attr = 0;
+		condition.right_is_attr = 0;
+		condition.sub_selects = $3;
+		condition.sub_selects_left = $1;
+		condition.left_exp = NULL;
+		condition.right_exp = NULL;
+		Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+		selects->conditions[selects->condition_num++] = condition;
 	}
 	;
 

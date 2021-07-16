@@ -37,6 +37,13 @@ struct ConDesc {
   void * value;       // 如果是值类型，这里记录值的数据
 };
 
+class ExprHandler{
+  public:
+    RC CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple, double &res);
+    RC AppendAttrs(const CalExp *exp, RelAttr *attrs, int capacity, int &index);
+    std::string expr_to_string(const CalExp *exp);
+};
+
 class ConditionFilter {
 public:
   virtual ~ConditionFilter();
@@ -97,7 +104,6 @@ public:
   virtual bool filter(const Record &rec) const;
   bool filter(TupleSchema &schema, const Tuple &tuple) const;
 
-  RC CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple, double &res) const;
 public:
   const ConDesc &left() const {
     return left_;

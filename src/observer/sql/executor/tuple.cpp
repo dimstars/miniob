@@ -18,8 +18,10 @@
 //
 
 #include "sql/executor/tuple.h"
+
 #include "storage/common/record_manager.h"
 #include "storage/common/table.h"
+#include "storage/common/condition_filter.h"
 #include "common/log/log.h"
 #include "common/lang/bitmap.h"
 #include "time.h"
@@ -382,6 +384,49 @@ void TupleSet::clear() {
 
 void TupleSet::clear_tuples() {
   tuples_.clear();
+}
+
+void TupleSet::print(CalExp * const *exprs, int num, std::ostream &os){
+  double res = 0;
+  ExprHandler handler;
+  if(num == 0)
+    return;
+  for(int i = num-1; i > 0; --i){
+      os<<handler.expr_to_string(exprs[i]);
+      os<<" | ";
+  }
+  os<<handler.expr_to_string(exprs[0])<< std::endl;
+  LOG_INFO("tnum:%d",tuples_.size());
+  for (const Tuple &item : tuples_) {
+    for(int i = num - 1; i >= 0; --i){
+      if(exprs[i]->is_attr){
+        std::vector<const TupleField>::iterator field_iter = schema_.fields().begin();
+        std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter = item.values().begin();
+        for (; field_iter != schema_.fields().end(); ++field_iter, ++value_iter) {
+          if(exprs[i]->attr.relation_name == nullptr){
+            if (0 != strcmp(field_iter->field_name(), exprs[i]->attr.attribute_name)){
+              continue;
+            }
+          }else if (0 != strcmp(field_iter->table_name(), exprs[i]->attr.relation_name) || 0 != strcmp(field_iter->field_name(), exprs[i]->attr.attribute_name)){
+            continue;
+          }
+          TupleValue * tuple_value = value_iter->get();
+          tuple_value->to_string(os);
+          break;
+        }
+      }else{
+        RC rc = handler.CalculateExp(exprs[i],schema_,item,res);
+        if(rc == RC::SUCCESS){
+          os<<res;
+        }else{
+          return;
+        }
+      }
+      if(i > 0)
+        os << " | ";
+    }
+    os << std::endl;
+  }
 }
 
 void TupleSet::print(std::ostream &os) const {

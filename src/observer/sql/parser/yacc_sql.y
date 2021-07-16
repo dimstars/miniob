@@ -590,16 +590,9 @@ select_attr:
 			relation_attr_init(&attr, $1, "*");
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
-    | ID attr_list {
-			RelAttr attr;
-			relation_attr_init(&attr, NULL, $1);
-			selects_append_attribute(&CONTEXT->selects[CONTEXT->selects_num], &attr);
-		}
-  	| ID DOT ID attr_list {
-			RelAttr attr;
-			relation_attr_init(&attr, $1, $3);
-			selects_append_attribute(&CONTEXT->selects[CONTEXT->selects_num], &attr);
-		}
+	| expr attr_list {
+		selects_append_expr(&CONTEXT->selects[CONTEXT->selects_num], $1);
+	}
 	| agg_attr attr_list {}
 	;
 
@@ -677,18 +670,9 @@ attr_list:
 			relation_attr_init(&attr, $2, "*");
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 		}
-    | COMMA ID attr_list {
-			RelAttr attr;
-			relation_attr_init(&attr, NULL, $2);
-			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
-			selects_append_attribute(&CONTEXT->selects[CONTEXT->selects_num], &attr);
-      }
-    | COMMA ID DOT ID attr_list {
-			RelAttr attr;
-			relation_attr_init(&attr, $2, $4);
-			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
-			selects_append_attribute(&CONTEXT->selects[CONTEXT->selects_num], &attr);
-  	  }
+	| COMMA expr attr_list {
+		selects_append_expr(&CONTEXT->selects[CONTEXT->selects_num], $2);
+	}
 	| COMMA MAX lbrace ID rbrace attr_list {
 			AggOp agg;
 			aggregation_init_string(&agg, NULL, $4, MAX_A);

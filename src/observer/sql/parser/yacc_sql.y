@@ -772,12 +772,12 @@ condition:
 				}else{
 					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, value, 0, NULL, &exp->value);
 				}
-				CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-				Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
-				selects->conditions[selects->condition_num++] = condition;	
 			}else{
-				//错误格式
+				condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, value, 0, NULL, NULL);
 			}
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
 		}
 	|expr comOp str_value
 		{
@@ -786,16 +786,16 @@ condition:
 			Condition condition;
 			if(exp->cal_op == NO_CAL_OP){
 				if(exp->is_attr == 1){
-					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, value, 1, &exp->attr , NULL);
+					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 1, &exp->attr, NULL, 0, NULL,value);
 				}else{
-					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, value, 0, NULL, &exp->value);
+					condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, &exp->value, 0, NULL,value);
 				}
-				CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-				Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
-				selects->conditions[selects->condition_num++] = condition;	
 			}else{
-				//错误格式
+				condition_init(&condition, CONTEXT->comp[CONTEXT->selects_num], 0, NULL, NULL, 0, NULL, value);
 			}
+			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
+			Selects *selects = &CONTEXT->selects[CONTEXT->selects_num];
+			selects->conditions[selects->condition_num++] = condition;
 		}
 	/* value IS value 会允许 1 is 1, 这是不允许的 */
 	|value IS NULL_T  

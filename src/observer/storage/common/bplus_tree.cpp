@@ -30,7 +30,7 @@ IndexNode * BplusTreeHandler::get_index_node(char *page_data) const {
 }
 
 RC BplusTreeHandler::sync() {
-  return disk_buffer_pool_->flush_all_pages(file_id_);
+  return disk_buffer_pool_->flush_all_pages(file_name_.c_str());
 }
 RC BplusTreeHandler::create(const char *file_name, const std::vector<const FieldMeta*> *field_meta, bool unique){
   BPPageHandle page_handle;
@@ -42,14 +42,11 @@ RC BplusTreeHandler::create(const char *file_name, const std::vector<const Field
   if(rc!=SUCCESS){
     return rc;
   }
-
-  int file_id;
-  rc = disk_buffer_pool->open_file(file_name, &file_id);
   if(rc != SUCCESS){
     LOG_ERROR("Failed to open file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
     return rc;
   }
-  rc = disk_buffer_pool->allocate_page(file_id, &page_handle);
+  rc = disk_buffer_pool->allocate_page(file_name, &page_handle);
   if(rc!=SUCCESS){
     LOG_ERROR("Failed to allocate page. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
     return rc;
@@ -101,27 +98,23 @@ RC BplusTreeHandler::create(const char *file_name, const std::vector<const Field
   }
 
   disk_buffer_pool_ = disk_buffer_pool;
-  file_id_ = file_id;
+  file_name_ = file_name;
   unique_index_ = unique;
   header_dirty_ = false;
   return SUCCESS;
 }
 
 RC BplusTreeHandler::open(const char *file_name, bool unique) {
-  RC rc;
   BPPageHandle page_handle;
   char *pdata;
   if (disk_buffer_pool_ != nullptr) {
     return RC::RECORD_OPENNED;
   }
-
+  RC rc = SUCCESS;
   DiskBufferPool *disk_buffer_pool = theGlobalDiskBufferPool();
-  int file_id;
-  rc = disk_buffer_pool->open_file(file_name, &file_id);
-  if(rc!=SUCCESS){
-    return rc;
-  }
-  rc = disk_buffer_pool->get_this_page(file_id, 1, &page_handle);
+  this->file_name_ = file_name;
+
+  rc = disk_buffer_pool->get_this_page(file_name_.c_str(), 1, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -133,7 +126,6 @@ RC BplusTreeHandler::open(const char *file_name, bool unique) {
 
   header_dirty_ = false;
   disk_buffer_pool_ = disk_buffer_pool;
-  file_id_ = file_id;
   unique_index_ = unique;
 
   rc = disk_buffer_pool->unpin_page(&page_handle);
@@ -145,8 +137,7 @@ RC BplusTreeHandler::open(const char *file_name, bool unique) {
 
 RC BplusTreeHandler::close() {
   sync();
-  disk_buffer_pool_->close_file(file_id_);
-  file_id_ = -1;
+  disk_buffer_pool_->close_file(file_name_.c_str());
   disk_buffer_pool_ = nullptr;
   return RC::SUCCESS;
 }
@@ -166,7 +157,6 @@ int CompareKey(const char *pdata, const char *pkey, AttrType data_type, AttrType
   int i1,i2;
   float f1,f2;
   const char *s1,*s2;
-  unsigned int d1,d2;
   float cmp = 0;
   switch(data_type){
     case INTS: {
@@ -200,9 +190,9 @@ int CompareKey(const char *pdata, const char *pkey, AttrType data_type, AttrType
     }
       break;
     case DATES: {
-      d1 = *(unsigned int*)pdata;
-      d2 = *(unsigned int*)pkey;
-      cmp = d1 - d2;
+      i1 = *(int*)pdata;
+      i2 = *(int*)pkey;
+      cmp = i1 - i2;
     }
       break;
     default:{
@@ -245,6 +235,8 @@ int CompareMutiKey(const AttrType *data_type, const AttrType *key_type, const in
 
 int CmpMutiKey(const AttrType* data_type, const AttrType* key_type, const int *field_len, int field_num, int attr_length, const char *pdata, const char *pkey){
   int result = CompareMutiKey(data_type, key_type, field_len, field_num, pdata, pkey);
+
+  LOG_INFO("cmp result:%d",result);
   if(0 != result)
     return result;
   RID *rid1 = (RID *) (pdata + attr_length);
@@ -258,7 +250,7 @@ RC BplusTreeHandler::find_leaf(const char *pkey, const AttrType *ktype, PageNum 
   IndexNode *node;
   char *pdata;
   int i,tmp;
-  rc = disk_buffer_pool_->get_this_page(file_id_, file_header_.root_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), file_header_.root_page, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -279,7 +271,7 @@ RC BplusTreeHandler::find_leaf(const char *pkey, const AttrType *ktype, PageNum 
     if(rc!=SUCCESS){
       return rc;
     }
-    rc = disk_buffer_pool_->get_this_page(file_id_, node->rids[i].page_num, &page_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), node->rids[i].page_num, &page_handle);
     if(rc!=SUCCESS){
       return rc;
     }
@@ -309,7 +301,7 @@ RC BplusTreeHandler::insert_into_leaf(PageNum leaf_page, const char *pkey, const
   IndexNode *node;
   RC rc;
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, leaf_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), leaf_page, &page_handle);
   if(rc != SUCCESS){
     return rc;
   }
@@ -323,6 +315,7 @@ RC BplusTreeHandler::insert_into_leaf(PageNum leaf_page, const char *pkey, const
       tmp=CmpMutiKey(file_header_.attr_types, file_header_.attr_types, file_header_.field_len, \
                       file_header_.field_num, file_header_.attr_length, pkey, node->keys + insert_pos * file_header_.key_length);
     if (tmp == 0) {
+      disk_buffer_pool_->unpin_page(&page_handle);
       return RC::RECORD_DUPLICATE_KEY;
     }
     if(tmp < 0)
@@ -355,12 +348,12 @@ RC BplusTreeHandler::print() {
   int i,j;
   char *pdata;
   int page_count;
-  rc = disk_buffer_pool_->get_page_count(file_id_, &page_count);
+  rc = disk_buffer_pool_->get_page_count(file_name_.c_str(), &page_count);
   if (rc != SUCCESS) {
     return rc;
   }
   for(i=1; i <= page_count; i++){
-    rc = disk_buffer_pool_->get_this_page(file_id_, i, &page_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), i, &page_handle);
     if(rc==RC::BUFFERPOOL_INVALID_PAGE_NUM)
       continue;
     if(rc!=SUCCESS){
@@ -394,7 +387,7 @@ RC BplusTreeHandler::insert_into_leaf_after_split(PageNum leaf_page, const char 
   char *pdata;
   int insert_pos,split,i,j,tmp;
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, leaf_page, &page_handle1);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), leaf_page, &page_handle1);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -405,7 +398,7 @@ RC BplusTreeHandler::insert_into_leaf_after_split(PageNum leaf_page, const char 
   leaf = get_index_node(pdata);
 
   //add a new node
-  rc = disk_buffer_pool_->allocate_page(file_id_, &page_handle2);
+  rc = disk_buffer_pool_->allocate_page(file_name_.c_str(), &page_handle2);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -525,7 +518,7 @@ RC BplusTreeHandler::insert_intern_node(PageNum parent_page,PageNum left_page,Pa
   RID rid;
   RC rc;
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, parent_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), parent_page, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -568,7 +561,7 @@ RC BplusTreeHandler::insert_intern_node_after_split(PageNum inter_page,PageNum l
   char *temp_keys,*new_key;
   char *pdata;
   int insert_pos,i,j,split;
-  rc = disk_buffer_pool_->get_this_page(file_id_, inter_page, &page_handle1);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), inter_page, &page_handle1);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -580,7 +573,7 @@ RC BplusTreeHandler::insert_intern_node_after_split(PageNum inter_page,PageNum l
   inter_node = get_index_node(pdata);
 
   //add a new node
-  rc = disk_buffer_pool_->allocate_page(file_id_, &page_handle2);
+  rc = disk_buffer_pool_->allocate_page(file_name_.c_str(), &page_handle2);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -665,7 +658,7 @@ RC BplusTreeHandler::insert_intern_node_after_split(PageNum inter_page,PageNum l
 
   for(i=0;i<=new_node->key_num;i++){
     child_page=new_node->rids[i].page_num;
-    rc = disk_buffer_pool_->get_this_page(file_id_, child_page, &child_page_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), child_page, &child_page_handle);
     if(rc!=SUCCESS){
       free(new_key);
       return rc;
@@ -731,7 +724,7 @@ RC BplusTreeHandler::insert_into_parent(PageNum parent_page, PageNum left_page, 
     return insert_into_new_root(left_page,pkey,right_page);
   }
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, parent_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), parent_page, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -763,7 +756,7 @@ RC BplusTreeHandler::insert_into_new_root(PageNum left_page, const char *pkey, P
   PageNum root_page;
   RID rid;
   char *pdata;
-  rc = disk_buffer_pool_->allocate_page(file_id_, &page_handle);
+  rc = disk_buffer_pool_->allocate_page(file_name_.c_str(), &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -797,7 +790,7 @@ RC BplusTreeHandler::insert_into_new_root(PageNum left_page, const char *pkey, P
     return rc;
   }
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, left_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), left_page, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -817,7 +810,7 @@ RC BplusTreeHandler::insert_into_new_root(PageNum left_page, const char *pkey, P
     return rc;
   }
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, right_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), right_page, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -878,7 +871,7 @@ RC BplusTreeHandler::insert_entry(std::vector<const char *> *pkey, const RID *ri
     return rc;
   }
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, leaf_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), leaf_page, &page_handle);
   if(rc!=SUCCESS){
     free(key);
     return rc;
@@ -974,7 +967,7 @@ RC BplusTreeHandler::get_entry(std::vector<const char *> *pkey,RID *rid) {
     return rc;
   }
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, leaf_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), leaf_page, &page_handle);
   if(rc!=SUCCESS){
     free(key);
     return rc;
@@ -1005,7 +998,7 @@ RC BplusTreeHandler::delete_entry_from_node(PageNum node_page,const char *pkey) 
   int delete_index,i,tmp;
   RC rc;
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, node_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), node_page, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1062,7 +1055,7 @@ RC BplusTreeHandler::coalesce_node(PageNum leaf_page,PageNum right_page)
   RC rc;
   int i,j,k,start;
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, leaf_page, &left_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), leaf_page, &left_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1073,7 +1066,7 @@ RC BplusTreeHandler::coalesce_node(PageNum leaf_page,PageNum right_page)
 
   left = get_index_node(pdata);
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, right_page, &right_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), right_page, &right_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1086,7 +1079,7 @@ RC BplusTreeHandler::coalesce_node(PageNum leaf_page,PageNum right_page)
   right = get_index_node(pdata);
 
   parent_page=left->parent;
-  rc = disk_buffer_pool_->get_this_page(file_id_, parent_page, &parent_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), parent_page, &parent_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1120,7 +1113,7 @@ RC BplusTreeHandler::coalesce_node(PageNum leaf_page,PageNum right_page)
     memcpy(left->rids+i,right->rids+j,sizeof(RID));
 
     for(i=start;i<=left->key_num;i++){
-      rc = disk_buffer_pool_->get_this_page(file_id_, left->rids[i].page_num, &tmphandle);
+      rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), left->rids[i].page_num, &tmphandle);
       if(rc!=SUCCESS){
         return rc;
       }
@@ -1164,7 +1157,7 @@ RC BplusTreeHandler::coalesce_node(PageNum leaf_page,PageNum right_page)
     free(tmp_key);
     return rc;
   }
-  rc = disk_buffer_pool_->dispose_page(file_id_, right_page);
+  rc = disk_buffer_pool_->dispose_page(file_name_.c_str(), right_page);
   if(rc!=SUCCESS){
     free(tmp_key);
     return rc;
@@ -1194,7 +1187,7 @@ RC BplusTreeHandler::redistribute_nodes(PageNum leaf_page,PageNum right_page)
   RC rc;
   int min_key,i,k;
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, leaf_page, &left_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), leaf_page, &left_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1205,7 +1198,7 @@ RC BplusTreeHandler::redistribute_nodes(PageNum leaf_page,PageNum right_page)
 
   left = get_index_node(pdata);
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, right_page, &right_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), right_page, &right_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1217,7 +1210,7 @@ RC BplusTreeHandler::redistribute_nodes(PageNum leaf_page,PageNum right_page)
   right = get_index_node(pdata);
 
   parent_page=left->parent;
-  rc = disk_buffer_pool_->get_this_page(file_id_, parent_page, &parent_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), parent_page, &parent_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1271,7 +1264,7 @@ RC BplusTreeHandler::redistribute_nodes(PageNum leaf_page,PageNum right_page)
       }
       right->key_num--;
 
-      rc = disk_buffer_pool_->get_this_page(file_id_, left->rids[left->key_num].page_num,&tmphandle);
+      rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), left->rids[left->key_num].page_num,&tmphandle);
       if(rc!=SUCCESS){
         return rc;
       }
@@ -1302,7 +1295,7 @@ RC BplusTreeHandler::redistribute_nodes(PageNum leaf_page,PageNum right_page)
       memcpy(parent->keys+k*file_header_.key_length,left->keys+(left->key_num-1)*file_header_.key_length,file_header_.key_length);
       left->key_num--;
 
-      rc = disk_buffer_pool_->get_this_page(file_id_, right->rids[0].page_num, &tmphandle);
+      rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), right->rids[0].page_num, &tmphandle);
       if(rc!=SUCCESS){
         return rc;
       }
@@ -1365,7 +1358,7 @@ RC BplusTreeHandler::delete_entry_internal(PageNum page_num,const char *pkey) {
     return rc;
   }
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, page_num, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), page_num, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1377,7 +1370,7 @@ RC BplusTreeHandler::delete_entry_internal(PageNum page_num,const char *pkey) {
 
   if(node->parent==-1){
     if(node->key_num==0&&node->is_leaf==false){
-      rc = disk_buffer_pool_->get_this_page(file_id_, node->rids[0].page_num, &tmphandle);
+      rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), node->rids[0].page_num, &tmphandle);
       if(rc!=SUCCESS){
         return rc;
       }
@@ -1403,7 +1396,7 @@ RC BplusTreeHandler::delete_entry_internal(PageNum page_num,const char *pkey) {
       if(rc!=SUCCESS){
         return rc;
       }
-      rc = disk_buffer_pool_->dispose_page(file_id_, page_num);
+      rc = disk_buffer_pool_->dispose_page(file_name_.c_str(), page_num);
       if(rc!=SUCCESS){
         return rc;
       }
@@ -1430,7 +1423,7 @@ RC BplusTreeHandler::delete_entry_internal(PageNum page_num,const char *pkey) {
     return SUCCESS;
   }
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, node->parent, &parent_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), node->parent, &parent_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1451,7 +1444,7 @@ RC BplusTreeHandler::delete_entry_internal(PageNum page_num,const char *pkey) {
   if(delete_index==0){
     leaf_page=page_num;
     right_page=parent->rids[delete_index+1].page_num;
-    rc = disk_buffer_pool_->get_this_page(file_id_, right_page, &right_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), right_page, &right_handle);
     if(rc!=SUCCESS){
       return rc;
     }
@@ -1494,7 +1487,7 @@ RC BplusTreeHandler::delete_entry_internal(PageNum page_num,const char *pkey) {
   }
   else{
     leaf_page=parent->rids[delete_index-1].page_num;
-    rc = disk_buffer_pool_->get_this_page(file_id_, leaf_page, &left_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), leaf_page, &left_handle);
     if(rc!=SUCCESS){
       return rc;
     }
@@ -1580,7 +1573,7 @@ RC BplusTreeHandler::print_tree() {
   int i;
   RC rc;
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, file_header_.root_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), file_header_.root_page, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1597,7 +1590,7 @@ RC BplusTreeHandler::print_tree() {
     if(rc!=SUCCESS){
       return rc;
     }
-    rc = disk_buffer_pool_->get_this_page(file_id_, page_num, &page_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), page_num, &page_handle);
     if(rc!=SUCCESS){
       return rc;
     }
@@ -1623,7 +1616,7 @@ RC BplusTreeHandler::print_tree() {
     page_num=node->rids[file_header_.order-1].page_num;
     if(page_num==0)
       break;
-    rc = disk_buffer_pool_->get_this_page(file_id_, page_num, &page_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), page_num, &page_handle);
     if(rc!=SUCCESS){
       return rc;
     }
@@ -1675,7 +1668,7 @@ RC BplusTreeHandler::find_first_index_satisfied(CompOp compop, const char *key, 
   next=leaf_page;
 
   while(next > 0){
-    rc = disk_buffer_pool_->get_this_page(file_id_, next, &page_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), next, &page_handle);
     if(rc!=SUCCESS){
       break;
     }
@@ -1728,7 +1721,7 @@ RC BplusTreeHandler::get_first_leaf_page(PageNum *leaf_page) {
   IndexNode *node;
   char *pdata;
 
-  rc = disk_buffer_pool_->get_this_page(file_id_, file_header_.root_page, &page_handle);
+  rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), file_header_.root_page, &page_handle);
   if(rc!=SUCCESS){
     return rc;
   }
@@ -1746,7 +1739,7 @@ RC BplusTreeHandler::get_first_leaf_page(PageNum *leaf_page) {
       return rc;
     }
 
-    rc = disk_buffer_pool_->get_this_page(file_id_, page_num, &page_handle);
+    rc = disk_buffer_pool_->get_this_page(file_name_.c_str(), page_num, &page_handle);
     if(rc!=SUCCESS){
       return rc;
     }
@@ -1833,6 +1826,7 @@ RC BplusTreeScanner::next_entry(RID *rid) {
   if(!opened_){
     return RC::RECORD_CLOSED;
   }
+  LOG_INFO("rid %d %d",rid->page_num,rid->slot_num);
   rc = get_next_idx_in_memory(rid);//和RM中一样，有可能有错误，一次只查当前页和当前页的下一页，有待确定
   if(rc == RC::RECORD_NO_MORE_IDX_IN_MEM){
     rc = find_idx_pages();
@@ -1868,7 +1862,7 @@ RC BplusTreeScanner::find_idx_pages() {
   for(int i = 0; i < num_fixed_pages_; i++){
     if(next_page_num_ <= 0)
       break;
-    rc = index_handler_.disk_buffer_pool_->get_this_page(index_handler_.file_id_, next_page_num_, page_handles_ + i);
+    rc = index_handler_.disk_buffer_pool_->get_this_page(index_handler_.file_name_.c_str(), next_page_num_, page_handles_ + i);
     if(rc != SUCCESS){
       return rc;
     }
@@ -1922,7 +1916,7 @@ RC BplusTreeScanner::get_next_idx_in_memory(RID *rid) {
 bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
   int i1=0,i2=0;
   float f1=0,f2=0;
-  unsigned int d1=0,d2=0;
+ // int d1=0,d2=0;
   const char *s1=nullptr,*s2=nullptr;
 
   if(comp_op_ == NO_OP){
@@ -1941,7 +1935,7 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
     const char *ptmp_value = value_ + offset;
     if(i == attr_num_ - 1)
       op = comp_op_;
-    float cmp = 0;
+    double cmp = 0;
     int attr_length = index_handler_.file_header_.field_len[i];
     switch(attr_type){
       case INTS:
@@ -1971,11 +1965,12 @@ bool BplusTreeScanner::satisfy_condition(const char *pkey) { // TODO 简化
         s2=ptmp_value;
         cmp = strncmp(s1,s2,attr_length);
         break;
-      case DATES:
-        d1=*(unsigned int*)ptmp_key;
-        d2=*(unsigned int*)ptmp_value;
-        cmp = d1 - d2;
+      case DATES:{
+        i1=*(int*)ptmp_key;
+        i2=*(int*)ptmp_value;
+        cmp = (i1 - i2);
         break;
+      }
       default:
         LOG_PANIC("Unknown attr type: %d", attr_type);
         return false;

@@ -41,7 +41,7 @@ class ExprHandler{
   public:
     RC CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple, double &res);
     RC AppendAttrs(const CalExp *exp, RelAttr *attrs, int capacity, int &index);
-    std::string expr_to_string(const CalExp *exp);
+    std::string expr_to_string(const CalExp *exp, bool muti_tables = true);
 };
 
 class ConditionFilter {

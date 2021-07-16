@@ -118,8 +118,8 @@ private:
   std::string             base_dir_;
   TableMeta               table_meta_;
   DiskBufferPool *        data_buffer_pool_; /// 数据文件关联的buffer pool
-  int                     file_id_;
-  int                     of_file_id_;
+  std::string             file_name_;
+  std::string             of_file_name_;
   RecordFileHandler *     record_handler_;   /// 记录操作
   OverflowFileHandler *   overflow_handler_; 
   std::vector<Index *>    indexes_;

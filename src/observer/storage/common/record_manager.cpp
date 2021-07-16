@@ -68,22 +68,21 @@ int page_header_size(int record_capacity) {
 ////////////////////////////////////////////////////////////////////////////////
 RecordPageHandler::RecordPageHandler() : 
     disk_buffer_pool_(nullptr),
-    file_id_(-1),
     page_header_(nullptr),
-    bitmap_(nullptr) {
+    bitmap_(nullptr){
 }
 
 RecordPageHandler::~RecordPageHandler() {
   deinit();
 }
 
-RC RecordPageHandler::init(DiskBufferPool &buffer_pool, int file_id, PageNum page_num) {
+RC RecordPageHandler::init(DiskBufferPool &buffer_pool,const char * file_name, PageNum page_num) {
   if (disk_buffer_pool_ != nullptr) {
     return RC::RECORD_OPENNED;
   }
 
   RC ret = RC::SUCCESS;
-  if ((ret = buffer_pool.get_this_page(file_id, page_num, &page_handle_)) != RC::SUCCESS) {
+  if ((ret = buffer_pool.get_this_page(file_name, page_num, &page_handle_)) != RC::SUCCESS) {
     LOG_ERROR("Failed to get page handle from disk buffer pool. ret=%d:%s", ret, strrc(ret));
     return ret;
   }
@@ -96,15 +95,15 @@ RC RecordPageHandler::init(DiskBufferPool &buffer_pool, int file_id, PageNum pag
   }
 
   disk_buffer_pool_ = &buffer_pool;
-  file_id_ = file_id;
+  file_name_ = file_name;
 
   page_header_ = (PageHeader*)(data);
   bitmap_ = data + page_fix_size();
   return ret;
 }
 
-RC RecordPageHandler::init_empty_page(DiskBufferPool &buffer_pool, int file_id, PageNum page_num, int record_size) {
-  RC ret = init(buffer_pool, file_id, page_num);
+RC RecordPageHandler::init_empty_page(DiskBufferPool &buffer_pool, const char *file_name, PageNum page_num, int record_size) {
+  RC ret = init(buffer_pool, file_name, page_num);
   if (ret != RC::SUCCESS) {
     return ret;
   }
@@ -198,11 +197,10 @@ RC RecordPageHandler::delete_record(const RID *rid) {
 
     if (page_header_->record_num == 0) {
       DiskBufferPool *disk_buffer_pool = disk_buffer_pool_;
-      int file_id = file_id_;
       PageNum page_num = get_page_num();
       if(page_num == 0) return ret;
       deinit();
-      disk_buffer_pool->dispose_page(file_id, page_num);
+      disk_buffer_pool->dispose_page(file_name_.c_str(), page_num);
     }
   } else {
     ret = RC::RECORD_RECORD_NOT_EXIST;
@@ -270,7 +268,6 @@ bool RecordPageHandler::is_full() const {
 ////////////////////////////////////////////////////////////////////////////////
 OverflowPageHandler::OverflowPageHandler() : 
     disk_buffer_pool_(nullptr),
-    file_id_(-1),
     page_header_(nullptr) {
 }
 
@@ -278,13 +275,14 @@ OverflowPageHandler::~OverflowPageHandler() {
   deinit();
 }
 
-RC OverflowPageHandler::init(DiskBufferPool &buffer_pool, int file_id, PageNum page_num) {
+RC OverflowPageHandler::init(DiskBufferPool &buffer_pool, const char *file_name, PageNum page_num) {
   if (disk_buffer_pool_ != nullptr) {
     return RC::RECORD_OPENNED;
   }
 
   RC ret = RC::SUCCESS;
-  if ((ret = buffer_pool.get_this_page(file_id, page_num, &page_handle_)) != RC::SUCCESS) {
+  file_name_ = file_name;
+  if ((ret = buffer_pool.get_this_page(file_name_.c_str(), page_num, &page_handle_)) != RC::SUCCESS) {
     LOG_ERROR("Failed to get page handle from disk buffer pool. ret=%d:%s", ret, strrc(ret));
     return ret;
   }
@@ -297,7 +295,6 @@ RC OverflowPageHandler::init(DiskBufferPool &buffer_pool, int file_id, PageNum p
   }
 
   disk_buffer_pool_ = &buffer_pool;
-  file_id_ = file_id;
 
   page_header_ = (OFPageHeader*)(data);
   
@@ -341,11 +338,10 @@ RC OverflowPageHandler::delete_record() {
   RC ret = RC::SUCCESS;
 
   DiskBufferPool *disk_buffer_pool = disk_buffer_pool_;
-  int file_id = file_id_;
   PageNum page_num = get_page_num();
   if(page_num == 0) return ret;
   deinit();
-  disk_buffer_pool->dispose_page(file_id, page_num);
+  disk_buffer_pool->dispose_page(file_name_.c_str(), page_num);
 
   return ret;
 }
@@ -373,11 +369,11 @@ PageNum OverflowPageHandler::get_next_page_num() const {
 }
 ////////////////////////////////////////////////////////////////////////////////
 RecordFileHandler::RecordFileHandler() :
-    disk_buffer_pool_(nullptr),
-    file_id_(-1) {
+    disk_buffer_pool_(nullptr)
+   {
 }
 
-RC RecordFileHandler::init(DiskBufferPool &buffer_pool, int file_id) {
+RC RecordFileHandler::init(DiskBufferPool &buffer_pool, const char *file_name) {
 
   RC ret = RC::SUCCESS;
 
@@ -386,7 +382,7 @@ RC RecordFileHandler::init(DiskBufferPool &buffer_pool, int file_id) {
   }
 
   disk_buffer_pool_ = &buffer_pool;
-  file_id_ = file_id;
+  file_name_ = file_name;
 
   return ret;
 }
@@ -401,7 +397,7 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
   RC ret = RC::SUCCESS;
   // 找到没有填满的页面 
   int page_count = 0;
-  if ((ret = disk_buffer_pool_->get_page_count(file_id_, &page_count)) != RC::SUCCESS) {
+  if ((ret = disk_buffer_pool_->get_page_count(file_name_.c_str(), &page_count)) != RC::SUCCESS) {
     LOG_ERROR("Failed to get page count while inserting record");
     return ret;
   }
@@ -410,7 +406,7 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
   if (current_page_num < 0) {
     if (page_count >= 2) { // 当前buffer pool 有页面时才尝试加载第一页
       // 参考diskBufferPool，pageNum从1开始
-      if ((ret = record_page_handler_.init(*disk_buffer_pool_, file_id_, 1)) != RC::SUCCESS) {
+      if ((ret = record_page_handler_.init(*disk_buffer_pool_, file_name_.c_str(), 1)) != RC::SUCCESS) {
         LOG_ERROR("Failed to init record page handler.ret=%d", ret);
         return ret;
       }
@@ -428,7 +424,7 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
     }
     if (current_page_num != record_page_handler_.get_page_num()) {
       record_page_handler_.deinit();
-      ret = record_page_handler_.init(*disk_buffer_pool_, file_id_, current_page_num);
+      ret = record_page_handler_.init(*disk_buffer_pool_, file_name_.c_str(), current_page_num);
       if (ret != RC::SUCCESS && ret != RC::BUFFERPOOL_INVALID_PAGE_NUM) {
         LOG_ERROR("Failed to init record page handler. page number is %d. ret=%d:%s", current_page_num, ret, strrc(ret));
         return ret;
@@ -444,14 +440,14 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
   // 找不到就分配一个新的页面
   if (!page_found) {
     BPPageHandle page_handle;
-    if ((ret = disk_buffer_pool_->allocate_page(file_id_, &page_handle)) != RC::SUCCESS) {
+    if ((ret = disk_buffer_pool_->allocate_page(file_name_.c_str(), &page_handle)) != RC::SUCCESS) {
       LOG_ERROR("Failed to allocate page while inserting record. ret=%d", ret);
       return ret;
     }
 
     current_page_num = page_handle.frame->page.page_num;
     record_page_handler_.deinit();
-    ret = record_page_handler_.init_empty_page(*disk_buffer_pool_, file_id_, current_page_num, record_size);
+    ret = record_page_handler_.init_empty_page(*disk_buffer_pool_, file_name_.c_str(), current_page_num, record_size);
     if (ret != RC::SUCCESS) {
       LOG_ERROR("Failed to init empty page. ret=%d", ret);
       disk_buffer_pool_->unpin_page(&page_handle);
@@ -461,7 +457,10 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
   }
 
   // 找到空闲位置
-  return record_page_handler_.insert_record(data, rid);
+  RC rc = record_page_handler_.insert_record(data, rid);
+  if(page_found)
+    disk_buffer_pool_->unpin_page(file_name_.c_str(),current_page_num);
+  return rc;
 }
 
 RC RecordFileHandler::update_record(const Record *rec) {
@@ -469,23 +468,27 @@ RC RecordFileHandler::update_record(const Record *rec) {
   RC ret = RC::SUCCESS;
 
   RecordPageHandler page_handler;
-  if ((ret != page_handler.init(*disk_buffer_pool_, file_id_, rec->rid.page_num)) != RC::SUCCESS) {
+  if ((ret != page_handler.init(*disk_buffer_pool_, file_name_.c_str(), rec->rid.page_num)) != RC::SUCCESS) {
     LOG_ERROR("Failed to init record page handler.page number=%d", rec->rid.page_num);
     return ret;
   }
 
-  return page_handler.update_record(rec);
+  ret = page_handler.update_record(rec);
+  disk_buffer_pool_->unpin_page(file_name_.c_str(),rec->rid.page_num);
+  return ret;
 }
 
 RC RecordFileHandler::delete_record(const RID *rid) {
 
   RC ret = RC::SUCCESS;
   RecordPageHandler page_handler;
-  if ((ret != page_handler.init(*disk_buffer_pool_, file_id_, rid->page_num)) != RC::SUCCESS) {
+  if ((ret != page_handler.init(*disk_buffer_pool_, file_name_.c_str(), rid->page_num)) != RC::SUCCESS) {
     LOG_ERROR("Failed to init record page handler.page number=%d", rid->page_num);
     return ret;
   }
-  return page_handler.delete_record(rid);
+  ret = page_handler.delete_record(rid);
+  disk_buffer_pool_->unpin_page(file_name_.c_str(),rid->page_num);
+  return ret;
 }
 
 RC RecordFileHandler::get_record(const RID *rid, Record *rec) {
@@ -495,21 +498,23 @@ RC RecordFileHandler::get_record(const RID *rid, Record *rec) {
     return RC::INVALID_ARGUMENT;
   }
   RecordPageHandler page_handler;
-  if ((ret != page_handler.init(*disk_buffer_pool_, file_id_, rid->page_num)) != RC::SUCCESS) {
+  if ((ret != page_handler.init(*disk_buffer_pool_, file_name_.c_str(), rid->page_num)) != RC::SUCCESS) {
     LOG_ERROR("Failed to init record page handler.page number=%d", rid->page_num);
     return ret;
   }
 
-  return page_handler.get_record(rid, rec);
+  ret = page_handler.get_record(rid, rec);
+  //disk_buffer_pool_->unpin_page(file_name_.c_str(),rid->page_num);
+  return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 OverflowFileHandler::OverflowFileHandler() :
-    disk_buffer_pool_(nullptr),
-    file_id_(-1) {
+    disk_buffer_pool_(nullptr)
+   {
 }
 
-RC OverflowFileHandler::init(DiskBufferPool &buffer_pool, int file_id) {
+RC OverflowFileHandler::init(DiskBufferPool &buffer_pool, const char *file_name) {
 
   RC ret = RC::SUCCESS;
 
@@ -518,7 +523,7 @@ RC OverflowFileHandler::init(DiskBufferPool &buffer_pool, int file_id) {
   }
 
   disk_buffer_pool_ = &buffer_pool;
-  file_id_ = file_id;
+  file_name_ = file_name;
 
   return ret;
 }
@@ -538,12 +543,12 @@ RC OverflowFileHandler::insert_record(const char *data, int data_len, OID *oid) 
 
   for(int i = 0; i < size; i++) {
     BPPageHandle page_handle;
-    if ((ret = disk_buffer_pool_->allocate_page(file_id_, &page_handle)) != RC::SUCCESS) {
+    if ((ret = disk_buffer_pool_->allocate_page(file_name_.c_str(), &page_handle)) != RC::SUCCESS) {
       LOG_ERROR("Failed to allocate page while inserting record. ret=%d", ret);
       return ret;
     }
     page_nums[i] = page_handle.frame->page.page_num;
-    overflow_page_handle[i].init(*disk_buffer_pool_, file_id_, page_nums[i]);
+    overflow_page_handle[i].init(*disk_buffer_pool_, file_name_.c_str(), page_nums[i]);
   }
 
   int offset = 0, cpy_len;
@@ -595,7 +600,7 @@ RC OverflowFileHandler::delete_record(const OID *oid) {
   for(int i = 0; i < size; i++) {
     if(i == 0) page_nums[i] = oid->first_page_num;
     else page_nums[i] = overflow_page_handle[i-1].get_next_page_num();
-    overflow_page_handle[i].init(*disk_buffer_pool_, file_id_, page_nums[i]);
+    overflow_page_handle[i].init(*disk_buffer_pool_, file_name_.c_str(), page_nums[i]);
   }
 
   for(int i = 0; i < size; i++) {
@@ -623,7 +628,7 @@ RC OverflowFileHandler::get_record(const OID *oid, char *data) {
   for(int i = 0; i < size; i++) {
     if(i == 0) page_nums[i] = oid->first_page_num;
     else page_nums[i] = overflow_page_handle[i-1].get_next_page_num();
-    overflow_page_handle[i].init(*disk_buffer_pool_, file_id_, page_nums[i]);
+    overflow_page_handle[i].init(*disk_buffer_pool_, file_name_.c_str(), page_nums[i]);
   }
 
   int offset = 0, cpy_len;
@@ -646,16 +651,15 @@ RC OverflowFileHandler::get_record(const OID *oid, char *data) {
 ////////////////////////////////////////////////////////////////////////////////
 RecordFileScanner::RecordFileScanner() : 
     disk_buffer_pool_(nullptr),
-    file_id_(-1),
-    condition_filter_(nullptr) {
+    condition_filter_(nullptr){
 }
 
-RC RecordFileScanner::open_scan(DiskBufferPool & buffer_pool, int file_id, ConditionFilter *condition_filter)
+RC RecordFileScanner::open_scan(DiskBufferPool & buffer_pool, const char *file_name, ConditionFilter *condition_filter)
 {
   close_scan();
 
   disk_buffer_pool_ = &buffer_pool;
-  file_id_ = file_id;
+  file_name_ = file_name;
 
   condition_filter_ = condition_filter;
   return RC::SUCCESS;
@@ -689,8 +693,8 @@ RC RecordFileScanner::get_next_record(Record *rec) {
   Record current_record = *rec;
 
   int page_count = 0;
-  if ((ret = disk_buffer_pool_->get_page_count(file_id_, &page_count)) != RC::SUCCESS) {
-    LOG_ERROR("Failed to get page count while getting next record. file id=%d", file_id_);
+  if ((ret = disk_buffer_pool_->get_page_count(file_name_.c_str(), &page_count)) != RC::SUCCESS) {
+    LOG_ERROR("Failed to get page count while getting next record. file =%s", file_name_.c_str());
   }
 
   if (1 == page_count) {
@@ -701,7 +705,7 @@ RC RecordFileScanner::get_next_record(Record *rec) {
 
     if (current_record.rid.page_num != record_page_handler_.get_page_num()) {
       record_page_handler_.deinit();
-      ret = record_page_handler_.init(*disk_buffer_pool_, file_id_, current_record.rid.page_num);
+      ret = record_page_handler_.init(*disk_buffer_pool_, file_name_.c_str(), current_record.rid.page_num);
       if (ret != RC::SUCCESS && ret != RC::BUFFERPOOL_INVALID_PAGE_NUM) {
         LOG_ERROR("Failed to init record page handler. page num=%d", current_record.rid.page_num);
         return ret;
@@ -730,5 +734,6 @@ RC RecordFileScanner::get_next_record(Record *rec) {
   if (RC::SUCCESS == ret) {
     *rec = current_record;
   }
+  record_page_handler_.deinit();
   return ret;
 }

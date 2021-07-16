@@ -118,6 +118,16 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition, TupleS
   }
 
   LOG_WARN("left type %d, right type %d, op %d", type_left, type_right, condition.comp);
+  if(right.value && condition.right_value.type == DATES){
+    LOG_INFO("right %x",(int*)(right.value));
+  }else{
+    LOG_INFO("right = null");
+  }
+  if(left.value && condition.left_value.type == DATES){
+    LOG_INFO("left %x",(int*)(left.value));
+  }else{
+    LOG_INFO("left = null");
+  }  
   if (condition.sub_selects != nullptr) {
     type_right = tuple_set->schema().fields()[0].type();
   } else if(left.is_attr && !left.nullable && condition.comp == NOT_EQUAL && !right.is_attr && type_right == NULLS) {
@@ -475,13 +485,13 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
   std::vector<const std::shared_ptr<TupleValue> >::const_iterator value_iter;
   TupleValue *left_date = nullptr;
   TupleValue *right_date = nullptr;
-  LOG_INFO("join:::");
   ExprHandler handler;
   if (left_exp_) {
     RC rc = handler.CalculateExp(left_exp_, schema, tuple, left);
+    if(RC::SCHEMA_FIELD_MISSING == rc)
+      return true;
     if(RC::SUCCESS != rc)
       return false;
-    LOG_INFO("calculate left = %f",left);
   }
   else {
     field_iter = schema.fields().begin();
@@ -493,7 +503,7 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
         break;
       }
     }
-    if(tuple_value == nullptr) return false;
+    if(tuple_value == nullptr) return true;
     // 任何null值不满足任何比较条件，只有is null或is not null支持null比较
     if(tuple_value->get_type() == NULLS ) return false;
     if(tuple_value->get_type() == INTS){
@@ -509,6 +519,8 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
 
   if (right_exp_) {
     RC rc = handler.CalculateExp(right_exp_, schema, tuple, right);
+    if(RC::SCHEMA_FIELD_MISSING == rc)
+      return true;
     if(RC::SUCCESS != rc)
       return false;    
     LOG_INFO("calculate right = %f",right);
@@ -523,7 +535,7 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
         break;
       }
     }
-    if(tuple_value == nullptr) return false;
+    if(tuple_value == nullptr) return true;
     // 任何null值不满足任何比较条件，只有is null或is not null支持null比较
     if(tuple_value->get_type() == NULLS ) return false;
     if(tuple_value->get_type() == INTS){
@@ -628,9 +640,6 @@ RC ExprHandler::CalculateExp(const CalExp *exp, const TupleSchema &schema, const
   if(exp->cal_op == NO_CAL_OP){
     //value
     if(exp->is_attr){
-      LOG_INFO("size");
-      LOG_INFO("tuple:%d schema:%d",schema.fields().size(),tuple.values().size());
-      LOG_INFO("table name: %s attr name: %s",exp->attr.relation_name,exp->attr.attribute_name);
       std::vector<const TupleField>::iterator field_iter = schema.fields().begin();
       std::vector<const std::shared_ptr<TupleValue> >::iterator value_iter = tuple.values().begin();
       for (; field_iter != schema.fields().end(); ++field_iter, ++value_iter) {
@@ -645,25 +654,20 @@ RC ExprHandler::CalculateExp(const CalExp *exp, const TupleSchema &schema, const
         if(tuple_value->get_type() == INTS){
           IntValue *tmp_value = dynamic_cast<IntValue *>(tuple_value);
           res = tmp_value->get_value();
-          LOG_INFO("attr = %f",res);
         }else if(tuple_value->get_type() == FLOATS){
           FloatValue *tmp_value = dynamic_cast<FloatValue *>(tuple_value);
           res = tmp_value->get_value();
-          LOG_INFO("attr = %f",res);
         }else{
-          LOG_INFO("attr = error type");
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
         }
         return RC::SUCCESS;
       }
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      return RC::SUCCESS;
     }else{
       if(exp->value.type == INTS){
         res = (double)*(int*)exp->value.data;
-        LOG_INFO("value = %f",res);
       }else if(exp->value.type == FLOATS){
         res = (double)*(float*)exp->value.data;
-        LOG_INFO("value = %f",res);
       }else{
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
@@ -695,7 +699,6 @@ RC ExprHandler::CalculateExp(const CalExp *exp, const TupleSchema &schema, const
       default:
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
-    LOG_INFO("left:%f right:%f %d,res:%f",left,right,exp->cal_op,res);
   }
   return RC::SUCCESS;
 }
@@ -735,13 +738,13 @@ RC ExprHandler::AppendAttrs(const CalExp *exp, RelAttr *attrs, int capacity, int
   return rc;
 }
 
-std::string ExprHandler::expr_to_string(const CalExp *exp){
+std::string ExprHandler::expr_to_string(const CalExp *exp, bool print_relation){
   std::string s;
   if(!exp)
     return "";
   if(exp->cal_op == NO_CAL_OP){
     if(exp->is_attr){
-      if(exp->attr.relation_name){
+      if(exp->attr.relation_name && print_relation){
         s = std::string(exp->attr.relation_name) + "." + std::string(exp->attr.attribute_name);
       }else{
         s = std::string(exp->attr.attribute_name);

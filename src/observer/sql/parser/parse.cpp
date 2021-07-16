@@ -66,11 +66,6 @@ Selects *getSelects() {
   Selects *se;
   se = (Selects *)malloc(sizeof(Selects));
   (se)->attr_num = 0;
-  /*
-  for (i = 0; i < MAX_NUM; i++) {
-    (se)->selAttrs[i] = getRelAttr();
-  }
-   */
   (se)->relation_num = 0;
   for (i = 0; i < MAX_NUM; i++) {
     (se)->relations[i] = (char *)malloc(sizeof(char));
@@ -367,6 +362,10 @@ void selects_append_conditions(Selects *selects, Condition conditions[], int con
     selects->conditions[i] = conditions[i];
   }
   selects->condition_num = condition_num;
+}
+
+void selects_append_expr(Selects *selects, CalExp *expr){
+  selects->exprs[selects->expr_num++] = expr;
 }
 
 void selects_destroy(Selects *selects) {

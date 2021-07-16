@@ -356,7 +356,7 @@ RC check_attr_in_table(std::vector<Table *> *tables, const RelAttr &attr, AttrTy
 }
 
 
-//select condition中表达式的元数据校验
+//select 中表达式的元数据校验
 RC check_meta_select_expr(std::vector<Table *> *tables, CalExp *exp){
   RC rc = RC::SUCCESS;
   if(!exp)
@@ -402,6 +402,13 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
     AttrType type;
     RC rc = check_attr_in_table(&tables, attr, type);
     if (rc != RC::SCHEMA_FIELD_REDUNDAN && rc != RC::SUCCESS) {
+      return rc;
+    }
+  }
+
+  for (int i = 0; i < selects.expr_num; i++) {
+    RC rc = check_meta_select_expr(&tables, selects.exprs[i]);
+    if(RC::SUCCESS != rc){
       return rc;
     }
   }
@@ -614,15 +621,24 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       return rc;
     }
     join_tables(tuple_sets, join_condition_filters, join_tuple_set);
-    join_tuple_set.print(ss);
+    if(selects.expr_num)
+      join_tuple_set.print(&selects.exprs[0],selects.expr_num,ss);
+    else
+      join_tuple_set.print(ss);
   } else {
     if(!join_condition_filters.empty()){
       //存在表达式
       join_tables(tuple_sets, join_condition_filters, join_tuple_set);
+    if(selects.expr_num)
+      join_tuple_set.print(&selects.exprs[0],selects.expr_num,ss);
+    else
       join_tuple_set.print(ss);
     }else{
       // 当前只查询一张表，直接返回结果即可
-      tuple_sets.front().print(ss);
+      if(selects.expr_num)
+        tuple_sets.front().print(&selects.exprs[0],selects.expr_num,ss);
+      else
+        tuple_sets.front().print(ss);
     }
   }
 
@@ -766,9 +782,31 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
   }
   
   // TODO 目前不支持同时有属性和聚合运算的查询
-  if(selects.attr_num > 0 && selects.aggr_num > 0) {
+  if(selects.attr_num + selects.expr_num > 0 && selects.aggr_num > 0) {
     LOG_ERROR("Not support attribute and aggregation both exist now");
     return RC::SCHEMA_FIELD_NOT_SUPPORT;
+  }
+
+  //处理select后expr属性
+  int index = 0;
+  RelAttr attrs[MAX_NUM];
+  ExprHandler h;
+  for(int i = selects.expr_num - 1; i >= 0; i--){
+    index = 0;
+    RC rc = h.AppendAttrs(selects.exprs[i], &attrs[0], MAX_NUM, index);
+    LOG_INFO("index:%d",index);
+    if(RC::SUCCESS != rc)
+      return rc;
+    for(int i = index - 1; i >= 0; i--){
+      if(nullptr != attrs[i].relation_name){
+        if(0 != strcmp(attrs[i].relation_name,table->name())){
+          continue;
+        }
+      }
+      RC rc = schema_add_field(table, attrs[i].attribute_name, schema);
+      if(RC::SUCCESS != rc)
+        return rc;
+    }
   }
 
   // 处理查找属性

@@ -63,7 +63,8 @@ typedef enum {
   FLOATS,
   TEXTS,
   DATES, // 0x(yyyyyyyyyyyyyymmmmmdddddd) // 14bit|5bit|6bit // 9999-19-39
-  NULLS
+  NULLS,
+  EXPR
 } AttrType;
 
 //聚合运算类型
@@ -89,6 +90,7 @@ typedef struct _Value {
 
 typedef struct CalExp {
   int            is_attr;
+  int            brace;
   RelAttr        attr;
   Value          value;
   struct CalExp *left_exp;
@@ -120,6 +122,8 @@ typedef struct Selects {
   RelAttr attributes[MAX_NUM];     // attrs in Select clause
   int relation_num;                // Length of relations in Fro clause
   char *relations[MAX_NUM];        // relations in From clause
+  CalExp *exprs[MAX_NUM];
+  int expr_num;
   int condition_num;               // Length of conditions in Where clause
   Condition conditions[MAX_NUM];   // conditions in Where clause
 } Selects;
@@ -268,6 +272,7 @@ void selects_append_aggregation(Selects *selects, AggOp *agg);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], int condition_num);
+void selects_append_expr(Selects *selects, CalExp *expr);
 void selects_destroy(Selects *selects);
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[][MAX_NUM], int tuple_num, int value_nums[]);

@@ -476,8 +476,9 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
   TupleValue *left_date = nullptr;
   TupleValue *right_date = nullptr;
   LOG_INFO("join:::");
+  ExprHandler handler;
   if (left_exp_) {
-    RC rc = CalculateExp(left_exp_, schema, tuple, left);
+    RC rc = handler.CalculateExp(left_exp_, schema, tuple, left);
     if(RC::SUCCESS != rc)
       return false;
     LOG_INFO("calculate left = %f",left);
@@ -507,7 +508,7 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
   }
 
   if (right_exp_) {
-    RC rc = CalculateExp(right_exp_, schema, tuple, right);
+    RC rc = handler.CalculateExp(right_exp_, schema, tuple, right);
     if(RC::SUCCESS != rc)
       return false;    
     LOG_INFO("calculate right = %f",right);
@@ -566,7 +567,61 @@ bool JoinConditionFilter::filter(TupleSchema &schema, const Tuple &tuple) const 
   return cmp_result; // should not go here
 }
 
-RC JoinConditionFilter::CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple, double &res) const {
+CompositeConditionFilter::~CompositeConditionFilter() {
+  if (memory_owner_) {
+    delete[] filters_;
+    filters_ = nullptr;
+  }
+}
+
+RC CompositeConditionFilter::init(const ConditionFilter *filters[], int filter_num, bool own_memory) {
+  filters_ = filters;
+  filter_num_ = filter_num;
+  memory_owner_ = own_memory;
+  return RC::SUCCESS;
+}
+RC CompositeConditionFilter::init(const ConditionFilter *filters[], int filter_num) {
+  return init(filters, filter_num, false);
+}
+
+RC CompositeConditionFilter::init(Table &table, const Condition *conditions, int condition_num) {
+  if (condition_num == 0) {
+    return RC::SUCCESS;
+  }
+  if (conditions == nullptr) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  RC rc = RC::SUCCESS;
+  ConditionFilter **condition_filters = new ConditionFilter *[condition_num];
+  for (int i = 0; i < condition_num; i++) {
+    DefaultConditionFilter *default_condition_filter = new DefaultConditionFilter(table);
+    rc = default_condition_filter->init(table, conditions[i], NULL);
+    if (rc != RC::SUCCESS) {
+      delete default_condition_filter;
+      for (int j = i - 1; j >= 0; j--) {
+        delete condition_filters[j];
+        condition_filters[j] = nullptr;
+      }
+      delete[] condition_filters;
+      condition_filters = nullptr;
+      return rc;
+    }
+    condition_filters[i] = default_condition_filter;
+  }
+  return init((const ConditionFilter **)condition_filters, condition_num, true);
+}
+
+bool CompositeConditionFilter::filter(const Record &rec) const {
+  for (int i = 0; i < filter_num_; i++) {
+    if (!filters_[i]->filter(rec)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+RC ExprHandler::CalculateExp(const CalExp *exp, const TupleSchema &schema, const Tuple &tuple, double &res){
   res = 0;
   if(!exp)
     return RC::SUCCESS;
@@ -633,6 +688,8 @@ RC JoinConditionFilter::CalculateExp(const CalExp *exp, const TupleSchema &schem
         res = left * right;
         break;
       case DIV:
+        if(right == 0)
+          return RC::SCHEMA_EXPR_ILLEGAL;
         res = left / right;
         break;
       default:
@@ -643,57 +700,79 @@ RC JoinConditionFilter::CalculateExp(const CalExp *exp, const TupleSchema &schem
   return RC::SUCCESS;
 }
 
-CompositeConditionFilter::~CompositeConditionFilter() {
-  if (memory_owner_) {
-    delete[] filters_;
-    filters_ = nullptr;
-  }
-}
-
-RC CompositeConditionFilter::init(const ConditionFilter *filters[], int filter_num, bool own_memory) {
-  filters_ = filters;
-  filter_num_ = filter_num;
-  memory_owner_ = own_memory;
-  return RC::SUCCESS;
-}
-RC CompositeConditionFilter::init(const ConditionFilter *filters[], int filter_num) {
-  return init(filters, filter_num, false);
-}
-
-RC CompositeConditionFilter::init(Table &table, const Condition *conditions, int condition_num) {
-  if (condition_num == 0) {
-    return RC::SUCCESS;
-  }
-  if (conditions == nullptr) {
-    return RC::INVALID_ARGUMENT;
-  }
-
+RC ExprHandler::AppendAttrs(const CalExp *exp, RelAttr *attrs, int capacity, int &index){
   RC rc = RC::SUCCESS;
-  ConditionFilter **condition_filters = new ConditionFilter *[condition_num];
-  for (int i = 0; i < condition_num; i++) {
-    DefaultConditionFilter *default_condition_filter = new DefaultConditionFilter(table);
-    rc = default_condition_filter->init(table, conditions[i], NULL);
-    if (rc != RC::SUCCESS) {
-      delete default_condition_filter;
-      for (int j = i - 1; j >= 0; j--) {
-        delete condition_filters[j];
-        condition_filters[j] = nullptr;
+  if(!exp)
+    return rc;
+  if(exp->is_attr){
+    if(index < capacity){
+      bool flag = false;
+      for(int i = 0; i < index; ++i){
+        if(strcmp(exp->attr.attribute_name, (attrs + i)->attribute_name) == 0){
+          if(!(attrs + i)->relation_name && !exp->attr.relation_name){
+            flag = true;
+            break;
+          }
+          if((attrs + i)->relation_name && exp->attr.relation_name){
+            if(strcmp(exp->attr.relation_name, (attrs + i)->relation_name) == 0){
+              flag = true;
+              break;
+            }
+          }
+        }
       }
-      delete[] condition_filters;
-      condition_filters = nullptr;
+      if(!flag)
+        *(attrs+index++) = exp->attr;
       return rc;
     }
-    condition_filters[i] = default_condition_filter;
+    return RC::SCHEMA_EXPR_ILLEGAL;
+  }else{
+    rc = AppendAttrs(exp->left_exp, attrs, capacity, index);
+    if(RC::SUCCESS != rc)
+      return rc;
+    rc = AppendAttrs(exp->right_exp, attrs, capacity, index);
   }
-  return init((const ConditionFilter **)condition_filters, condition_num, true);
+  return rc;
 }
 
-bool CompositeConditionFilter::filter(const Record &rec) const {
-  for (int i = 0; i < filter_num_; i++) {
-    if (!filters_[i]->filter(rec)) {
-      return false;
+std::string ExprHandler::expr_to_string(const CalExp *exp){
+  std::string s;
+  if(!exp)
+    return "";
+  if(exp->cal_op == NO_CAL_OP){
+    if(exp->is_attr){
+      if(exp->attr.relation_name){
+        s = std::string(exp->attr.relation_name) + "." + std::string(exp->attr.attribute_name);
+      }else{
+        s = std::string(exp->attr.attribute_name);
+      }
+    }else{ //numbers
+      if(exp->value.type == FLOATS){
+        s = std::to_string(*(float*)exp->value.data);
+      }else{
+        s = std::to_string(*(int*)exp->value.data);
+      }
+    }
+  }else{
+    switch(exp->cal_op){
+      case MINUS:
+        s = expr_to_string(exp->left_exp) + "-" + expr_to_string(exp->right_exp);
+        break;
+      case PLUS:
+        s = expr_to_string(exp->left_exp) + "+" + expr_to_string(exp->right_exp);
+        break;      
+      case MULT:
+        s = expr_to_string(exp->left_exp) + "*" + expr_to_string(exp->right_exp);
+        break;
+      case DIV:
+        s = expr_to_string(exp->left_exp) + "/" + expr_to_string(exp->right_exp);
+        break;
+      default: //运算符类型错误
+        break;
     }
   }
-  return true;
+  if(exp->brace)
+    return "(" + s + ")";
+  else
+    return s;
 }
-

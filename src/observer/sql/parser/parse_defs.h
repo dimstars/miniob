@@ -112,6 +112,7 @@ typedef struct _Condition {
   CalExp *right_exp;
   struct Selects *sub_selects_left;
   struct Selects *sub_selects;  // subquery if not null
+  int     is_complex;
 } Condition;
 
 // struct of select

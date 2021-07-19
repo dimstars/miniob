@@ -127,6 +127,8 @@ public:
     delete other;
   }
 
+  std::string get_value() const { return value_;}
+
 private:
   std::string value_;
 };
@@ -156,6 +158,8 @@ public:
     value_ = int_other->value_;
     delete other;
   }
+
+  unsigned int get_value() const { return value_;}
 
 private:
   unsigned int value_;

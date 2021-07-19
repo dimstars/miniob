@@ -130,7 +130,7 @@ private:
 
 private:
   DiskBufferPool  * disk_buffer_pool_ = nullptr;
-  int               file_id_ = -1;
+  std::string       file_name_;
   bool              header_dirty_ = false;
   IndexFileHeader   file_header_;
   bool              unique_index_ = false;   ///唯一索引

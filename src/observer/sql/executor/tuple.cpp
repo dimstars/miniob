@@ -386,17 +386,16 @@ void TupleSet::clear_tuples() {
   tuples_.clear();
 }
 
-void TupleSet::print(CalExp * const *exprs, int num, std::ostream &os){
+void TupleSet::print(CalExp * const *exprs, int num, bool print_reletion, std::ostream &os){
   double res = 0;
   ExprHandler handler;
   if(num == 0)
     return;
   for(int i = num-1; i > 0; --i){
-      os<<handler.expr_to_string(exprs[i]);
+      os<<handler.expr_to_string(exprs[i],print_reletion);
       os<<" | ";
   }
-  os<<handler.expr_to_string(exprs[0])<< std::endl;
-  LOG_INFO("tnum:%d",tuples_.size());
+  os<<handler.expr_to_string(exprs[0],print_reletion)<< std::endl;
   for (const Tuple &item : tuples_) {
     for(int i = num - 1; i >= 0; --i){
       if(exprs[i]->is_attr){
@@ -419,7 +418,7 @@ void TupleSet::print(CalExp * const *exprs, int num, std::ostream &os){
         if(rc == RC::SUCCESS){
           os<<res;
         }else{
-          return;
+          os<<" ";
         }
       }
       if(i > 0)

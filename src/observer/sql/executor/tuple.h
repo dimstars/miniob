@@ -239,7 +239,7 @@ public:
   const std::vector<Tuple> &tuples() const;
 
   void print(std::ostream &os) const;
-  void print(CalExp * const *exprs, int num, std::ostream &os);
+  void print(CalExp * const *exprs, int num, bool print_relation, std::ostream &os);
 public:
   const TupleSchema &schema() const {
     return schema_;

@@ -40,7 +40,7 @@
 
 using namespace common;
 
-RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, std::vector<TupleSet> &sub_tuple_sets, SelectExeNode &select_node);
+RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, int table_num, std::vector<TupleSet> &sub_tuple_sets, SelectExeNode &select_node);
 RC do_sub_select(const char *db, const Selects &selects, SessionEvent *session_event, TupleSet &tuple_set);
 
 //! Constructor
@@ -407,9 +407,17 @@ RC check_meta_select(const char *db, const Selects &selects, std::vector<TupleSe
   }
 
   for (int i = 0; i < selects.expr_num; i++) {
-    RC rc = check_meta_select_expr(&tables, selects.exprs[i]);
-    if(RC::SUCCESS != rc){
-      return rc;
+    if(selects.exprs[i]->is_attr){
+      AttrType type;
+      RC rc = check_attr_in_table(&tables, selects.exprs[i]->attr, type);
+      if (rc != RC::SCHEMA_FIELD_REDUNDAN && rc != RC::SUCCESS) {
+        return rc;
+      }
+    }else{
+      RC rc = check_meta_select_expr(&tables, selects.exprs[i]);
+      if(RC::SUCCESS != rc){
+        return rc;
+      }
     }
   }
 
@@ -575,7 +583,7 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
   for (int i = selects.relation_num - 1; i >= 0; i--) {
     const char *table_name = selects.relations[i];
     SelectExeNode *select_node = new SelectExeNode;
-    rc = create_selection_executor(trx, selects, db, table_name, sub_tuple_sets, *select_node);
+    rc = create_selection_executor(trx, selects, db, table_name, selects.relation_num, sub_tuple_sets, *select_node);
     if (rc != RC::SUCCESS) {
       for (SelectExeNode *& tmp_node: select_nodes) {
         delete tmp_node;
@@ -620,9 +628,18 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
     if (rc != RC::SUCCESS) {
       return rc;
     }
-    join_tables(tuple_sets, join_condition_filters, join_tuple_set);
+    std::vector<TupleSet> join_tuple_sets;
+    join_tuple_sets.push_back(std::move(tuple_sets[0]));
+    join_tuple_sets.push_back(std::move(tuple_sets[1]));
+    join_tables(join_tuple_sets, join_condition_filters, join_tuple_set);
+    for(int i = 2; i < tuple_sets.size(); ++i){
+      join_tuple_sets.clear();
+      join_tuple_sets.push_back(std::move(join_tuple_set));
+      join_tuple_sets.push_back(std::move(tuple_sets[i]));
+      join_tables(join_tuple_sets, join_condition_filters, join_tuple_set);
+    }
     if(selects.expr_num)
-      join_tuple_set.print(&selects.exprs[0],selects.expr_num,ss);
+      join_tuple_set.print(&selects.exprs[0],selects.expr_num, true, ss);
     else
       join_tuple_set.print(ss);
   } else {
@@ -630,13 +647,13 @@ RC ExecuteStage::do_select(const char *db, Query *sql, SessionEvent *session_eve
       //存在表达式
       join_tables(tuple_sets, join_condition_filters, join_tuple_set);
     if(selects.expr_num)
-      join_tuple_set.print(&selects.exprs[0],selects.expr_num,ss);
+      join_tuple_set.print(&selects.exprs[0],selects.expr_num, false, ss);
     else
       join_tuple_set.print(ss);
     }else{
       // 当前只查询一张表，直接返回结果即可
       if(selects.expr_num)
-        tuple_sets.front().print(&selects.exprs[0],selects.expr_num,ss);
+        tuple_sets.front().print(&selects.exprs[0],selects.expr_num,false, ss);
       else
         tuple_sets.front().print(ss);
     }
@@ -699,7 +716,7 @@ RC do_sub_select(const char *db, const Selects &selects, SessionEvent *session_e
   for (int i = selects.relation_num - 1; i >= 0; i--) {
     const char *table_name = selects.relations[i];
     SelectExeNode *select_node = new SelectExeNode;
-    rc = create_selection_executor(trx, selects, db, table_name, sub_tuple_sets, *select_node);
+    rc = create_selection_executor(trx, selects, db, table_name, selects.relation_num, sub_tuple_sets, *select_node);
     if (rc != RC::SUCCESS) {
       for (SelectExeNode *& tmp_node: select_nodes) {
         delete tmp_node;
@@ -772,7 +789,7 @@ static RC schema_add_field_agg(Table *table, AggType atype, const char *field_na
 }
 
 // 把和某张表关联的condition都拿出来，生成该表最底层的select 执行节点, 一个执行节点包括需要返回的列、条件
-RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, std::vector<TupleSet> &sub_tuple_sets, SelectExeNode &select_node) {
+RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, const char *table_name, int table_num, std::vector<TupleSet> &sub_tuple_sets, SelectExeNode &select_node) {
   // 列出跟这张表关联的Attr
   TupleSchema schema;
   Table * table = DefaultHandler::get_default().find_table(db, table_name);
@@ -787,41 +804,44 @@ RC create_selection_executor(Trx *trx, const Selects &selects, const char *db, c
     return RC::SCHEMA_FIELD_NOT_SUPPORT;
   }
 
-  //处理select后expr属性
-  int index = 0;
-  RelAttr attrs[MAX_NUM];
-  ExprHandler h;
-  for(int i = selects.expr_num - 1; i >= 0; i--){
-    index = 0;
-    RC rc = h.AppendAttrs(selects.exprs[i], &attrs[0], MAX_NUM, index);
-    LOG_INFO("index:%d",index);
-    if(RC::SUCCESS != rc)
-      return rc;
-    for(int i = index - 1; i >= 0; i--){
-      if(nullptr != attrs[i].relation_name){
-        if(0 != strcmp(attrs[i].relation_name,table->name())){
-          continue;
-        }
-      }
-      RC rc = schema_add_field(table, attrs[i].attribute_name, schema);
+  if(table_num > 1){
+    TupleSchema::from_table(table, schema);
+  }else{
+    //处理select后expr属性
+    int index = 0;
+    RelAttr attrs[MAX_NUM];
+    ExprHandler h;
+    for(int i = selects.expr_num - 1; i >= 0; i--){
+      index = 0;
+      RC rc = h.AppendAttrs(selects.exprs[i], &attrs[0], MAX_NUM, index);
       if(RC::SUCCESS != rc)
         return rc;
-    }
-  }
-
-  // 处理查找属性
-  for (int i = selects.attr_num - 1; i >= 0; i--) {
-    const RelAttr &attr = selects.attributes[i];
-    if (nullptr == attr.relation_name || 0 == strcmp(table_name, attr.relation_name)) {
-      if (0 == strcmp("*", attr.attribute_name)) {
-        // 列出这张表所有字段
-        TupleSchema::from_table(table, schema);
-        break; // TODO 没有校验，给出* 之后，再写字段的错误 // *,ID paser直接失败
-      } else {
-        // 列出这张表相关字段
-        RC rc = schema_add_field(table, attr.attribute_name, schema);
-        if (rc != RC::SUCCESS) {
+      for(int i = index - 1; i >= 0; i--){
+        if(nullptr != attrs[i].relation_name){
+          if(0 != strcmp(attrs[i].relation_name,table->name())){
+            continue;
+          }
+        }
+        RC rc = schema_add_field(table, attrs[i].attribute_name, schema);
+        if(RC::SUCCESS != rc)
           return rc;
+      }
+    }
+
+    // 处理查找属性
+    for (int i = selects.attr_num - 1; i >= 0; i--) {
+      const RelAttr &attr = selects.attributes[i];
+      if (nullptr == attr.relation_name || 0 == strcmp(table_name, attr.relation_name)) {
+        if (0 == strcmp("*", attr.attribute_name)) {
+          // 列出这张表所有字段
+          TupleSchema::from_table(table, schema);
+          break; // TODO 没有校验，给出* 之后，再写字段的错误 // *,ID paser直接失败
+        } else {
+          // 列出这张表相关字段
+          RC rc = schema_add_field(table, attr.attribute_name, schema);
+          if (rc != RC::SUCCESS) {
+            return rc;
+          }
         }
       }
     }

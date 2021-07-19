@@ -39,10 +39,9 @@ using namespace common;
 
 Table::Table() : 
     data_buffer_pool_(nullptr),
-    file_id_(-1),
-    of_file_id_(-1),
     record_handler_(nullptr),
-    overflow_handler_(nullptr) {
+    overflow_handler_(nullptr)
+    {
 }
 
 Table::~Table() {
@@ -52,8 +51,12 @@ Table::~Table() {
   overflow_handler_ = nullptr;
 
   if (data_buffer_pool_ != nullptr) {
-    if(file_id_ >= 0) data_buffer_pool_->close_file(file_id_);
-    if(of_file_id_ >= 0) data_buffer_pool_->close_file(of_file_id_);
+    if(!file_name_.empty()) {
+      data_buffer_pool_->close_file(file_name_.c_str());
+    }
+    if(!of_file_name_.empty()) {
+      data_buffer_pool_->close_file(of_file_name_.c_str());
+    }
     data_buffer_pool_ = nullptr;
   }
 
@@ -433,41 +436,32 @@ RC Table::init_record_handler(const char *base_dir) {
     data_buffer_pool_ = theGlobalDiskBufferPool();
   }
 
+  RC rc = RC::SUCCESS;
   if(table_meta_.overflow_exist()) {
     std::string overflow_file = table_overflow_file(base_dir, table_meta_.name());
 
-    int overflow_file_id;
-    RC rc = data_buffer_pool_->open_file(overflow_file.c_str(), &overflow_file_id);
-    if (rc != RC::SUCCESS) {
-      LOG_ERROR("Failed to open overflow file. rc=%d:%s", rc, strrc(rc));
-      return rc;
-    }
-
     overflow_handler_ = new OverflowFileHandler();
-    rc = overflow_handler_->init(*data_buffer_pool_, overflow_file_id);
+    rc = overflow_handler_->init(*data_buffer_pool_, overflow_file.c_str());
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to init overflow handler. rc=%d:%s", rc, strrc(rc));
       return rc;
     }
-
-    of_file_id_ = overflow_file_id;
+    of_file_name_ = overflow_file.c_str();
   }
 
-  int data_buffer_pool_file_id;
-  RC rc = data_buffer_pool_->open_file(data_file.c_str(), &data_buffer_pool_file_id);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to open disk buffer pool. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
 
   record_handler_ = new RecordFileHandler();
-  rc = record_handler_->init(*data_buffer_pool_, data_buffer_pool_file_id);
+  rc = record_handler_->init(*data_buffer_pool_, data_file.c_str());
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to init record handler. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
 
-  file_id_ = data_buffer_pool_file_id;
+  file_name_ = data_file;
   return rc;
 }
 
@@ -516,12 +510,11 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   if (index_scanner != nullptr) {
     return scan_record_by_index(trx, index_scanner, filter, limit, context, record_reader);
   }
-  LOG_INFO("index not found");
   RC rc = RC::SUCCESS;
   RecordFileScanner scanner;
-  rc = scanner.open_scan(*data_buffer_pool_, file_id_, filter);
+  rc = scanner.open_scan(*data_buffer_pool_, file_name_.c_str(), filter);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("failed to open scanner. file id=%s. rc=%d:%s", file_id_, rc, strrc(rc));
+    LOG_ERROR("failed to open scanner. file =%s. rc=%d:%s", file_name_.c_str(), rc, strrc(rc));
     return rc;
   }
 
@@ -541,7 +534,7 @@ RC Table::scan_record(Trx *trx, ConditionFilter *filter, int limit, void *contex
   if (RC::RECORD_EOF == rc) {
     rc = RC::SUCCESS;
   } else {
-    LOG_ERROR("failed to scan record. file id=%d, rc=%d:%s", file_id_, rc, strrc(rc));
+    LOG_ERROR("failed to scan record. file =%s, rc=%d:%s", file_name_.c_str(), rc, strrc(rc));
   }
   scanner.close_scan();
   return rc;
@@ -1260,7 +1253,7 @@ IndexScanner *Table::find_index_for_scan(const ConditionFilter *filter) {
 }
 
 RC Table::sync() {
-  RC rc = data_buffer_pool_->flush_all_pages(file_id_);
+  RC rc = data_buffer_pool_->flush_all_pages(file_name_.c_str());
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to flush table's data pages. table=%s, rc=%d:%s", name(), rc, strrc(rc));
     return rc;

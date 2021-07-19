@@ -23,13 +23,13 @@
 #include <stdio.h>
 #include <sys/types.h>
 
-#include <string.h>
+#include <string>
 #include <sys/stat.h>
 #include <time.h>
 
 #include <vector>
 #include <unordered_map>
-
+#include <map>
 #include "rc.h"
 
 typedef int PageNum;
@@ -62,6 +62,7 @@ typedef struct {
   unsigned long acc_time;
   int file_desc;
   Page page;
+  std::string fname;
 } Frame;
 
 typedef struct {
@@ -91,63 +92,6 @@ typedef struct _LruItem{
   int val;  //bpmanager中frame的位序
 }LruItem;
 
-class LruCache {
-public:
-  LruCache(int size, BPManager *bp);
-
-  ~LruCache();
-
-  RC get(int file_desc, PageNum page_num, LruItem **iter);
-
-  /**
-   * 将指定页刷入磁盘
-   */
-  RC flush(int file_desc, PageNum page_num);
-  
-  /**
-   * 将指定文件的所有页刷入磁盘
-   */
-  RC flush_file(int file_desc);
-
-  /**
-   * 内存中删除指定文件所有页的缓存
-   */
-  RC erase_file(int file_desc);
-
-  /**
-   * frame刷入磁盘
-   */
-  RC flush_block(Frame *frame);
-
-  /**
-   * 内存中删除指定页的缓存
-   */
-  RC erase(int file_desc, PageNum page_num);
-
-  /**
-   * 分配一个frame，frame信息更新后需要调用alloc添加到哈希表和双向链表
-   */
-  RC alloc(LruItem **iter);
-
-  /**
-   * 添加frame到哈希表和双向链表
-   */
-  void insert(int file_desc, PageNum page_num, int frame_pos);
-
-  /**
-   * 释放frame到空闲页链表
-   */
-  void free(int frame_pos);
-
-private:
-  std::unordered_map<int, std::unordered_map<int,LruItem*>> hash_map;//(file_desc,page_number->frame数组位序
-  LruItem *items_;
-  LruItem *head_;
-  LruItem *tail_;
-  LruItem *free_list_;
-  BPManager *bp_manager_;
-};
-
 class BPManager {
 public:
   BPManager(int size = BP_BUFFER_SIZE);
@@ -158,27 +102,45 @@ public:
 
   Frame* alloc();
 
-  Frame *get(int file_desc, PageNum page_num);
+  RC open_file(const char *fname, BPFileHandle **fhandle);
+
+  Frame *get(const char *fname, PageNum page_num);
 
   void dispose_block(Frame *f);
 
   void insert_page(Frame *f);
 
-  RC dispose_page(int file_desc, PageNum page_num);
+  RC dispose_page(const char *fname, PageNum page_num);
 
-  RC dispose_all_pages(int file_desc);
+  RC dispose_page(int desc, PageNum page_num);
 
-  RC force_page(int file_desc, PageNum page_num);
+  RC dispose_all_pages(const char *fname);
 
-  RC force_all_pages(int file_desc);
+  RC force_page(const char *fname, PageNum page_num);
 
-  Frame *getFrame() { return frame; }
+  RC force_all_pages(const char *fname);
 
-public:
-  int size;
-  Frame * frame = nullptr;
+  Frame *getFrame() { return frame_; }
+
+  RC close_file(const char *fname);
+
+  RC flush_block(Frame *frame);
+
+  RC load_page(PageNum page_num, BPFileHandle *file_handle, Frame *frame);
+
+  void print();
+
+  void unpin_page(const char *file_name, int page_num);
 private:
-  LruCache *lru_cache_;
+  int size;
+  Frame *frame_ = nullptr;
+  BPFileHandle *open_list_[MAX_OPEN_FILE];
+  LruItem *items_;
+  LruItem *head_;
+  LruItem *tail_;
+  LruItem *free_list_;
+  std::map<std::string, int> file_map_;
+  std::unordered_map<int, std::unordered_map<int, LruItem*> > hash_map_;
 };
 
 // TODO refactor
@@ -193,25 +155,24 @@ public:
    * 根据文件名打开一个分页文件，返回文件ID
    * @return
    */
-  RC open_file(const char *file_name, int *file_id);
 
   /**
    * 关闭fileID对应的分页文件
    */
-  RC close_file(int file_id);
+  RC close_file(const char *file_name);
 
   /**
    * 根据文件ID和页号获取指定页面到缓冲区，返回页面句柄指针。
    * @return
    */
-  RC get_this_page(int file_id, PageNum page_num, BPPageHandle *page_handle);
+  RC get_this_page(const char *file_name, PageNum page_num, BPPageHandle *page_handle);
 
   /**
    * 在指定文件中分配一个新的页面，并将其放入缓冲区，返回页面句柄指针。
    * 分配页面时，如果文件中有空闲页，就直接分配一个空闲页；
    * 如果文件中没有空闲页，则扩展文件规模来增加新的空闲页。
    */
-  RC allocate_page(int file_id, BPPageHandle *page_handle);
+  RC allocate_page(const char *file_name, BPPageHandle *page_handle);
 
   /**
    * 根据页面句柄指针返回对应的页面号
@@ -226,7 +187,7 @@ public:
   /**
    * 丢弃文件中编号为pageNum的页面，将其变为空闲页
    */
-  RC dispose_page(int file_id, PageNum page_num);
+  RC dispose_page(const char *file_name, PageNum page_num);
 
   /**
    * 标记指定页面为“脏”页。如果修改了页面的内容，则应调用此函数，
@@ -242,35 +203,31 @@ public:
    */
   RC unpin_page(BPPageHandle *page_handle);
 
+  RC unpin_page(const char *file_name, int page_num);
+
   /**
    * 获取文件的总页数
    */
-  RC get_page_count(int file_id, int *page_count);
+  RC get_page_count(const char *file_name, int *page_count);
 
-  RC flush_all_pages(int file_id);
+  RC flush_all_pages(const char *file_name);
 
-  RC dispose_all_pages(int file_id);
+  RC dispose_all_pages(const char *file_name);
 
 protected:
   RC allocate_block(Frame **buf);
   RC dispose_block(Frame *buf);
-
+  RC open_file(const char *file_name);
   /**
    * 刷新指定文件关联的所有脏页到磁盘，除了pinned page
    * @param file_handle
    * @param page_num 如果不指定page_num 将刷新所有页
    */
-  RC force_page(BPFileHandle *file_handle, PageNum page_num);
-  RC force_all_pages(BPFileHandle *file_handle);
-  RC check_file_id(int file_id);
+  RC force_page(const char *file_name, PageNum page_num);
+  RC force_all_pages(const char *file_name);
   RC check_page_num(PageNum page_num, BPFileHandle *file_handle);
-  RC load_page(PageNum page_num, BPFileHandle *file_handle, Frame *frame);
-  RC flush_block(Frame *frame);
-
 private:
   BPManager bp_manager_;
-  BPFileHandle *open_list_[MAX_OPEN_FILE];
-
 };
 
 DiskBufferPool *theGlobalDiskBufferPool();

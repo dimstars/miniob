@@ -61,8 +61,8 @@ class RecordPageHandler {
 public:
   RecordPageHandler();
   ~RecordPageHandler();
-  RC init(DiskBufferPool &buffer_pool, int file_id, PageNum page_num);
-  RC init_empty_page(DiskBufferPool &buffer_pool, int file_id, PageNum page_num, int record_size);
+  RC init(DiskBufferPool &buffer_pool, const char *file_name, PageNum page_num);
+  RC init_empty_page(DiskBufferPool &buffer_pool, const char *file_name, PageNum page_num, int record_size);
   RC deinit();
 
   RC insert_record(const char *data, RID *rid);
@@ -92,7 +92,7 @@ public:
 
 private:
   DiskBufferPool * disk_buffer_pool_;
-  int              file_id_;
+  std::string      file_name_;
   BPPageHandle     page_handle_;
   PageHeader    *  page_header_;
   char *           bitmap_;       // 每个普通page内的bitmap
@@ -103,7 +103,7 @@ public:
   OverflowPageHandler();
   ~OverflowPageHandler();
 
-  RC init(DiskBufferPool &buffer_pool, int file_id, PageNum page_num);
+  RC init(DiskBufferPool &buffer_pool, const char *file_name, PageNum page_num);
   RC deinit();
 
   RC insert_record(const char *data, int data_len, PageNum next_page_num);
@@ -118,7 +118,7 @@ public:
 
 private:
   DiskBufferPool * disk_buffer_pool_;
-  int              file_id_;
+  std::string      file_name_;
   BPPageHandle     page_handle_;    
   OFPageHeader   * page_header_;
 };
@@ -126,7 +126,7 @@ private:
 class RecordFileHandler {
 public:
   RecordFileHandler();
-  RC init(DiskBufferPool &buffer_pool, int file_id);
+  RC init(DiskBufferPool &buffer_pool, const char *file_name);
   void close();
 
   /**
@@ -165,7 +165,7 @@ public:
 
     RC rc = RC::SUCCESS;
     RecordPageHandler page_handler;
-    if ((rc != page_handler.init(*disk_buffer_pool_, file_id_, rid->page_num)) != RC::SUCCESS) {
+    if ((rc != page_handler.init(*disk_buffer_pool_, file_name_.c_str(), rid->page_num)) != RC::SUCCESS) {
       return rc;
     }
 
@@ -174,7 +174,7 @@ public:
 
 private:
   DiskBufferPool  *   disk_buffer_pool_;
-  int                 file_id_;                    // 参考DiskBufferPool中的fileId
+  std::string         file_name_;
 
   RecordPageHandler   record_page_handler_;        // 目前只有insert record使用
 };
@@ -182,7 +182,7 @@ private:
 class OverflowFileHandler {
 public:
   OverflowFileHandler();
-  RC init(DiskBufferPool &buffer_pool, int file_id);
+  RC init(DiskBufferPool &buffer_pool, const char *file_name);
   void close();
 
   /**
@@ -219,7 +219,7 @@ public:
 
 private:
   DiskBufferPool  *   disk_buffer_pool_;
-  int                 file_id_;                    // 参考DiskBufferPool中的fileId
+  std::string         file_name_;
 };
 
 class RecordFileScanner 
@@ -235,12 +235,12 @@ public:
    * 如果条件数量conNum为0，则意味着检索文件中的所有记录。
    * 如果条件不为空，则要对每条记录进行条件比较，只有满足所有条件的记录才被返回
    * @param buffer_pool 
-   * @param file_id 
+   * @param file_name 
    * @param condition_num 
    * @param conditions
    * @return
    */
-  RC open_scan(DiskBufferPool & buffer_pool, int file_id, ConditionFilter *condition_filter);
+  RC open_scan(DiskBufferPool & buffer_pool, const char *file_name, ConditionFilter *condition_filter);
 
   /**
    * 关闭一个文件扫描，释放相应的资源
@@ -261,7 +261,7 @@ public:
 
 private:
   DiskBufferPool  *   disk_buffer_pool_;
-  int                 file_id_;                    // 参考DiskBufferPool中的fileId
+  std::string         file_name_;
 
   ConditionFilter *   condition_filter_;
   RecordPageHandler   record_page_handler_;
